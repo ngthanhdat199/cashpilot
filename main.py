@@ -5,6 +5,7 @@ import datetime
 import os
 import logging
 import json
+import pytz
 from flask import Flask
 from threading import Thread
 
@@ -31,6 +32,13 @@ try:
 except Exception as e:
     print(f"⚠️  Failed to load config.json: {e}")
     exit(1)
+
+# Timezone setup
+timezone = pytz.timezone(config["settings"]["timezone"])
+
+def get_current_time():
+    """Get current time in the configured timezone"""
+    return datetime.datetime.now(timezone)
 
 # Google Sheets setup
 try:
@@ -59,8 +67,8 @@ def get_or_create_monthly_sheet(target_month=None):
             sheet_name = target_month
         else:
             # Use current month
-            now = datetime.datetime.now()
-            # now = datetime.datetime.now() + datetime.timedelta(days=63)
+            now = get_current_time()
+            # now = get_current_time() + datetime.timedelta(days=63)
             sheet_name = now.strftime("%m/%Y")  # Format: MM/YYYY
         
         # Try to get existing sheet
@@ -180,8 +188,8 @@ async def log_expense(update, context):
         if parts[0].isdigit():
             amount = int(parts[0])
             note = " ".join(parts[1:]) if len(parts) > 1 else "Không có ghi chú"
-            now = datetime.datetime.now() 
-            # now = datetime.datetime.now() + datetime.timedelta(days=63)
+            now = get_current_time()
+            # now = get_current_time() + datetime.timedelta(days=63)
             entry_date = now.strftime("%d/%m")
             entry_time = now.strftime("%H:%M")
             target_month = now.strftime("%m/%Y")
@@ -195,7 +203,7 @@ async def log_expense(update, context):
             
             # Extract month from date for target sheet
             day, month = entry_date.split("/")
-            current_year = datetime.datetime.now().year
+            current_year = get_current_time().year
             target_month = f"{month.zfill(2)}/{current_year}"
             
         # Case C: Date + Time - 02/09 08:30 15000 breakfast
@@ -207,7 +215,7 @@ async def log_expense(update, context):
             
             # Extract month from date for target sheet
             day, month = entry_date.split("/")
-            current_year = datetime.datetime.now().year
+            current_year = get_current_time().year
             target_month = f"{month.zfill(2)}/{current_year}"
             
         else:
@@ -278,7 +286,7 @@ async def delete_expense(update, context):
             
             # Extract month from date for target sheet
             day, month = entry_date.split("/")
-            current_year = datetime.datetime.now().year
+            current_year = get_current_time().year
             target_month = f"{month.zfill(2)}/{current_year}"
             
         else:
@@ -334,8 +342,8 @@ async def delete_expense(update, context):
 async def today(update, context):
     """Show today's total expenses"""
     try:
-        now = datetime.datetime.now()
-        # now = datetime.datetime.now() + datetime.timedelta(days=63)
+        now = get_current_time()
+        # now = get_current_time() + datetime.timedelta(days=63)
         today_day_month = now.strftime("%d/%m")
         
         # Get current month's sheet
