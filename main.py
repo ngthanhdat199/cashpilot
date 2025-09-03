@@ -59,8 +59,8 @@ def get_or_create_monthly_sheet(target_month=None):
             sheet_name = target_month
         else:
             # Use current month
-            # now = datetime.datetime.now()
-            now = datetime.datetime.now() + datetime.timedelta(days=63)
+            now = datetime.datetime.now()
+            # now = datetime.datetime.now() + datetime.timedelta(days=63)
             sheet_name = now.strftime("%m/%Y")  # Format: MM/YYYY
         
         # Try to get existing sheet
@@ -180,7 +180,8 @@ async def log_expense(update, context):
         if parts[0].isdigit():
             amount = int(parts[0])
             note = " ".join(parts[1:]) if len(parts) > 1 else "Không có ghi chú"
-            now = datetime.datetime.now() + datetime.timedelta(days=63)
+            now = datetime.datetime.now() 
+            # now = datetime.datetime.now() + datetime.timedelta(days=63)
             entry_date = now.strftime("%d/%m")
             entry_time = now.strftime("%H:%M")
             target_month = now.strftime("%m/%Y")
@@ -333,8 +334,8 @@ async def delete_expense(update, context):
 async def today(update, context):
     """Show today's total expenses"""
     try:
-        # now = datetime.datetime.now()
-        now = datetime.datetime.now() + datetime.timedelta(days=63)
+        now = datetime.datetime.now()
+        # now = datetime.datetime.now() + datetime.timedelta(days=63)
         today_day_month = now.strftime("%d/%m")
         
         # Get current month's sheet
@@ -370,8 +371,8 @@ async def today(update, context):
 async def week(update, context):
     """Show this week's total expenses"""
     try:
-        # now = datetime.datetime.now()
-        now = datetime.datetime.now() + datetime.timedelta(days=63)
+        now = datetime.datetime.now()
+        # now = datetime.datetime.now() + datetime.timedelta(days=63)
         week_start = now - datetime.timedelta(days=now.weekday())
         
         # Get current month's sheet
