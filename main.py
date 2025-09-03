@@ -4,29 +4,37 @@ from google.oauth2.service_account import Credentials
 import datetime
 import os
 import logging
+import json
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Load configuration
+try:
+    with open("config.json", "r") as config_file:
+        config = json.load(config_file)
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(level=getattr(logging, config["settings"]["logging_level"]))
+    logger.info("Configuration loaded successfully")
+except Exception as e:
+    print(f"⚠️  Failed to load config.json: {e}")
+    exit(1)
 
 # Google Sheets setup
 try:
-    scope = ["https://spreadsheets.google.com/feeds","https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
+    scope = config["google_sheets"]["scopes"]
+    creds = Credentials.from_service_account_file(config["google_sheets"]["credentials_file"], scopes=scope)
     client = gspread.authorize(creds)
     # Open the specific Google Sheet by ID from the URL
-    spreadsheet = client.open_by_key("1INKics5ZQXs7WVddOMkr0BsFuZ91BXhR7PTdfdewWBw")
+    spreadsheet = client.open_by_key(config["google_sheets"]["spreadsheet_id"])
     logger.info("Google Sheets connected successfully")
 except Exception as e:
     logger.error(f"Failed to connect to Google Sheets: {e}")
     print("⚠️  Please make sure you have:")
-    print("1. Created credentials.json file")
-    print("2. Shared the Google Sheet (ID: 1INKics5ZQXs7WVddOMkr0BsFuZ91BXhR7PTdfdewWBw) with your service account email")
+    print(f"1. Created {config['google_sheets']['credentials_file']} file")
+    print(f"2. Shared the Google Sheet (ID: {config['google_sheets']['spreadsheet_id']}) with your service account email")
     print("3. The sheet has the correct permissions")
     exit(1)
 
 # Telegram bot
-TOKEN = "7933243357:AAFq944QHfbXVV5XE17RQ-59FSdetO_VFBI"
+TOKEN = config["telegram"]["bot_token"]
 
 def get_or_create_monthly_sheet(target_month=None):
     """Get month's sheet or create a new one for target month"""
@@ -49,9 +57,9 @@ def get_or_create_monthly_sheet(target_month=None):
             logger.info(f"Sheet {sheet_name} not found, creating new one")
             
             try:
-                # Try to copy from "template" sheet
+                # Try to copy from template sheet
                 try:
-                    template_sheet = spreadsheet.worksheet("template")
+                    template_sheet = spreadsheet.worksheet(config["settings"]["template_sheet_name"])
                     logger.info(f"Copying from template sheet")
                     
                     # Create new sheet by duplicating the template
