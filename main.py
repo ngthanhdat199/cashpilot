@@ -222,6 +222,9 @@ async def log_expense(update, context):
             await update.message.reply_text("❌ Định dạng không đúng!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
             return
 
+        # Multiply amount by 1000 if note contains "ngàn"
+        amount = amount * 1000
+
         # Get or create the target month's sheet
         sheet = get_or_create_monthly_sheet(target_month)
         
