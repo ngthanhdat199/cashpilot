@@ -396,37 +396,67 @@ async def log_expense(update, context):
         # Get or create the target month's sheet
         sheet = get_or_create_monthly_sheet(target_month)
 
-        # Find the correct position to insert the record
-        all_values = sheet.get_all_values()
-        insert_row = len(all_values) + 1  # Default to append at end
-
-        # Skip header row and find correct position based on date/time
-        if len(all_values) > 1:
-            for i, row in enumerate(all_values[1:], start=2):  # Start from row 2 (after headers)
-                if len(row) >= 2:
-                    existing_date = row[0].strip()
-                    existing_time = row[1].strip()
-
-                    if existing_date and existing_time:
-                        # Compare dates first, then times
-                        if entry_date < existing_date or (entry_date == existing_date and entry_time < existing_time):
-                            insert_row = i
+        # Always append the data to columns A-D, then sort if needed
+        # Find the next empty row in columns A-D
+        try:
+            all_values = sheet.get_values("A:D")
+        except Exception as get_error:
+            logger.warning(f"Could not get values, using empty list: {get_error}")
+            all_values = []
+            
+        next_row = len(all_values) + 1
+        
+        # Add the new entry to columns A-D
+        range_name = f"A{next_row}:D{next_row}"
+        # Ensure amount is stored as a plain number without formatting
+        sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
+        
+        # Now sort only columns A-D by date and time to maintain order
+        if len(all_values) > 1:  # Only sort if there's more than just the header
+            try:
+                # Get all data from columns A-D (excluding header)
+                data_range = f"A2:D{next_row}"
+                data_values = sheet.get_values(data_range)
+                
+                if data_values:
+                    # Sort the data by date and time
+                    sorted_data = sorted(data_values, key=lambda x: (
+                        x[0] if len(x) > 0 else "",  # Date
+                        x[1] if len(x) > 1 else ""   # Time
+                    ))
+                    
+                    # Ensure all amounts are integers when updating
+                    for row in sorted_data:
+                        if len(row) >= 3 and row[2]:
+                            try:
+                                # Convert amount to integer to avoid formatting issues
+                                row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
+                            except (ValueError, TypeError):
+                                pass  # Keep original value if conversion fails
+                    
+                    # Update the sorted data back to columns A-D using RAW input
+                    sheet.update(f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option='RAW')
+                    
+                    # Find where our entry ended up after sorting
+                    for i, row in enumerate(sorted_data, start=2):
+                        if (len(row) >= 4 and row[0] == entry_date and row[1] == entry_time and 
+                            int(float(str(row[2]).replace(',', '').replace('₫', '').strip())) == int(amount) and row[3] == note):
+                            position_msg = f"📍 Vị trí: Dòng {i}"
                             break
-
-        # Insert the record at the correct position
-        if insert_row <= len(all_values):
-            # Insert at specific position
-            sheet.insert_row([entry_date, entry_time, amount, note], insert_row)
-            position_msg = f"📍 Vị trí: Dòng {insert_row}"
+                    else:
+                        position_msg = "📍 Vị trí: Đã sắp xếp"
+                else:
+                    position_msg = f"📍 Vị trí: Dòng {next_row}"
+            except Exception as sort_error:
+                logger.warning(f"Could not sort data: {sort_error}")
+                position_msg = f"📍 Vị trí: Dòng {next_row}"
         else:
-            # Append at the end
-            sheet.append_row([entry_date, entry_time, amount, note])
-            position_msg = "📍 Vị trí: Cuối bảng"
+            position_msg = f"📍 Vị trí: Dòng {next_row}"
 
         response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n{position_msg}\n� Sheet: {target_month}"
         await update.message.reply_text(response)
 
-        logger.info(f"Logged expense: {amount} VND - {note} at {entry_date} {entry_time} (row {insert_row}) in sheet {target_month}")
+        logger.info(f"Logged expense: {amount} VND - {note} at {entry_date} {entry_time} in sheet {target_month}")
 
     except ValueError as ve:
         await update.message.reply_text("❌ Lỗi định dạng số tiền!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
