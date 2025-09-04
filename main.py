@@ -1,3 +1,4 @@
+import re
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 import gspread
 from google.oauth2.service_account import Credentials
@@ -32,6 +33,24 @@ timezone = pytz.timezone(config["settings"]["timezone"])
 def get_current_time():
     """Get current time in the configured timezone"""
     return datetime.datetime.now(timezone)
+
+def parse_amount(value):
+    """
+    Convert an amount from int/float/str into a float (VND).
+    Handles commas, dots, '₫', 'VND', etc.
+    Returns 0 if parsing fails.
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if isinstance(value, str):
+        # Remove everything except digits
+        cleaned = re.sub(r"[^\d]", "", value)
+        if cleaned.isdigit():
+            return float(cleaned)
+
+    logger.warning(f"Invalid amount format '{value}' in today summary")
+    return 0.0
 
 # Google Sheets setup
 try:
@@ -575,20 +594,12 @@ async def today(update, context):
         
         for r in records:
             # Make sure we have valid data in the record
-            record_date = r.get("Date", "").strip()
+            record_date = r.get("Date", "").strip().lstrip("'")
             record_amount = r.get("VND", 0)
             
             if record_date == today_str and record_amount:  # Only count if both date and amount exist
                 today_expenses.append(r)
-                if isinstance(record_amount, (int, float)):
-                    total += record_amount
-                elif isinstance(record_amount, str) and record_amount.replace(',', '').replace('.', '').isdigit():
-                    # Handle string numbers that might have commas or dots
-                    try:
-                        total += float(record_amount.replace(',', ''))
-                    except ValueError:
-                        logger.warning(f"Could not parse amount '{record_amount}' in today summary")
-                        continue
+                total += parse_amount(record_amount)
         
         count = len(today_expenses)
         logger.info(f"Found {count} expenses for today with total {total} VND")
@@ -650,21 +661,19 @@ async def week(update, context):
                             if len(date_parts) == 2:
                                 day, month = date_parts
                                 year = target_month.split("/")[1]  # Get year from sheet name
-                                expense_date = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y")
+                                date_obj = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y").date()
+                                expense_date = datetime.datetime.combine(date_obj, datetime.time(0, 0, 0, tzinfo=week_start.tzinfo))
                                 
+                                logger.info("week_start: %s, expense_date: %s, week_end: %s", week_start, expense_date, week_end)  # Debug info
+
                                 # Check if this date falls within our week
                                 if week_start <= expense_date <= week_end:
                                     week_expenses.append(r)
                                     amount = r.get("VND", 0)
-                                    if isinstance(amount, (int, float)):
-                                        total += amount
-                                    elif isinstance(amount, str) and amount.replace(',', '').replace('.', '').isdigit():
-                                        # Handle string numbers that might have commas or dots
-                                        try:
-                                            total += float(amount.replace(',', ''))
-                                        except ValueError:
-                                            logger.warning(f"Could not parse amount '{amount}' in week summary")
-                                            continue
+                                    total += parse_amount(amount)
+                                else:
+                                    logger.info(f"Skipping date {expense_date} not in week range")
+
                     except Exception as date_parse_error:
                         logger.warning(f"Could not parse date '{day_month}' from sheet {target_month}: {date_parse_error}")
                         continue
@@ -719,21 +728,13 @@ async def month(update, context):
         
         for r in records:
             # Only count records with valid date and amount (not empty rows)
-            record_date = r.get("Date", "").strip()
+            record_date = r.get("Date", "").strip().lstrip("'")
             record_amount = r.get("VND", 0)
-            
+
             if record_date and record_amount:  # Only count if both date and amount exist and are not empty
                 month_expenses.append(r)
-                if isinstance(record_amount, (int, float)):
-                    total += record_amount
-                elif isinstance(record_amount, str) and record_amount.replace(',', '').replace('.', '').isdigit():
-                    # Handle string numbers that might have commas or dots
-                    try:
-                        total += float(record_amount.replace(',', ''))
-                    except ValueError:
-                        logger.warning(f"Could not parse amount '{record_amount}' in month summary")
-                        continue
-                
+                total += parse_amount(record_amount)
+
         count = len(month_expenses)
         logger.info(f"Found {count} expenses for this month with total {total} VND")
         
