@@ -68,6 +68,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler("help", help_command))
         bot_app.add_handler(CommandHandler("today", today))
         bot_app.add_handler(CommandHandler("week", week))
+        bot_app.add_handler(CommandHandler("month", month))
         
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -102,6 +103,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler("help", help_command))  
         fresh_app.add_handler(CommandHandler("today", today))
         fresh_app.add_handler(CommandHandler("week", week))
+        fresh_app.add_handler(CommandHandler("month", month))
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         # Add error handler to prevent "No error handlers are registered" warnings
@@ -229,7 +231,7 @@ def get_or_create_monthly_sheet(target_month=None):
                     new_sheet = spreadsheet.add_worksheet(title=sheet_name, rows="100", cols="10")
                     
                     # Add basic headers
-                    headers = ["Ngày", "Thời gian", "VND", "Ghi chú"]
+                    headers = ["Date", "Time", "VND", "Note"]
                     new_sheet.append_row(headers)
                     
                     logger.info(f"Created basic sheet: {sheet_name}")
@@ -277,6 +279,7 @@ async def start(update, context):
 📊 Lệnh có sẵn:
 • /today - Xem tổng chi tiêu hôm nay
 • /week - Xem tổng chi tiêu tuần này
+• /month - Xem tổng chi tiêu tháng này
 • /help - Xem hướng dẫn
 
 Bot sẽ tự động sắp xếp theo thời gian! 🕐💰
@@ -317,6 +320,7 @@ async def help_command(update, context):
 📊 Lệnh thống kê:
 • /today - Chi tiêu hôm nay
 • /week - Chi tiêu tuần này
+• /month - Chi tiêu tháng này
 
 🤖 Bot tự động sắp xếp theo thời gian!
         """
@@ -361,124 +365,74 @@ async def log_expense(update, context):
             entry_date = parts[0]
             amount = int(parts[1])
             note = " ".join(parts[2:]) if len(parts) > 2 else "Không có ghi chú"
-            entry_time = "12:00"  # Default time when only date is provided
-            
-            # Parse month/year from the date
-            day_month = entry_date
-            now = get_current_time()
-            # now = get_current_time() + datetime.timedelta(days=63)
-            target_month = now.strftime("%m/%Y")
-            
-            # Check if different month/year
-            if "/" in day_month:
-                day, month = day_month.split("/")
-                if len(month) == 2:  # MM format
-                    target_month = f"{month}/{now.year}"
-                elif len(month) == 4:  # MM/YYYY format (day is actually day/month)
-                    # Handle case where user inputs DD/MM/YYYY
-                    parts_date = day_month.split("/")
-                    if len(parts_date) == 3:
-                        target_month = f"{parts_date[1]}/{parts_date[2]}"
-                        entry_date = f"{parts_date[0]}/{parts_date[1]}"
+            entry_time = "24:00"  # Default time
+
+            # Extract month from date for target sheet
+            day, month = entry_date.split("/")
+            current_year = get_current_time().year
+            target_month = f"{month.zfill(2)}/{current_year}"
             
         # Case C: Date + Time - 02/09 08:30 15000 breakfast
-        elif "/" in parts[0] and ":" in parts[1] and len(parts) >= 3 and parts[2].isdigit():
+        elif "/" in parts[0] and len(parts) >= 3 and ":" in parts[1] and parts[2].isdigit():
             entry_date = parts[0]
             entry_time = parts[1]
             amount = int(parts[2])
             note = " ".join(parts[3:]) if len(parts) > 3 else "Không có ghi chú"
-            
-            # Parse month/year from the date
-            day_month = entry_date
-            now = get_current_time()
-            # now = get_current_time() + datetime.timedelta(days=63)
-            target_month = now.strftime("%m/%Y")
-            
-            # Check if different month/year
-            if "/" in day_month:
-                day, month = day_month.split("/")
-                if len(month) == 2:  # MM format
-                    target_month = f"{month}/{now.year}"
-                elif len(month) == 4:  # MM/YYYY format
-                    parts_date = day_month.split("/")
-                    if len(parts_date) == 3:
-                        target_month = f"{parts_date[1]}/{parts_date[2]}"
-                        entry_date = f"{parts_date[0]}/{parts_date[1]}"
+
+            # Extract month from date for target sheet
+            day, month = entry_date.split("/")
+            current_year = get_current_time().year
+            target_month = f"{month.zfill(2)}/{current_year}"
 
         else:
-            logger.warning(f"Invalid format from user {update.effective_user.id}: '{text}'")
-            await update.message.reply_text("❌ Định dạng không hợp lệ! Vui lòng thử lại.")
+            await update.message.reply_text("❌ Định dạng không đúng!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
             return
+
+        # Multiply amount by 1000 if note contains "ngàn"
+        amount = amount * 1000
 
         logger.info(f"Parsed expense: {amount} VND on {entry_date} {entry_time} - {note} (sheet: {target_month})")
 
-        # Get the appropriate monthly sheet
-        try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
-            return
+        # Get or create the target month's sheet
+        sheet = get_or_create_monthly_sheet(target_month)
 
-        # Append row to Google Sheet
-        try:
-            row = [entry_date, entry_time, amount, note]
-            current_sheet.append_row(row)
-            logger.info(f"Successfully appended row to sheet: {row}")
-        except Exception as append_error:
-            logger.error(f"Error appending row to sheet: {append_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể ghi dữ liệu vào Google Sheets. Vui lòng thử lại!")
-            return
+        # Find the correct position to insert the record
+        all_values = sheet.get_all_values()
+        insert_row = len(all_values) + 1  # Default to append at end
 
-        # Sort the sheet by date and time
-        try:
-            # Get all rows with data
-            all_rows = current_sheet.get_all_records()
-            
-            if len(all_rows) > 1:  # Only sort if there's more than header + 1 row
-                # Sort by date and time
-                sorted_rows = sorted(all_rows, key=lambda x: (
-                    datetime.datetime.strptime(f"{x['Ngày']}/{target_month.split('/')[1]}", "%d/%m/%Y") if x['Ngày'] else datetime.datetime.min,
-                    datetime.datetime.strptime(x['Thời gian'], "%H:%M") if x['Thời gian'] else datetime.datetime.min
-                ))
-                
-                # Clear all data rows and re-add sorted data
-                if len(sorted_rows) > 0:
-                    range_to_clear = f"A2:D{len(sorted_rows) + 1}"
-                    current_sheet.batch_clear([range_to_clear])
-                    
-                    # Re-add sorted data
-                    for row_data in sorted_rows:
-                        current_sheet.append_row([
-                            row_data['Ngày'],
-                            row_data['Thời gian'],
-                            row_data['VND'],
-                            row_data['Ghi chú']
-                        ])
-                    logger.info(f"Successfully sorted {len(sorted_rows)} rows in sheet")
-        except Exception as sort_error:
-            logger.warning(f"Could not sort sheet: {sort_error}")
-            # Continue without sorting if there's an error
+        # Skip header row and find correct position based on date/time
+        if len(all_values) > 1:
+            for i, row in enumerate(all_values[1:], start=2):  # Start from row 2 (after headers)
+                if len(row) >= 2:
+                    existing_date = row[0].strip()
+                    existing_time = row[1].strip()
 
-        logger.info(f"Expense logged: {amount} VND at {entry_date} {entry_time} - {note}")
-        
-        response = f"✅ Đã ghi: {amount:,.0f} VND\n📅 {entry_date} {entry_time}\n📝 {note}\n📄 Sheet: {target_month}"
+                    if existing_date and existing_time:
+                        # Compare dates first, then times
+                        if entry_date < existing_date or (entry_date == existing_date and entry_time < existing_time):
+                            insert_row = i
+                            break
+
+        # Insert the record at the correct position
+        if insert_row <= len(all_values):
+            # Insert at specific position
+            sheet.insert_row([entry_date, entry_time, amount, note], insert_row)
+            position_msg = f"📍 Vị trí: Dòng {insert_row}"
+        else:
+            # Append at the end
+            sheet.append_row([entry_date, entry_time, amount, note])
+            position_msg = "📍 Vị trí: Cuối bảng"
+
+        response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n{position_msg}\n� Sheet: {target_month}"
         await update.message.reply_text(response)
-        logger.info(f"Expense confirmation sent to user {update.effective_user.id}")
+
+        logger.info(f"Logged expense: {amount} VND - {note} at {entry_date} {entry_time} (row {insert_row}) in sheet {target_month}")
 
     except ValueError as ve:
-        logger.error(f"Value error in log_expense for user {update.effective_user.id}: {ve}", exc_info=True)
-        try:
-            await update.message.reply_text("❌ Số tiền không hợp lệ! Vui lòng nhập số.")
-        except Exception as reply_error:
-            logger.error(f"Failed to send value error message: {reply_error}")
+        await update.message.reply_text("❌ Lỗi định dạng số tiền!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
     except Exception as e:
-        logger.error(f"Error logging expense for user {update.effective_user.id}: {e}", exc_info=True)
-        try:
-            await update.message.reply_text("❌ Có lỗi xảy ra! Vui lòng thử lại.")
-        except Exception as reply_error:
-            logger.error(f"Failed to send error message in log_expense: {reply_error}")
+        logger.error(f"Error logging expense: {e}")
+        await update.message.reply_text("❌ Có lỗi xảy ra. Vui lòng thử lại!")
 
 @safe_async_handler
 async def delete_expense(update, context):
@@ -534,7 +488,7 @@ async def delete_expense(update, context):
         found = False
         
         for i, record in enumerate(all_records, start=2):  # Start from row 2 (after header)
-            if record.get('Ngày') == entry_date and record.get('Thời gian') == entry_time:
+            if record.get('Date') == entry_date and record.get('Time') == entry_time:
                 try:
                     current_sheet.delete_rows(i)
                     found = True
@@ -590,14 +544,25 @@ async def today(update, context):
         total = 0
         
         for r in records:
-            if r.get("Ngày") == today_str:
+            # Make sure we have valid data in the record
+            record_date = r.get("Date", "").strip()
+            record_amount = r.get("VND", 0)
+            
+            if record_date == today_str and record_amount:  # Only count if both date and amount exist
                 today_expenses.append(r)
-                amount = r.get("VND", 0)
-                if isinstance(amount, (int, float)):
-                    total += amount
+                if isinstance(record_amount, (int, float)):
+                    total += record_amount
+                elif isinstance(record_amount, str) and record_amount.replace(',', '').replace('.', '').isdigit():
+                    # Handle string numbers that might have commas or dots
+                    try:
+                        total += float(record_amount.replace(',', ''))
+                    except ValueError:
+                        logger.warning(f"Could not parse amount '{record_amount}' in today summary")
+                        continue
         
         count = len(today_expenses)
         logger.info(f"Found {count} expenses for today with total {total} VND")
+        logger.info(f"Today date string: '{today_str}', Records found: {[r.get('Date') for r in records[:5]]}")  # Debug info
         
         response = f"📊 Tổng kết hôm nay ({today_str}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {target_month}"
         await update.message.reply_text(response)
@@ -617,15 +582,91 @@ async def week(update, context):
         logger.info(f"Week command requested by user {update.effective_user.id}")
         
         now = get_current_time()
-        # now = get_current_time() + datetime.timedelta(days=63)
-        target_month = now.strftime("%m/%Y")
         
         # Calculate week start (Monday)
         days_since_monday = now.weekday()
         week_start = now - datetime.timedelta(days=days_since_monday)
         week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_end = week_start + datetime.timedelta(days=6, hours=23, minutes=59, seconds=59)
         
-        logger.info(f"Getting week expenses from {week_start.strftime('%d/%m')} in sheet {target_month}")
+        logger.info(f"Getting week expenses from {week_start.strftime('%d/%m')} to {week_end.strftime('%d/%m')}")
+        
+        # Get months that this week spans
+        months_to_check = set()
+        current_date = week_start
+        while current_date <= week_end:
+            months_to_check.add(current_date.strftime("%m/%Y"))
+            current_date += datetime.timedelta(days=1)
+        
+        logger.info(f"Checking sheets for months: {list(months_to_check)}")
+        
+        week_expenses = []
+        total = 0
+        
+        for target_month in months_to_check:
+            try:
+                current_sheet = get_or_create_monthly_sheet(target_month)
+                logger.info(f"Successfully obtained sheet for {target_month}")
+                
+                records = current_sheet.get_all_records()
+                logger.info(f"Retrieved {len(records)} records from sheet {target_month}")
+                
+                for r in records:
+                    try:
+                        day_month = r.get("Date", "")
+                        if "/" in day_month:
+                            # Parse the date from the record
+                            date_parts = day_month.split("/")
+                            if len(date_parts) == 2:
+                                day, month = date_parts
+                                year = target_month.split("/")[1]  # Get year from sheet name
+                                expense_date = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y")
+                                
+                                # Check if this date falls within our week
+                                if week_start <= expense_date <= week_end:
+                                    week_expenses.append(r)
+                                    amount = r.get("VND", 0)
+                                    if isinstance(amount, (int, float)):
+                                        total += amount
+                                    elif isinstance(amount, str) and amount.replace(',', '').replace('.', '').isdigit():
+                                        # Handle string numbers that might have commas or dots
+                                        try:
+                                            total += float(amount.replace(',', ''))
+                                        except ValueError:
+                                            logger.warning(f"Could not parse amount '{amount}' in week summary")
+                                            continue
+                    except Exception as date_parse_error:
+                        logger.warning(f"Could not parse date '{day_month}' from sheet {target_month}: {date_parse_error}")
+                        continue
+                        
+            except Exception as sheet_error:
+                logger.warning(f"Could not access sheet {target_month}: {sheet_error}")
+                continue
+                
+        count = len(week_expenses)
+        logger.info(f"Found {count} expenses for this week with total {total} VND")
+        
+        response = f"📊 Tổng kết tuần này ({week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch"
+        await update.message.reply_text(response)
+        logger.info(f"Week summary sent successfully to user {update.effective_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error in week command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in week command: {reply_error}")
+
+@safe_async_handler
+async def month(update, context):
+    """Get this month's total expenses"""
+    try:
+        logger.info(f"Month command requested by user {update.effective_user.id}")
+        
+        now = get_current_time()
+        target_month = now.strftime("%m/%Y")
+        
+        logger.info(f"Getting month expenses for sheet {target_month}")
         
         try:
             current_sheet = get_or_create_monthly_sheet(target_month)
@@ -643,36 +684,50 @@ async def week(update, context):
             await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
             return
         
-        week_expenses = []
+        month_expenses = []
         total = 0
         
         for r in records:
-            try:
-                day_month = r.get("Ngày", "")
-                if "/" in day_month:
-                    expense_date = datetime.datetime.strptime(f"{day_month}/{now.year}", "%d/%m/%Y")
-                    if expense_date >= week_start:
-                        week_expenses.append(r)
-                        amount = r.get("VND", 0)
-                        if isinstance(amount, (int, float)):
-                            total += amount
-            except Exception as date_parse_error:
-                logger.warning(f"Could not parse date '{day_month}': {date_parse_error}")
-                continue
+            # Only count records with valid date and amount (not empty rows)
+            record_date = r.get("Date", "").strip()
+            record_amount = r.get("VND", 0)
+            
+            if record_date and record_amount:  # Only count if both date and amount exist and are not empty
+                month_expenses.append(r)
+                if isinstance(record_amount, (int, float)):
+                    total += record_amount
+                elif isinstance(record_amount, str) and record_amount.replace(',', '').replace('.', '').isdigit():
+                    # Handle string numbers that might have commas or dots
+                    try:
+                        total += float(record_amount.replace(',', ''))
+                    except ValueError:
+                        logger.warning(f"Could not parse amount '{record_amount}' in month summary")
+                        continue
                 
-        count = len(week_expenses)
-        logger.info(f"Found {count} expenses for this week with total {total} VND")
+        count = len(month_expenses)
+        logger.info(f"Found {count} expenses for this month with total {total} VND")
         
-        response = f"📊 Tổng kết tuần này:\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {now.strftime('%m/%Y')}"
+        # Get month name in Vietnamese
+        month_names = {
+            "01": "Tháng 1", "02": "Tháng 2", "03": "Tháng 3", "04": "Tháng 4",
+            "05": "Tháng 5", "06": "Tháng 6", "07": "Tháng 7", "08": "Tháng 8", 
+            "09": "Tháng 9", "10": "Tháng 10", "11": "Tháng 11", "12": "Tháng 12"
+        }
+        
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+        
+        response = f"📊 Tổng kết {month_display}:\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {target_month}"
         await update.message.reply_text(response)
-        logger.info(f"Week summary sent successfully to user {update.effective_user.id}")
+        logger.info(f"Month summary sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
-        logger.error(f"Error in week command for user {update.effective_user.id}: {e}", exc_info=True)
+        logger.error(f"Error in month command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
         except Exception as reply_error:
-            logger.error(f"Failed to send error message in week command: {reply_error}")
+            logger.error(f"Failed to send error message in month command: {reply_error}")
 
 @safe_async_handler
 async def handle_message(update, context):
