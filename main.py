@@ -6,29 +6,22 @@ import os
 import logging
 import json
 import pytz
-from flask import Flask
-from threading import Thread
+from flask import Flask, request
+import threading
+import asyncio
+from telegram import Update
 
-# Flask web server for keep-alive
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "I'm alive"
-
-def run():
-    app.run(host='0.0.0.0', port=8080)
-
-# Start Flask server in background thread
-Thread(target=run).start()
+# Get the directory where this script is located
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Load configuration
 try:
-    with open("config.json", "r") as config_file:
+    config_path = os.path.join(BASE_DIR, "config.json")
+    with open(config_path, "r") as config_file:
         config = json.load(config_file)
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=getattr(logging, config["settings"]["logging_level"]))
-    logger.info("Configuration loaded successfully")
+    logger.info(f"Configuration loaded successfully from {config_path}")
 except Exception as e:
     print(f"⚠️  Failed to load config.json: {e}")
     exit(1)
@@ -43,21 +36,57 @@ def get_current_time():
 # Google Sheets setup
 try:
     scope = config["google_sheets"]["scopes"]
-    creds = Credentials.from_service_account_file(config["google_sheets"]["credentials_file"], scopes=scope)
+    credentials_path = os.path.join(BASE_DIR, config["google_sheets"]["credentials_file"])
+    creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
     client = gspread.authorize(creds)
     # Open the specific Google Sheet by ID from the URL
     spreadsheet = client.open_by_key(config["google_sheets"]["spreadsheet_id"])
-    logger.info("Google Sheets connected successfully")
+    logger.info(f"Google Sheets connected successfully using credentials from {credentials_path}")
 except Exception as e:
     logger.error(f"Failed to connect to Google Sheets: {e}")
     print("⚠️  Please make sure you have:")
-    print(f"1. Created {config['google_sheets']['credentials_file']} file")
+    print(f"1. Created {config['google_sheets']['credentials_file']} file in {BASE_DIR}")
     print(f"2. Shared the Google Sheet (ID: {config['google_sheets']['spreadsheet_id']}) with your service account email")
     print("3. The sheet has the correct permissions")
     exit(1)
 
 # Telegram bot
 TOKEN = config["telegram"]["bot_token"]
+WEBHOOK_URL = config["telegram"]["webhook_url"]
+
+# Flask app for webhook
+app = Flask(__name__)
+
+# Initialize bot application immediately
+def setup_bot():
+    """Setup the bot application"""
+    try:
+        bot_app = Application.builder().token(TOKEN).build()
+        
+        # Command handlers
+        bot_app.add_handler(CommandHandler("start", start))
+        bot_app.add_handler(CommandHandler("help", help_command))
+        bot_app.add_handler(CommandHandler("today", today))
+        bot_app.add_handler(CommandHandler("week", week))
+        
+        # Message handler for expenses and delete commands
+        bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
+        logger.info("Bot application setup completed!")
+        return bot_app
+        
+    except Exception as e:
+        logger.error(f"Error setting up bot: {e}")
+        raise
+
+async def initialize_bot(bot_app):
+    """Initialize the bot application asynchronously"""
+    if not bot_app.running:
+        await bot_app.initialize()
+    return bot_app
+
+# Global variable to store bot application - initialize it immediately
+bot_app = None
 
 def get_or_create_monthly_sheet(target_month=None):
     """Get month's sheet or create a new one for target month"""
@@ -132,10 +161,10 @@ async def start(update, context):
 • 02/09 5000 cafe (ngày cụ thể, 12:00)  
 • 02/09 08:30 15000 breakfast (ngày + giờ)
 
-�️ Xóa giao dịch:
+🗑️ Xóa giao dịch:
 • del 14/10 00:11 (xóa theo ngày + giờ)
 
-�📊 Lệnh có sẵn:
+📊 Lệnh có sẵn:
 • /today - Xem tổng chi tiêu hôm nay
 • /week - Xem tổng chi tiêu tuần này
 • /help - Xem hướng dẫn
@@ -159,11 +188,11 @@ async def help_command(update, context):
 • 02/09 15000 cà phê
 • 05/09 80000 ăn tối
 
-� Chỉ định ngày + giờ:
+⏰ Chỉ định ngày + giờ:
 • 02/09 08:30 25000 sáng
 • 03/09 14:00 120000 trưa
 
-�📊 Lệnh thống kê:
+📊 Lệnh thống kê:
 • /today - Chi tiêu hôm nay
 • /week - Chi tiêu tuần này
 
@@ -199,204 +228,201 @@ async def log_expense(update, context):
             entry_date = parts[0]
             amount = int(parts[1])
             note = " ".join(parts[2:]) if len(parts) > 2 else "Không có ghi chú"
-            entry_time = "24:00"  # Default time
+            entry_time = "12:00"  # Default time when only date is provided
             
-            # Extract month from date for target sheet
-            day, month = entry_date.split("/")
-            current_year = get_current_time().year
-            target_month = f"{month.zfill(2)}/{current_year}"
+            # Parse month/year from the date
+            day_month = entry_date
+            now = get_current_time()
+            # now = get_current_time() + datetime.timedelta(days=63)
+            target_month = now.strftime("%m/%Y")
+            
+            # Check if different month/year
+            if "/" in day_month:
+                day, month = day_month.split("/")
+                if len(month) == 2:  # MM format
+                    target_month = f"{month}/{now.year}"
+                elif len(month) == 4:  # MM/YYYY format (day is actually day/month)
+                    # Handle case where user inputs DD/MM/YYYY
+                    parts_date = day_month.split("/")
+                    if len(parts_date) == 3:
+                        target_month = f"{parts_date[1]}/{parts_date[2]}"
+                        entry_date = f"{parts_date[0]}/{parts_date[1]}"
             
         # Case C: Date + Time - 02/09 08:30 15000 breakfast
-        elif "/" in parts[0] and len(parts) >= 3 and ":" in parts[1] and parts[2].isdigit():
+        elif "/" in parts[0] and ":" in parts[1] and len(parts) >= 3 and parts[2].isdigit():
             entry_date = parts[0]
             entry_time = parts[1]
             amount = int(parts[2])
             note = " ".join(parts[3:]) if len(parts) > 3 else "Không có ghi chú"
             
-            # Extract month from date for target sheet
-            day, month = entry_date.split("/")
-            current_year = get_current_time().year
-            target_month = f"{month.zfill(2)}/{current_year}"
+            # Parse month/year from the date
+            day_month = entry_date
+            now = get_current_time()
+            # now = get_current_time() + datetime.timedelta(days=63)
+            target_month = now.strftime("%m/%Y")
             
+            # Check if different month/year
+            if "/" in day_month:
+                day, month = day_month.split("/")
+                if len(month) == 2:  # MM format
+                    target_month = f"{month}/{now.year}"
+                elif len(month) == 4:  # MM/YYYY format
+                    parts_date = day_month.split("/")
+                    if len(parts_date) == 3:
+                        target_month = f"{parts_date[1]}/{parts_date[2]}"
+                        entry_date = f"{parts_date[0]}/{parts_date[1]}"
+
         else:
-            await update.message.reply_text("❌ Định dạng không đúng!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
+            await update.message.reply_text("❌ Định dạng không hợp lệ! Vui lòng thử lại.")
             return
 
-        # Multiply amount by 1000 if note contains "ngàn"
-        amount = amount * 1000
+        # Get the appropriate monthly sheet
+        current_sheet = get_or_create_monthly_sheet(target_month)
 
-        # Get or create the target month's sheet
-        sheet = get_or_create_monthly_sheet(target_month)
-        
-        # Find the correct position to insert the record
-        all_values = sheet.get_all_values()
-        insert_row = len(all_values) + 1  # Default to append at end
-        
-        # Skip header row and find correct position based on date/time
-        if len(all_values) > 1:
-            for i, row in enumerate(all_values[1:], start=2):  # Start from row 2 (after headers)
-                if len(row) >= 2:
-                    existing_date = row[0].strip()
-                    existing_time = row[1].strip()
+        # Append row to Google Sheet
+        row = [entry_date, entry_time, amount, note]
+        current_sheet.append_row(row)
+
+        # Sort the sheet by date and time
+        try:
+            # Get all rows with data
+            all_rows = current_sheet.get_all_records()
+            
+            if len(all_rows) > 1:  # Only sort if there's more than header + 1 row
+                # Sort by date and time
+                sorted_rows = sorted(all_rows, key=lambda x: (
+                    datetime.datetime.strptime(f"{x['Ngày']}/{target_month.split('/')[1]}", "%d/%m/%Y") if x['Ngày'] else datetime.datetime.min,
+                    datetime.datetime.strptime(x['Thời gian'], "%H:%M") if x['Thời gian'] else datetime.datetime.min
+                ))
+                
+                # Clear all data rows and re-add sorted data
+                if len(sorted_rows) > 0:
+                    range_to_clear = f"A2:D{len(sorted_rows) + 1}"
+                    current_sheet.batch_clear([range_to_clear])
                     
-                    if existing_date and existing_time:
-                        # Compare dates first, then times
-                        if entry_date < existing_date or (entry_date == existing_date and entry_time < existing_time):
-                            insert_row = i
-                            break
-        
-        # Insert the record at the correct position
-        if insert_row <= len(all_values):
-            # Insert at specific position
-            sheet.insert_row([entry_date, entry_time, amount, note], insert_row)
-            position_msg = f"📍 Vị trí: Dòng {insert_row}"
-        else:
-            # Append at the end
-            sheet.append_row([entry_date, entry_time, amount, note])
-            position_msg = "📍 Vị trí: Cuối bảng"
+                    # Re-add sorted data
+                    for row_data in sorted_rows:
+                        current_sheet.append_row([
+                            row_data['Ngày'],
+                            row_data['Thời gian'],
+                            row_data['VND'],
+                            row_data['Ghi chú']
+                        ])
+        except Exception as sort_error:
+            logger.warning(f"Could not sort sheet: {sort_error}")
+            # Continue without sorting if there's an error
 
-        response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n🕐 {entry_date} {entry_time}\n{position_msg}\n📊 Sheet: {target_month}"
+        logger.info(f"Expense logged: {amount} VND at {entry_date} {entry_time} - {note}")
+        
+        response = f"✅ Đã ghi: {amount:,.0f} VND\n📅 {entry_date} {entry_time}\n📝 {note}\n📄 Sheet: {target_month}"
         await update.message.reply_text(response)
-        
-        logger.info(f"Logged expense: {amount} VND - {note} at {entry_date} {entry_time} (row {insert_row}) in sheet {target_month}")
-        
+
     except ValueError as ve:
-        await update.message.reply_text("❌ Lỗi định dạng số tiền!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
+        logger.error(f"Value error in log_expense: {ve}")
+        await update.message.reply_text("❌ Số tiền không hợp lệ! Vui lòng nhập số.")
     except Exception as e:
         logger.error(f"Error logging expense: {e}")
-        await update.message.reply_text("❌ Có lỗi xảy ra. Vui lòng thử lại!")
+        await update.message.reply_text("❌ Có lỗi xảy ra! Vui lòng thử lại.")
 
 async def delete_expense(update, context):
-    """Delete expense from Google Sheet"""
+    """Delete expense entry from Google Sheet"""
     text = update.message.text.strip()
     
-    # Remove "del " prefix
-    if text.lower().startswith("del "):
-        text = text[4:].strip()
-    
-    parts = text.split()
-
     try:
-        entry_date = None
-        entry_time = None
-        target_month = None
-        
-        # Parse delete format: del 14/10 00:11 6000 cafe
-        # We only need date and time to find the entry
-        if len(parts) >= 2 and "/" in parts[0] and ":" in parts[1]:
-            entry_date = parts[0]
-            entry_time = parts[1]
+        # Parse delete command: "del 14/10 00:11"
+        parts = text.split()
+        if len(parts) < 3:
+            await update.message.reply_text("❌ Định dạng: del dd/mm hh:mm")
+            return
             
-            # Extract month from date for target sheet
+        entry_date = parts[1]
+        entry_time = parts[2]
+        
+        # Determine target month
+        now = get_current_time()
+        # now = get_current_time() + datetime.timedelta(days=63)
+        target_month = now.strftime("%m/%Y")
+        
+        # Check if different month
+        if "/" in entry_date:
             day, month = entry_date.split("/")
-            current_year = get_current_time().year
-            target_month = f"{month.zfill(2)}/{current_year}"
-            
-        else:
-            await update.message.reply_text("❌ Định dạng xóa không đúng!\n\n📝 Định dạng: del 14/10 00:11\n(Chỉ cần ngày và giờ để tìm và xóa)")
-            return
-
-        # Get the target month's sheet
-        try:
-            sheet = get_or_create_monthly_sheet(target_month)
-        except:
-            await update.message.reply_text(f"❌ Không tìm thấy sheet tháng {target_month}")
-            return
+            if len(month) == 2:
+                target_month = f"{month}/{now.year}"
         
-        # Find and delete the matching entry
-        all_values = sheet.get_all_values()
-        deleted_row = None
-        deleted_entry = None
+        # Get the appropriate monthly sheet
+        current_sheet = get_or_create_monthly_sheet(target_month)
         
-        # Search through all rows (skip header)
-        if len(all_values) > 1:
-            for i, row in enumerate(all_values[1:], start=2):  # Start from row 2 (after headers)
-                if len(row) >= 4:  # Ensure we have all columns
-                    existing_date = row[0].strip()
-                    existing_time = row[1].strip()
-                    
-                    # Check for exact match on date and time
-                    if existing_date == entry_date and existing_time == entry_time:
-                        deleted_entry = {
-                            'date': existing_date,
-                            'time': existing_time,
-                            'amount': row[2],
-                            'note': row[3]
-                        }
-                        deleted_row = i
-                        break
+        # Find and delete the matching row
+        all_records = current_sheet.get_all_records()
+        found = False
         
-        if deleted_row:
-            # Delete the row
-            sheet.delete_rows(deleted_row)
-            
-            response = f"🗑️ Đã xóa:\n📅 {deleted_entry['date']} {deleted_entry['time']}\n💰 {deleted_entry['amount']} VND\n📝 {deleted_entry['note']}\n📊 Sheet: {target_month}"
-            await update.message.reply_text(response)
-            
-            logger.info(f"Deleted expense: {deleted_entry['amount']} VND at {deleted_entry['date']} {deleted_entry['time']} from sheet {target_month}")
-            
-        else:
-            await update.message.reply_text(f"❌ Không tìm thấy giao dịch:\n📅 {entry_date} {entry_time}\n📊 Sheet: {target_month}\n\n💡 Kiểm tra lại ngày và giờ chính xác!")
+        for i, record in enumerate(all_records, start=2):  # Start from row 2 (after header)
+            if record.get('Ngày') == entry_date and record.get('Thời gian') == entry_time:
+                current_sheet.delete_rows(i)
+                found = True
+                logger.info(f"Deleted expense: {entry_date} {entry_time}")
+                await update.message.reply_text(f"✅ Đã xóa giao dịch: {entry_date} {entry_time}")
+                break
         
+        if not found:
+            await update.message.reply_text(f"❌ Không tìm thấy giao dịch: {entry_date} {entry_time}")
+            
     except Exception as e:
         logger.error(f"Error deleting expense: {e}")
-        await update.message.reply_text("❌ Có lỗi xảy ra khi xóa. Vui lòng thử lại!")
+        await update.message.reply_text("❌ Có lỗi xảy ra khi xóa! Vui lòng thử lại.")
 
 async def today(update, context):
-    """Show today's total expenses"""
+    """Get today's total expenses"""
     try:
         now = get_current_time()
         # now = get_current_time() + datetime.timedelta(days=63)
-        today_day_month = now.strftime("%d/%m")
+        today_str = now.strftime("%d/%m")
+        target_month = now.strftime("%m/%Y")
         
-        # Get current month's sheet
-        sheet = get_or_create_monthly_sheet()
-        records = sheet.get_all_records()
+        current_sheet = get_or_create_monthly_sheet(target_month)
+        records = current_sheet.get_all_records()
         
-        # Filter records for today based on day/month in column B
         today_expenses = []
         total = 0
         
         for r in records:
-            # Check if the record matches today's day/month
-            record_day_month = str(r.get("Ngày", "")).strip()  # Column B
-            amount = r.get("VND", 0)  # Column D
-            
-            if record_day_month == today_day_month:
+            if r.get("Ngày") == today_str:
                 today_expenses.append(r)
+                amount = r.get("VND", 0)
                 if isinstance(amount, (int, float)):
                     total += amount
         
         count = len(today_expenses)
         
-        if count == 0:
-            await update.message.reply_text(f"📊 Hôm nay ({today_day_month}):\n💰 Chưa có chi tiêu nào\n📄 Sheet: {now.strftime('%m/%Y')}")
-        else:
-            response = f"📊 Tổng kết hôm nay ({today_day_month}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {now.strftime('%m/%Y')}"
-            await update.message.reply_text(response)
-            
+        response = f"📊 Tổng kết hôm nay ({today_str}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {target_month}"
+        await update.message.reply_text(response)
+        
     except Exception as e:
         logger.error(f"Error getting today's expenses: {e}")
         await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
 
 async def week(update, context):
-    """Show this week's total expenses"""
+    """Get this week's total expenses"""
     try:
-        now = datetime.datetime.now()
-        # now = datetime.datetime.now() + datetime.timedelta(days=63)
-        week_start = now - datetime.timedelta(days=now.weekday())
+        now = get_current_time()
+        # now = get_current_time() + datetime.timedelta(days=63)
+        target_month = now.strftime("%m/%Y")
         
-        # Get current month's sheet
-        sheet = get_or_create_monthly_sheet()
-        records = sheet.get_all_records()
+        # Calculate week start (Monday)
+        days_since_monday = now.weekday()
+        week_start = now - datetime.timedelta(days=days_since_monday)
+        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        current_sheet = get_or_create_monthly_sheet(target_month)
+        records = current_sheet.get_all_records()
+        
         week_expenses = []
         total = 0
         
         for r in records:
             try:
-                # Parse day/month from column B and add current year
                 day_month = r.get("Ngày", "")
-                if day_month:
+                if "/" in day_month:
                     expense_date = datetime.datetime.strptime(f"{day_month}/{now.year}", "%d/%m/%Y")
                     if expense_date >= week_start:
                         week_expenses.append(r)
@@ -424,29 +450,138 @@ async def handle_message(update, context):
     else:
         await log_expense(update, context)
 
-def main():
-    """Main function to run the bot"""
+@app.route('/')
+def home():
+    return "Money Tracker Bot is running with webhooks!"
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Handle incoming webhook requests from Telegram"""
+    global bot_app
+    
     try:
-        app = Application.builder().token(TOKEN).build()
+        # Ensure bot is initialized
+        if bot_app is None:
+            bot_app = setup_bot()
+            
+        # Get the update from Telegram
+        update_data = request.get_json()
         
-        # Command handlers
-        app.add_handler(CommandHandler("start", start))
-        app.add_handler(CommandHandler("help", help_command))
-        app.add_handler(CommandHandler("today", today))
-        app.add_handler(CommandHandler("week", week))
-        # Removed month command as requested
+        if update_data:
+            # Create Update object
+            update = Update.de_json(update_data, bot_app.bot)
+            
+            # Process the update in a new event loop
+            def process_update():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    # Initialize bot if not already done
+                    if not bot_app.running:
+                        loop.run_until_complete(bot_app.initialize())
+                    
+                    # Process the update
+                    loop.run_until_complete(bot_app.process_update(update))
+                finally:
+                    loop.close()
+            
+            thread = threading.Thread(target=process_update)
+            thread.start()
+            
+        return "OK", 200
+    except Exception as e:
+        logger.error(f"Error processing webhook: {e}")
+        return "Error", 500
+
+@app.route('/set_webhook', methods=['GET'])
+def set_webhook():
+    """Set the webhook URL for the bot"""
+    try:
+        # This will be called to set up the webhook
+        import requests
+        webhook_url = f"{WEBHOOK_URL}/webhook"
         
-        # Message handler for expenses and delete commands
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        response = requests.post(
+            f"https://api.telegram.org/bot{TOKEN}/setWebhook",
+            json={"url": webhook_url}
+        )
         
-        logger.info("Bot started successfully!")
-        print("🚀 Money Tracker Bot is running...")
+        if response.status_code == 200:
+            result = response.json()
+            if result.get("ok"):
+                return f"Webhook set successfully to {webhook_url}", 200
+            else:
+                return f"Failed to set webhook: {result.get('description')}", 500
+        else:
+            return f"Failed to set webhook: HTTP {response.status_code}", 500
+            
+    except Exception as e:
+        logger.error(f"Error setting webhook: {e}")
+        return f"Error setting webhook: {e}", 500
+
+@app.route('/webhook_info', methods=['GET'])
+def webhook_info():
+    """Get current webhook information"""
+    try:
+        import requests
+        response = requests.get(f"https://api.telegram.org/bot{TOKEN}/getWebhookInfo")
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get("ok"):
+                webhook_info = result.get("result", {})
+                return {
+                    "url": webhook_info.get("url", "Not set"),
+                    "pending_updates": webhook_info.get("pending_update_count", 0),
+                    "last_error": webhook_info.get("last_error_message", "None")
+                }, 200
+            else:
+                return {"error": result.get("description")}, 500
+        else:
+            return {"error": f"HTTP {response.status_code}"}, 500
+            
+    except Exception as e:
+        logger.error(f"Error getting webhook info: {e}")
+        return {"error": str(e)}, 500
+
+@app.route('/delete_webhook', methods=['POST'])
+def delete_webhook():
+    """Delete the current webhook"""
+    try:
+        import requests
+        response = requests.post(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook")
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get("ok"):
+                return "Webhook deleted successfully", 200
+            else:
+                return f"Failed to delete webhook: {result.get('description')}", 500
+        else:
+            return f"Failed to delete webhook: HTTP {response.status_code}", 500
+            
+    except Exception as e:
+        logger.error(f"Error deleting webhook: {e}")
+        return f"Error deleting webhook: {e}", 500
+
+def main():
+    """Main function to run the bot with webhook"""
+    global bot_app
+    
+    try:
+        # Setup bot if not already initialized
+        if bot_app is None:
+            bot_app = setup_bot()
+        
+        logger.info("Bot started successfully with webhook support!")
+        print("🚀 Money Tracker Bot is running with webhooks...")
         print("📊 Connected to Google Sheets")
-        print("💬 Listening for messages...")
-        print("Press Ctrl+C to stop the bot")
+        print(f"🔗 Webhook URL: {WEBHOOK_URL}")
+        print("💬 Listening for webhook requests...")
+        print("📡 Visit /set_webhook to configure the webhook")
         
-        # Run the bot
-        app.run_polling()
+        # Run Flask app
+        app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
         
     except Exception as e:
         logger.error(f"Error starting bot: {e}")

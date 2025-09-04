@@ -1,0 +1,8 @@
+python-telegram-bot[webhooks]
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+flask
+pytz
+requests
