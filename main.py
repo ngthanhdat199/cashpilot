@@ -1,3 +1,5 @@
+import unicodedata
+from collections import defaultdict
 import re
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 import gspread
@@ -51,6 +53,37 @@ def parse_amount(value):
 
     logger.warning(f"Invalid amount format '{value}' in today summary")
     return 0.0
+
+def format_expense(r, index=None):
+    time_str = r.get("Time", "") or "—"
+    amount_str = f"{parse_amount(r.get('VND', 0)):,.0f} VND"
+    note_str = r.get("Note", "") or ""
+    note_norm = normalize_text(note_str)
+
+    if "xang" in note_norm:
+        note_icon = "⛽"
+    elif any(k in note_norm for k in ["an", "lunch", "com", "pho", "bun", "mien"]):
+        note_icon = "🍽️"
+    elif any(k in note_norm for k in ["cafe", "coffee", "ca phe", "caphe"]):
+        note_icon = "☕"
+    else:
+        note_icon = "📝"
+
+    prefix = f"{index}. " if index is not None else ""
+    return f"{prefix}⏰ {time_str} | 💰 {amount_str} | {note_icon} {note_str}"
+
+def normalize_text(s: str) -> str:
+    if not s:
+        return ""
+    s = str(s).replace("\xa0", " ")        # NBSP → space
+    s = unicodedata.normalize("NFD", s)    # decompose accents
+    # drop combining marks
+    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
+    # map Vietnamese đ/Đ to d/D for ASCII-ish search
+    s = s.replace("đ", "d").replace("Đ", "D")
+    # collapse whitespace and lowercase
+    s = " ".join(s.split()).lower()
+    return s
 
 # Google Sheets setup
 try:
@@ -606,6 +639,13 @@ async def today(update, context):
         logger.info(f"Today date string: '{today_str}', Records found: {[r.get('Date') for r in records[:5]]}")  # Debug info
         
         response = f"📊 Tổng kết hôm nay ({today_str}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {target_month}"
+        
+        if today_expenses:
+            details = "\n".join(
+                format_expense(r, i+1) for i, r in enumerate(today_expenses)
+            )
+            response += f"\n\n📝 Chi tiết:\n{details}"
+
         await update.message.reply_text(response)
         logger.info(f"Today summary sent successfully to user {update.effective_user.id}")
         
@@ -684,8 +724,27 @@ async def week(update, context):
                 
         count = len(week_expenses)
         logger.info(f"Found {count} expenses for this week with total {total} VND")
-        
-        response = f"📊 Tổng kết tuần này ({week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch"
+
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        for r in week_expenses:
+            grouped[r.get("Date", "")].append(r)
+
+        details = ""
+        for day, rows in sorted(grouped.items()):
+            details += f"\n📅 {day}:\n"
+            for i, r in enumerate(rows, start=1):
+                details += format_expense(r, i) + "\n"
+
+        response = (
+            f"📊 Tổng kết tuần này ({week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}):\n"
+            f"💰 {total:,.0f} VND\n"
+            f"📝 {count} giao dịch"
+        )
+
+        if details:
+            response += f"\n\n📝 Chi tiết:{details}"
+
         await update.message.reply_text(response)
         logger.info(f"Week summary sent successfully to user {update.effective_user.id}")
         
