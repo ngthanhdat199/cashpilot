@@ -85,6 +85,38 @@ def normalize_text(s: str) -> str:
     s = " ".join(s.split()).lower()
     return s
 
+def normalize_date(date_str: str) -> str:
+    """
+    Normalize a date like '4/9' or '4/10' into '04/09' or '04/10'.
+    Keeps only day/month (no year).
+    """
+    try:
+        day, month = date_str.split("/")
+        return f"{day.zfill(2)}/{month.zfill(2)}"
+    except ValueError:
+        return date_str.strip()
+
+def normalize_time(time_str: str) -> str:
+    """
+    Normalize time formats:
+    - '10h'   -> '10:00'
+    - '01h'   -> '01:00'
+    - '10h30' -> '10:30'
+    - '10h5'  -> '10:05'
+    - '10:05' -> '10:05' (unchanged)
+    """
+    time_str = time_str.strip().lower().replace(" ", "")
+    
+    if "h" in time_str:
+        parts = time_str.split("h")
+        hour = parts[0].zfill(2) if parts[0] else "00"
+        minute = parts[1].zfill(2) if len(parts) > 1 and parts[1] else "00"
+        return f"{hour}:{minute}"
+    
+    # Already colon format
+    return time_str
+
+
 # Google Sheets setup
 try:
     scope = config["google_sheets"]["scopes"]
@@ -414,27 +446,25 @@ async def log_expense(update, context):
             
         # Case B: Date Only - 02/09 5000 cafe
         elif "/" in parts[0] and len(parts) >= 2 and parts[1].isdigit():
-            entry_date = parts[0]
+            entry_date = normalize_date(parts[0])
             amount = int(parts[1])
             note = " ".join(parts[2:]) if len(parts) > 2 else "Không có ghi chú"
             entry_time = "24:00"  # Default time
 
-            # Extract month from date for target sheet
             day, month = entry_date.split("/")
             current_year = get_current_time().year
-            target_month = f"{month.zfill(2)}/{current_year}"
+            target_month = f"{month}/{current_year}"
             
         # Case C: Date + Time - 02/09 08:30 15000 breakfast
-        elif "/" in parts[0] and len(parts) >= 3 and ":" in parts[1] and parts[2].isdigit():
-            entry_date = parts[0]
-            entry_time = parts[1]
+        elif "/" in parts[0] and len(parts) >= 3 and (":" in parts[1] or "h" in parts[1].lower()) and parts[2].isdigit():
+            entry_date = normalize_date(parts[0])
+            entry_time = normalize_time(parts[1])
             amount = int(parts[2])
             note = " ".join(parts[3:]) if len(parts) > 3 else "Không có ghi chú"
 
-            # Extract month from date for target sheet
             day, month = entry_date.split("/")
             current_year = get_current_time().year
-            target_month = f"{month.zfill(2)}/{current_year}"
+            target_month = f"{month}/{current_year}"
 
         else:
             await update.message.reply_text("❌ Định dạng không đúng!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
@@ -531,9 +561,8 @@ async def delete_expense(update, context):
             await update.message.reply_text("❌ Định dạng: del dd/mm hh:mm")
             return
             
-        entry_date = parts[1]
-        entry_time = parts[2]
-        
+        entry_date = normalize_date(parts[1])
+        entry_time = normalize_time(parts[2])
         logger.info(f"Attempting to delete expense: {entry_date} {entry_time}")
         
         # Determine target month
@@ -570,7 +599,10 @@ async def delete_expense(update, context):
         found = False
         
         for i, record in enumerate(all_records, start=2):  # Start from row 2 (after header)
-            if record.get('Date') == entry_date and record.get('Time') == entry_time:
+            record_date = normalize_date(record.get('Date', '').strip())
+            record_time = normalize_time(record.get('Time', '').strip())
+            
+            if record_date == entry_date and record_time == entry_time:
                 try:
                     current_sheet.delete_rows(i)
                     found = True
@@ -845,51 +877,6 @@ async def handle_message(update, context):
 def home():
     return "Money Tracker Bot is running with webhooks!"
 
-@app.route('/health')
-def health():
-    """Health check endpoint"""
-    try:
-        global bot_app, webhook_failures, last_failure_time, use_fresh_bots
-        status = {
-            "status": "healthy",
-            "bot_initialized": bot_app is not None,
-            "bot_running": bot_app.running if bot_app else False,
-            "timestamp": datetime.datetime.now(timezone).isoformat(),
-            "active_threads": threading.active_count(),
-            "webhook_failures": webhook_failures,
-            "circuit_breaker_open": webhook_failures >= MAX_FAILURES,
-            "last_failure": last_failure_time.isoformat() if last_failure_time else None,
-            "use_fresh_bots": use_fresh_bots
-        }
-        
-        # Test Google Sheets connection
-        try:
-            sheet_count = len(spreadsheet.worksheets())
-            status["google_sheets"] = {"connected": True, "sheet_count": sheet_count}
-        except Exception as sheets_error:
-            status["google_sheets"] = {"connected": False, "error": str(sheets_error)}
-        
-        # Determine overall health
-        if webhook_failures >= MAX_FAILURES:
-            status["status"] = "degraded"
-        
-        return status, 200
-    except Exception as e:
-        logger.error(f"Health check failed: {e}", exc_info=True)
-        return {"status": "unhealthy", "error": str(e)}, 500
-
-@app.route('/toggle_fresh_bots', methods=['POST'])
-def toggle_fresh_bots():
-    """Toggle the use of fresh bot instances"""
-    try:
-        global use_fresh_bots
-        use_fresh_bots = not use_fresh_bots
-        logger.info(f"Fresh bot instances {'enabled' if use_fresh_bots else 'disabled'}")
-        return {"use_fresh_bots": use_fresh_bots, "message": f"Fresh bot instances {'enabled' if use_fresh_bots else 'disabled'}"}, 200
-    except Exception as e:
-        logger.error(f"Error toggling fresh bots: {e}", exc_info=True)
-        return {"error": str(e)}, 500
-
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """Handle incoming webhook requests from Telegram"""
@@ -1081,77 +1068,6 @@ def webhook():
         webhook_failures += 1
         last_failure_time = datetime.datetime.now()
         return "Internal server error", 500
-
-@app.route('/set_webhook', methods=['GET'])
-def set_webhook():
-    """Set the webhook URL for the bot"""
-    try:
-        # This will be called to set up the webhook
-        import requests
-        webhook_url = f"{WEBHOOK_URL}/webhook"
-        
-        response = requests.post(
-            f"https://api.telegram.org/bot{TOKEN}/setWebhook",
-            json={"url": webhook_url}
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            if result.get("ok"):
-                return f"Webhook set successfully to {webhook_url}", 200
-            else:
-                return f"Failed to set webhook: {result.get('description')}", 500
-        else:
-            return f"Failed to set webhook: HTTP {response.status_code}", 500
-            
-    except Exception as e:
-        logger.error(f"Error setting webhook: {e}")
-        return f"Error setting webhook: {e}", 500
-
-@app.route('/webhook_info', methods=['GET'])
-def webhook_info():
-    """Get current webhook information"""
-    try:
-        import requests
-        response = requests.get(f"https://api.telegram.org/bot{TOKEN}/getWebhookInfo")
-        
-        if response.status_code == 200:
-            result = response.json()
-            if result.get("ok"):
-                webhook_info = result.get("result", {})
-                return {
-                    "url": webhook_info.get("url", "Not set"),
-                    "pending_updates": webhook_info.get("pending_update_count", 0),
-                    "last_error": webhook_info.get("last_error_message", "None")
-                }, 200
-            else:
-                return {"error": result.get("description")}, 500
-        else:
-            return {"error": f"HTTP {response.status_code}"}, 500
-            
-    except Exception as e:
-        logger.error(f"Error getting webhook info: {e}")
-        return {"error": str(e)}, 500
-
-@app.route('/delete_webhook', methods=['POST'])
-def delete_webhook():
-    """Delete the current webhook"""
-    try:
-        import requests
-        response = requests.post(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook")
-        
-        if response.status_code == 200:
-            result = response.json()
-            if result.get("ok"):
-                return "Webhook deleted successfully", 200
-            else:
-                return f"Failed to delete webhook: {result.get('description')}", 500
-        else:
-            return f"Failed to delete webhook: HTTP {response.status_code}", 500
-            
-    except Exception as e:
-        logger.error(f"Error deleting webhook: {e}")
-        return f"Error deleting webhook: {e}", 500
 
 def main():
     """Main function to run the bot with webhook"""
