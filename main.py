@@ -1,3 +1,4 @@
+from telegram.ext import CommandHandler, CallbackContext
 import unicodedata
 from collections import defaultdict
 import re
@@ -689,12 +690,20 @@ async def today(update, context):
             logger.error(f"Failed to send error message in today command: {reply_error}")
 
 @safe_async_handler
-async def week(update, context):
+async def week(update, context: CallbackContext):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
     """Get this week's total expenses"""
     try:
         logger.info(f"Week command requested by user {update.effective_user.id}")
         
-        now = get_current_time()
+        now = get_current_time() + datetime.timedelta(weeks=offset)
         
         # Calculate week start (Monday)
         days_since_monday = now.weekday()
@@ -764,7 +773,8 @@ async def week(update, context):
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            details += f"\n📅 {day}:\n"
+            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
                 details += format_expense(r, i) + "\n"
 
@@ -788,12 +798,19 @@ async def week(update, context):
             logger.error(f"Failed to send error message in week command: {reply_error}")
 
 @safe_async_handler
-async def month(update, context):
+async def month(update, context: CallbackContext):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
     """Get this month's total expenses"""
     try:
         logger.info(f"Month command requested by user {update.effective_user.id}")
         
-        now = get_current_time()
+        now = get_current_time() + datetime.timedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         
         logger.info(f"Getting month expenses for sheet {target_month}")
