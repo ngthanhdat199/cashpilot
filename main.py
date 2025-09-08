@@ -1,3 +1,5 @@
+from dateutil.relativedelta import relativedelta
+from telegram import ReplyKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext
 import unicodedata
 from collections import defaultdict
@@ -149,12 +151,12 @@ def setup_bot():
         bot_app = Application.builder().token(TOKEN).build()
         
         # Command handlers
-        bot_app.add_handler(CommandHandler("start", start))
-        bot_app.add_handler(CommandHandler("help", help_command))
-        bot_app.add_handler(CommandHandler("today", today))
-        bot_app.add_handler(CommandHandler("week", week))
-        bot_app.add_handler(CommandHandler("month", month))
-        
+        bot_app.add_handler(CommandHandler(["start", "s"], start))
+        bot_app.add_handler(CommandHandler(["help", "h"], help_command))
+        bot_app.add_handler(CommandHandler(["today", "t"], today))
+        bot_app.add_handler(CommandHandler(["week", "w"], week))
+        bot_app.add_handler(CommandHandler(["month", "m"], month))
+
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
@@ -184,11 +186,11 @@ def create_fresh_bot():
         fresh_app = Application.builder().token(TOKEN).build()
         
         # Add all handlers
-        fresh_app.add_handler(CommandHandler("start", start))
-        fresh_app.add_handler(CommandHandler("help", help_command))  
-        fresh_app.add_handler(CommandHandler("today", today))
-        fresh_app.add_handler(CommandHandler("week", week))
-        fresh_app.add_handler(CommandHandler("month", month))
+        fresh_app.add_handler(CommandHandler(["start", "s"], start))
+        fresh_app.add_handler(CommandHandler(["help", "h"], help_command))
+        fresh_app.add_handler(CommandHandler(["today", "t"], today))
+        fresh_app.add_handler(CommandHandler(["week", "w"], week))
+        fresh_app.add_handler(CommandHandler(["month", "m"], month))
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         # Add error handler to prevent "No error handlers are registered" warnings
@@ -369,8 +371,16 @@ async def start(update, context):
 
 Bot sẽ tự động sắp xếp theo thời gian! 🕐💰
         """
-        await update.message.reply_text(welcome_msg)
-        logger.info(f"Welcome message sent successfully to user {update.effective_user.id}")
+
+        keyboard = [
+            ["/today", "/week", "/month"],
+            ["/week -1", "/month -1"],
+            ["/help"]
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        await update.message.reply_text(welcome_msg, reply_markup=reply_markup)
+        logger.info(f"Welcome message + keyboard sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
         logger.error(f"Error in start command for user {update.effective_user.id}: {e}", exc_info=True)
@@ -806,11 +816,12 @@ async def month(update, context: CallbackContext):
             offset = int(args[0])
         except ValueError:
             pass
+
     """Get this month's total expenses"""
     try:
         logger.info(f"Month command requested by user {update.effective_user.id}")
         
-        now = get_current_time() + datetime.timedelta(months=offset)
+        now = get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         
         logger.info(f"Getting month expenses for sheet {target_month}")
