@@ -1,10 +1,11 @@
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from dateutil.relativedelta import relativedelta
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import CommandHandler, CallbackContext
 import unicodedata
 from collections import defaultdict
 import re
-from telegram.ext import Application, MessageHandler, CommandHandler, filters
+from telegram.ext import Application, MessageHandler, CommandHandler, filters, CallbackQueryHandler
 import gspread
 from google.oauth2.service_account import Credentials
 import datetime
@@ -19,6 +20,47 @@ from telegram import Update
 
 # Get the directory where this script is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+msg = """
+📖 Hướng dẫn sử dụng Money Tracker Bot:
+
+� ULTRA-FAST TYPING MODES:
+
+⚡ Mode 1: CHỈ GÕ SỐ (nhanh nhất!)
+• 5 → Hiện buttons: Cafe/Ăn/Xăng/Grab
+• 15 → Chọn 1 click, xong!
+• 200 → Tự động nhân 1000 nếu cần
+
+⚡ Mode 2: SIÊU NGẮN (1-2 ký tự)
+• 5 c → 5000 VND cafe
+• 15 t → 15000 VND ăn trưa  
+• 200 x → 200000 VND xăng xe
+• 2m g → 2000000 VND grab
+
+⚡ Mode 3: EMOJI SHORTCUTS
+• 5 ☕ → 5000 VND cafe
+• 15 🍽️ → 15000 VND ăn
+• 200 ⛽ → 200000 VND xăng xe
+• 50 🚗 → 50000 VND grab
+
+⏰ Với ngày/giờ:
+• 02/09 5 c → 02/09 5000 VND cafe
+• 02/09 08:30 15 t → 02/09 08:30 15000 VND ăn trưa
+
+� Smart multipliers:
+• k/ngàn = x1000 (5k = 5000)
+• m/triệu = x1000000 (2m = 2000000)
+• Số < 1000 tự động x1000
+
+📊 Lệnh thống kê:
+• /today - Chi tiêu hôm nay
+• /week - Chi tiêu tuần này  
+• /month - Chi tiêu tháng này
+
+🗑️ Xóa: del dd/mm hh:mm
+
+🤖 Bot tự động sắp xếp theo thời gian!
+        """
 
 # Load configuration
 try:
@@ -157,6 +199,9 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["week", "w"], week))
         bot_app.add_handler(CommandHandler(["month", "m"], month))
 
+        # Callback handler for quick expense buttons
+        bot_app.add_handler(CallbackQueryHandler(handle_quick_expense))
+
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
@@ -191,6 +236,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["today", "t"], today))
         fresh_app.add_handler(CommandHandler(["week", "w"], week))
         fresh_app.add_handler(CommandHandler(["month", "m"], month))
+        fresh_app.add_handler(CallbackQueryHandler(handle_quick_expense))
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         # Add error handler to prevent "No error handlers are registered" warnings
@@ -351,27 +397,6 @@ async def start(update, context):
     """Send welcome message when bot starts"""
     try:
         logger.info(f"Start command requested by user {update.effective_user.id}")
-        
-        welcome_msg = """
-👋 Chào mừng đến với Money Tracker Bot!
-
-📝 Các định dạng hỗ trợ:
-• 1000 ăn trưa (thời gian hiện tại)
-• 02/09 5000 cafe (ngày cụ thể, 12:00)  
-• 02/09 08:30 15000 breakfast (ngày + giờ)
-
-🗑️ Xóa giao dịch:
-• del 14/10 00:11 (xóa theo ngày + giờ)
-
-📊 Lệnh có sẵn:
-• /today - Xem tổng chi tiêu hôm nay
-• /week - Xem tổng chi tiêu tuần này
-• /month - Xem tổng chi tiêu tháng này
-• /help - Xem hướng dẫn
-
-Bot sẽ tự động sắp xếp theo thời gian! 🕐💰
-        """
-
         keyboard = [
             ["/today", "/week", "/month"],
             ["/week -1", "/month -1"],
@@ -379,7 +404,7 @@ Bot sẽ tự động sắp xếp theo thời gian! 🕐💰
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-        await update.message.reply_text(welcome_msg, reply_markup=reply_markup)
+        await update.message.reply_text(msg, reply_markup=reply_markup)
         logger.info(f"Welcome message + keyboard sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
@@ -394,32 +419,7 @@ async def help_command(update, context):
     """Show help message"""
     try:
         logger.info(f"Help command requested by user {update.effective_user.id}")
-        
-        help_msg = """
-📖 Hướng dẫn sử dụng Money Tracker Bot:
-
-💰 Các định dạng ghi chi tiêu:
-
-🔸 Mặc định (thời gian hiện tại):
-• 45000 ăn sáng
-• 200000 mua áo
-
-🔸 Chỉ định ngày (12:00 mặc định):
-• 02/09 15000 cà phê
-• 05/09 80000 ăn tối
-
-⏰ Chỉ định ngày + giờ:
-• 02/09 08:30 25000 sáng
-• 03/09 14:00 120000 trưa
-
-📊 Lệnh thống kê:
-• /today - Chi tiêu hôm nay
-• /week - Chi tiêu tuần này
-• /month - Chi tiêu tháng này
-
-🤖 Bot tự động sắp xếp theo thời gian!
-        """
-        await update.message.reply_text(help_msg)
+        await update.message.reply_text(msg)
         logger.info(f"Help message sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
@@ -438,6 +438,43 @@ async def log_expense(update, context):
     try:
         logger.info(f"Log expense requested by user {update.effective_user.id}: '{text}'")
         
+        # Quick shortcuts for common expenses
+        shortcuts = {
+            # Ultra-fast single characters
+            "c": "cafe",
+            "a": "ăn",
+            "s": "ăn sáng", 
+            "t": "ăn trưa",
+            "o": "ăn tối",
+            "x": "xăng xe",
+            "g": "grab",
+            "b": "xe buýt",
+            
+            # Emoji shortcuts (copy-paste friendly)
+            "☕": "cafe",
+            "🍽️": "ăn",
+            "🌅": "ăn sáng",
+            "🌞": "ăn trưa", 
+            "🌙": "ăn tối",
+            "⛽": "xăng xe",
+            "🚗": "grab",
+            "🚌": "xe buýt",
+            
+            # Regular shortcuts  
+            "cf": "cafe",
+            "an": "ăn",
+            "sang": "ăn sáng", 
+            "trua": "ăn trưa",
+            "toi": "ăn tối",
+            "xang": "xăng xe",
+            "grab": "grab",
+            "bus": "xe buýt",
+            "com": "cơm",
+            "pho": "phở",
+            "bun": "bún",
+            "mien": "miến"
+        }
+        
         # Parse different input formats
         entry_date = None
         entry_time = None
@@ -445,44 +482,99 @@ async def log_expense(update, context):
         note = ""
         target_month = None
         
-        # Case A: Default Entry (No Date/Time) - 1000 ăn trưa
+        # Case A: Default Entry (No Date/Time) - 1000 ăn trưa or 5 cf or just "5"
         if parts[0].isdigit():
             amount = int(parts[0])
-            note = " ".join(parts[1:]) if len(parts) > 1 else "Không có ghi chú"
+            
+            # Super-fast mode: Just number, no description
+            if len(parts) == 1:
+                # User typed only a number, provide quick buttons
+                display_amount = amount
+                if amount < 1000:
+                    display_amount = amount * 1000
+                    
+                keyboard = [
+                    [InlineKeyboardButton(f"🍽️ Ăn sáng ({display_amount:,})", callback_data=f"log_{amount}_s")],
+                    [InlineKeyboardButton(f"🌅 Ăn trưa ({display_amount:,})", callback_data=f"log_{amount}_t")],
+                    [InlineKeyboardButton(f"🌙 Ăn tối ({display_amount:,})", callback_data=f"log_{amount}_t")],
+                    [InlineKeyboardButton(f"⛽ Xăng ({display_amount:,})", callback_data=f"log_{amount}_x")],
+                    [InlineKeyboardButton(f"🚗 Grab ({display_amount:,})", callback_data=f"log_{amount}_g")],
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await update.message.reply_text(
+                    f"💰 {display_amount:,} VND - Chọn loại chi tiêu:",
+                    reply_markup=reply_markup
+                )
+                return
+            
+            raw_note = " ".join(parts[1:])
+            
+            # Apply shortcuts to note
+            note_parts = raw_note.split()
+            expanded_parts = []
+            for part in note_parts:
+                expanded_parts.append(shortcuts.get(part.lower(), part))
+            note = " ".join(expanded_parts)
+            
             now = get_current_time()
             # now = get_current_time() + datetime.timedelta(days=63)
             entry_date = now.strftime("%d/%m")
             entry_time = now.strftime("%H:%M")
             target_month = now.strftime("%m/%Y")
             
-        # Case B: Date Only - 02/09 5000 cafe
+        # Case B: Date Only - 02/09 5000 cafe or 02/09 5 cf
         elif "/" in parts[0] and len(parts) >= 2 and parts[1].isdigit():
             entry_date = normalize_date(parts[0])
             amount = int(parts[1])
-            note = " ".join(parts[2:]) if len(parts) > 2 else "Không có ghi chú"
+            raw_note = " ".join(parts[2:]) if len(parts) > 2 else "Không có ghi chú"
+            
+            # Apply shortcuts to note
+            note_parts = raw_note.split()
+            expanded_parts = []
+            for part in note_parts:
+                expanded_parts.append(shortcuts.get(part.lower(), part))
+            note = " ".join(expanded_parts)
+            
             entry_time = "24:00"  # Default time
 
             day, month = entry_date.split("/")
             current_year = get_current_time().year
             target_month = f"{month}/{current_year}"
             
-        # Case C: Date + Time - 02/09 08:30 15000 breakfast
+        # Case C: Date + Time - 02/09 08:30 15000 breakfast or 02/09 08:30 15 cf
         elif "/" in parts[0] and len(parts) >= 3 and (":" in parts[1] or "h" in parts[1].lower()) and parts[2].isdigit():
             entry_date = normalize_date(parts[0])
             entry_time = normalize_time(parts[1])
             amount = int(parts[2])
-            note = " ".join(parts[3:]) if len(parts) > 3 else "Không có ghi chú"
+            raw_note = " ".join(parts[3:]) if len(parts) > 3 else "Không có ghi chú"
+            
+            # Apply shortcuts to note
+            note_parts = raw_note.split()
+            expanded_parts = []
+            for part in note_parts:
+                expanded_parts.append(shortcuts.get(part.lower(), part))
+            note = " ".join(expanded_parts)
 
             day, month = entry_date.split("/")
             current_year = get_current_time().year
             target_month = f"{month}/{current_year}"
 
         else:
-            await update.message.reply_text("❌ Định dạng không đúng!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
+            await update.message.reply_text("❌ Định dạng không đúng!\n\n� ULTRA-FAST MODES:\n\n⚡ CHỈ GÕ SỐ:\n• 5 → Chọn buttons\n• 15 → Buttons: Cafe/Ăn/Xăng/Grab\n\n⚡ SIÊU NGẮN:\n• 5 c → 5000 cafe\n• 15 t → 15000 ăn trưa\n• 200k x → 200000 xăng xe\n\n⚡ EMOJI:\n• 5 ☕ → 5000 cafe\n• 15 🍽️ → 15000 ăn\n\nShortcuts: c=cafe, a=ăn, s=ăn sáng, t=ăn trưa, o=ăn tối, x=xăng, g=grab, b=bus")
             return
 
-        # Multiply amount by 1000 if note contains "ngàn"
-        amount = amount * 1000
+        # Smart amount multipliers for faster typing
+        note_lower = note.lower()
+        if "ngàn" in note_lower or "k" in note_lower:
+            amount = amount * 1000
+        elif "triệu" in note_lower or "m" in note_lower:
+            amount = amount * 1000000
+        
+        # Auto-detect if amount is too small and likely needs multiplication
+        if amount < 1000 and not any(x in note_lower for x in ["ngàn", "k", "triệu", "m"]):
+            # If amount is less than 1000 and no multiplier specified, assume thousands
+            amount = amount * 1000
 
         logger.info(f"Parsed expense: {amount} VND on {entry_date} {entry_time} - {note} (sheet: {target_month})")
 
@@ -557,6 +649,64 @@ async def log_expense(update, context):
         logger.error(f"Error logging expense: {e}")
         await update.message.reply_text("❌ Có lỗi xảy ra. Vui lòng thử lại!")
 
+@safe_async_handler  
+async def handle_quick_expense(update, context):
+    """Handle quick expense selection from inline buttons"""
+    try:
+        query = update.callback_query
+        await query.answer()
+        
+        # Parse callback data: "log_amount_shortcut"
+        parts = query.data.split("_")
+        if len(parts) != 3 or parts[0] != "log":
+            return
+            
+        amount = int(parts[1])
+        shortcut = parts[2]
+        
+        # Get the note from shortcuts
+        shortcuts = {"s": "ăn sáng", "t": "ăn trưa", "t": "ăn tối", "x": "xăng xe", "g": "grab"}
+        note = shortcuts.get(shortcut, "")
+        
+        # Smart amount handling
+        if amount < 1000:
+            amount = amount * 1000
+        
+        # Get current time
+        now = get_current_time()
+        entry_date = now.strftime("%d/%m")
+        entry_time = now.strftime("%H:%M")
+        target_month = now.strftime("%m/%Y")
+        
+        logger.info(f"Quick expense: {amount} VND - {note}")
+        
+        # Get or create the target month's sheet
+        sheet = get_or_create_monthly_sheet(target_month)
+        
+        # Add the new entry
+        try:
+            all_values = sheet.get_values("A:D")
+        except Exception:
+            all_values = []
+            
+        next_row = len(all_values) + 1
+        range_name = f"A{next_row}:D{next_row}"
+        sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
+        
+        # Edit the original message to show success
+        await query.edit_message_text(
+            f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n📅 {entry_date} {entry_time}\n📄 Sheet: {target_month}"
+        )
+        
+        logger.info(f"Quick expense logged: {amount} VND - {note}")
+        
+    except Exception as e:
+        logger.error(f"Error in handle_quick_expense: {e}", exc_info=True)
+        try:
+            await update.callback_query.edit_message_text("❌ Có lỗi xảy ra. Vui lòng thử lại!")
+        except:
+            pass
+
 @safe_async_handler
 async def delete_expense(update, context):
     """Delete expense entry from Google Sheet"""
@@ -565,16 +715,20 @@ async def delete_expense(update, context):
     try:
         logger.info(f"Delete expense requested by user {update.effective_user.id}: '{text}'")
         
-        # Parse delete command: "del 14/10 00:11"
         parts = text.split()
-        if len(parts) < 3:
+        # Only "del hh:mm" -> assume today's date
+        if len(parts) == 2:
+            entry_date = get_current_time().strftime("%d/%m")
+            entry_time = normalize_time(parts[1])
+        # Parse delete command: "del 14/10 00:11"
+        elif len(parts) >= 3:
+            entry_date = normalize_date(parts[1])
+            entry_time = normalize_time(parts[2])
+            logger.info(f"Attempting to delete expense: {entry_date} {entry_time}")
+        else:
             logger.warning(f"Invalid delete format from user {update.effective_user.id}: '{text}'")
             await update.message.reply_text("❌ Định dạng: del dd/mm hh:mm")
             return
-            
-        entry_date = normalize_date(parts[1])
-        entry_time = normalize_time(parts[2])
-        logger.info(f"Attempting to delete expense: {entry_date} {entry_time}")
         
         # Determine target month
         now = get_current_time()
