@@ -33,7 +33,9 @@ msg = """
 
 ⚡ Mode 2: SIÊU NGẮN (1-2 ký tự)
 • 5 c → 5000 VND cafe
-• 15 t → 15000 VND ăn trưa  
+• 15 s → 15000 VND ăn sang  
+• 30 t → 30000 VND ăn trưa
+• 50 o → 50000 VND ăn tối
 • 200 x → 200000 VND xăng xe
 • 2m g → 2000000 VND grab
 
@@ -489,10 +491,8 @@ async def log_expense(update, context):
             # Super-fast mode: Just number, no description
             if len(parts) == 1:
                 # User typed only a number, provide quick buttons
-                display_amount = amount
-                if amount < 1000:
-                    display_amount = amount * 1000
-                    
+                display_amount = amount * 1000
+
                 keyboard = [
                     [InlineKeyboardButton(f"🍽️ Ăn sáng ({display_amount:,})", callback_data=f"log_{amount}_s")],
                     [InlineKeyboardButton(f"🌅 Ăn trưa ({display_amount:,})", callback_data=f"log_{amount}_t")],
@@ -565,16 +565,7 @@ async def log_expense(update, context):
             return
 
         # Smart amount multipliers for faster typing
-        note_lower = note.lower()
-        if "ngàn" in note_lower or "k" in note_lower:
-            amount = amount * 1000
-        elif "triệu" in note_lower or "m" in note_lower:
-            amount = amount * 1000000
-        
-        # Auto-detect if amount is too small and likely needs multiplication
-        if amount < 1000 and not any(x in note_lower for x in ["ngàn", "k", "triệu", "m"]):
-            # If amount is less than 1000 and no multiplier specified, assume thousands
-            amount = amount * 1000
+        amount = amount * 1000
 
         logger.info(f"Parsed expense: {amount} VND on {entry_date} {entry_time} - {note} (sheet: {target_month})")
 
@@ -669,8 +660,7 @@ async def handle_quick_expense(update, context):
         note = shortcuts.get(shortcut, "")
         
         # Smart amount handling
-        if amount < 1000:
-            amount = amount * 1000
+        amount = amount * 1000
         
         # Get current time
         now = get_current_time()
