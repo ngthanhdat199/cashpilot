@@ -1,3 +1,4 @@
+from collections import defaultdict
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from dateutil.relativedelta import relativedelta
 from telegram import ReplyKeyboardMarkup
@@ -49,20 +50,23 @@ msg = """
 • 02/09 5 c → 02/09 5000 VND cafe
 • 02/09 08:30 15 t → 02/09 08:30 15000 VND ăn trưa
 
-� Smart multipliers:
-• k/ngàn = x1000 (5k = 5000)
-• m/triệu = x1000000 (2m = 2000000)
-• Số < 1000 tự động x1000
-
 📊 Lệnh thống kê:
 • /today - Chi tiêu hôm nay
 • /week - Chi tiêu tuần này  
 • /month - Chi tiêu tháng này
+• /gas - Chi tiêu xăng xe tháng này
 
 🗑️ Xóa: del dd/mm hh:mm
 
 🤖 Bot tự động sắp xếp theo thời gian!
         """
+
+# Get month name in Vietnamese
+month_names = {
+    "01": "Tháng 1", "02": "Tháng 2", "03": "Tháng 3", "04": "Tháng 4",
+    "05": "Tháng 5", "06": "Tháng 6", "07": "Tháng 7", "08": "Tháng 8", 
+    "09": "Tháng 9", "10": "Tháng 10", "11": "Tháng 11", "12": "Tháng 12"
+}
 
 # Load configuration
 try:
@@ -200,6 +204,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["today", "t"], today))
         bot_app.add_handler(CommandHandler(["week", "w"], week))
         bot_app.add_handler(CommandHandler(["month", "m"], month))
+        bot_app.add_handler(CommandHandler(["gas", "g"], gas))
 
         # Callback handler for quick expense buttons
         bot_app.add_handler(CallbackQueryHandler(handle_quick_expense))
@@ -238,6 +243,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["today", "t"], today))
         fresh_app.add_handler(CommandHandler(["week", "w"], week))
         fresh_app.add_handler(CommandHandler(["month", "m"], month))
+        fresh_app.add_handler(CommandHandler(["gas", "g"], gas))
         fresh_app.add_handler(CallbackQueryHandler(handle_quick_expense))
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
@@ -402,7 +408,8 @@ async def start(update, context):
         keyboard = [
             ["/today", "/week", "/month"],
             ["/week -1", "/month -1"],
-            ["/help"]
+            ["/help"],
+            ["/gas", "/gas -1"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -920,7 +927,6 @@ async def week(update, context: CallbackContext):
         count = len(week_expenses)
         logger.info(f"Found {count} expenses for this week with total {total} VND")
 
-        from collections import defaultdict
         grouped = defaultdict(list)
         for r in week_expenses:
             grouped[r.get("Date", "")].append(r)
@@ -1001,13 +1007,6 @@ async def month(update, context: CallbackContext):
         count = len(month_expenses)
         logger.info(f"Found {count} expenses for this month with total {total} VND")
         
-        # Get month name in Vietnamese
-        month_names = {
-            "01": "Tháng 1", "02": "Tháng 2", "03": "Tháng 3", "04": "Tháng 4",
-            "05": "Tháng 5", "06": "Tháng 6", "07": "Tháng 7", "08": "Tháng 8", 
-            "09": "Tháng 9", "10": "Tháng 10", "11": "Tháng 11", "12": "Tháng 12"
-        }
-        
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
         month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
@@ -1022,6 +1021,89 @@ async def month(update, context: CallbackContext):
             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in month command: {reply_error}")
+
+@safe_async_handler
+async def gas(update, context):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    """Get this month's total expenses"""
+    try:
+        logger.info(f"Gas command requested by user {update.effective_user.id}")
+
+        now = get_current_time() + relativedelta(months=offset)    
+        target_month = now.strftime("%m/%Y")
+
+        logger.info(f"Getting gas expenses for sheet {target_month}")
+
+        try:
+            current_sheet = get_or_create_monthly_sheet(target_month)
+            logger.info(f"Successfully obtained sheet for {target_month}")
+        except Exception as sheet_error:
+            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            return
+    
+        try:
+            records = current_sheet.get_all_records()
+            logger.info(f"Retrieved {len(records)} records from sheet")
+        except Exception as records_error:
+            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            return
+    
+        gas_expenses = []
+        total = 0
+
+        for r in records:
+            note = r.get("Note", "").lower()
+            if "đổ xăng" in note:
+                record_amount = r.get("VND", 0)
+                if record_amount:  # Only count if amount exists
+                    gas_expenses.append(r)
+                    total += parse_amount(record_amount)
+        
+        count = len(gas_expenses)
+        logger.info(f"Found {count} gas expenses for this month with total {total} VND")
+
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+
+        grouped = defaultdict(list)
+        for r in gas_expenses:
+            grouped[r.get("Date", "")].append(r)
+
+        details = ""
+        for day, rows in sorted(grouped.items()):
+            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+            for i, r in enumerate(rows, start=1):
+                details += format_expense(r, i) + "\n"
+
+        response = (
+            f"⛽ Tổng kết đổ xăng {month_display}:\n"
+            f"💰 {total:,.0f} VND\n"
+            f"📝 {count} giao dịch\n"
+            f"📄 Sheet: {target_month}")
+        
+        if details:
+            response += f"\n\n📝 Chi tiết:{details}"
+
+        await update.message.reply_text(response)
+        logger.info(f"Gas summary sent successfully to user {update.effective_user.id}")
+    
+    except Exception as e:
+        logger.error(f"Error in gas command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in gas command: {reply_error}")
 
 @safe_async_handler
 async def handle_message(update, context):
