@@ -23,7 +23,7 @@ from telegram import Update
 # Get the directory where this script is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "0.1.0"  # Default version
+__version__ = "0.1.1"  # Default version
 
 help_msg = f"""
 📖 Hướng dẫn sử dụng Money Tracker Bot:
