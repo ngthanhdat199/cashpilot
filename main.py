@@ -1,3 +1,4 @@
+import subprocess
 from collections import defaultdict
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from dateutil.relativedelta import relativedelta
@@ -22,12 +23,11 @@ from telegram import Update
 # Get the directory where this script is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-msg = """
+__version__ = "0.1.0"  # Default version
+
+help_msg = f"""
 📖 Hướng dẫn sử dụng Money Tracker Bot:
-
-� ULTRA-FAST TYPING MODES:
-
-⚡ Mode 1: CHỈ GÕ SỐ (nhanh nhất!)
+⚡ ULTRA-FAST TYPING MODES:
 • 5 → Hiện buttons: Cafe/Ăn/Xăng/Grab
 • 15 → Chọn 1 click, xong!
 • 200 → Tự động nhân 1000 nếu cần
@@ -59,7 +59,8 @@ msg = """
 🗑️ Xóa: del dd/mm hh:mm
 
 🤖 Bot tự động sắp xếp theo thời gian!
-        """
+📌 Phiên bản: {__version__}
+"""
 
 # Get month name in Vietnamese
 month_names = {
@@ -200,7 +201,7 @@ def setup_bot():
         
         # Command handlers
         bot_app.add_handler(CommandHandler(["start", "s"], start))
-        bot_app.add_handler(CommandHandler(["help", "h"], help_command))
+        bot_app.add_handler(CommandHandler(["help", "h"], help))
         bot_app.add_handler(CommandHandler(["today", "t"], today))
         bot_app.add_handler(CommandHandler(["week", "w"], week))
         bot_app.add_handler(CommandHandler(["month", "m"], month))
@@ -239,7 +240,7 @@ def create_fresh_bot():
         
         # Add all handlers
         fresh_app.add_handler(CommandHandler(["start", "s"], start))
-        fresh_app.add_handler(CommandHandler(["help", "h"], help_command))
+        fresh_app.add_handler(CommandHandler(["help", "h"], help))
         fresh_app.add_handler(CommandHandler(["today", "t"], today))
         fresh_app.add_handler(CommandHandler(["week", "w"], week))
         fresh_app.add_handler(CommandHandler(["month", "m"], month))
@@ -400,6 +401,27 @@ def get_or_create_monthly_sheet(target_month=None):
             logger.error(f"Even fallback to sheet1 failed: {fallback_error}", exc_info=True)
             raise
 
+def get_gas_total(month):
+    """Helper to get total gas expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+        
+        gas_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if "đổ xăng" in note:
+                amount = r.get("VND", 0)
+                if amount:
+                    gas_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return gas_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting gas total for {month}: {e}", exc_info=True)
+        return [], 0
+
 @safe_async_handler
 async def start(update, context):
     """Send welcome message when bot starts"""
@@ -408,12 +430,12 @@ async def start(update, context):
         keyboard = [
             ["/today", "/week", "/month"],
             ["/week -1", "/month -1"],
-            ["/gas", "/gas -1"]
-            ["/help"],
+            ["/gas", "/gas -1"],
+            ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-        await update.message.reply_text(msg, reply_markup=reply_markup)
+        await update.message.reply_text(help_msg, reply_markup=reply_markup)
         logger.info(f"Welcome message + keyboard sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
@@ -424,19 +446,19 @@ async def start(update, context):
             logger.error(f"Failed to send error message in start command: {reply_error}")
 
 @safe_async_handler
-async def help_command(update, context):
+async def help(update, context):
     """Show help message"""
     try:
         logger.info(f"Help command requested by user {update.effective_user.id}")
-        await update.message.reply_text(msg)
+        await update.message.reply_text(help_msg)
         logger.info(f"Help message sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
-        logger.error(f"Error in help_command for user {update.effective_user.id}: {e}", exc_info=True)
+        logger.error(f"Error in help for user {update.effective_user.id}: {e}", exc_info=True)
         try:
             await update.message.reply_text("❌ Có lỗi xảy ra khi hiển thị hướng dẫn. Vui lòng thử lại!")
         except Exception as reply_error:
-            logger.error(f"Failed to send error message in help_command: {reply_error}")
+            logger.error(f"Failed to send error message in help: {reply_error}")
 
 @safe_async_handler
 async def log_expense(update, context):
@@ -1057,17 +1079,6 @@ async def gas(update, context):
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
             await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
             return
-    
-        # gas_expenses = []
-        # total = 0
-
-        # for r in records:
-        #     note = r.get("Note", "").lower()
-        #     if "đổ xăng" in note:
-        #         record_amount = r.get("VND", 0)
-        #         if record_amount:  # Only count if amount exists
-        #             gas_expenses.append(r)
-        #             total += parse_amount(record_amount)
 
         gas_expenses, total = get_gas_total(target_month)
         count = len(gas_expenses)
@@ -1118,26 +1129,6 @@ async def gas(update, context):
         except Exception as reply_error:
             logger.error(f"Failed to send error message in gas command: {reply_error}")
 
-def get_gas_total(month):
-    """Helper to get total gas expenses for a given month"""
-    try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
-        
-        gas_expenses = []
-        total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if "đổ xăng" in note:
-                amount = r.get("VND", 0)
-                if amount:
-                    gas_expenses.append(r)
-                    total += parse_amount(amount)
-        
-        return gas_expenses, total
-    except Exception as e:
-        logger.error(f"Error getting gas total for {month}: {e}", exc_info=True)
-        return [], 0
 
 @safe_async_handler
 async def handle_message(update, context):
