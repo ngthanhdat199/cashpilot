@@ -408,8 +408,8 @@ async def start(update, context):
         keyboard = [
             ["/today", "/week", "/month"],
             ["/week -1", "/month -1"],
-            ["/help"],
             ["/gas", "/gas -1"]
+            ["/help"],
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -1038,6 +1038,7 @@ async def gas(update, context):
 
         now = get_current_time() + relativedelta(months=offset)    
         target_month = now.strftime("%m/%Y")
+        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting gas expenses for sheet {target_month}")
 
@@ -1057,17 +1058,18 @@ async def gas(update, context):
             await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
             return
     
-        gas_expenses = []
-        total = 0
+        # gas_expenses = []
+        # total = 0
 
-        for r in records:
-            note = r.get("Note", "").lower()
-            if "đổ xăng" in note:
-                record_amount = r.get("VND", 0)
-                if record_amount:  # Only count if amount exists
-                    gas_expenses.append(r)
-                    total += parse_amount(record_amount)
-        
+        # for r in records:
+        #     note = r.get("Note", "").lower()
+        #     if "đổ xăng" in note:
+        #         record_amount = r.get("VND", 0)
+        #         if record_amount:  # Only count if amount exists
+        #             gas_expenses.append(r)
+        #             total += parse_amount(record_amount)
+
+        gas_expenses, total = get_gas_total(target_month)
         count = len(gas_expenses)
         logger.info(f"Found {count} gas expenses for this month with total {total} VND")
 
@@ -1086,14 +1088,25 @@ async def gas(update, context):
             for i, r in enumerate(rows, start=1):
                 details += format_expense(r, i) + "\n"
 
+        previous_expenses, previous_total = get_gas_total(previous_month)
+
+        # Calculate percentage change
+        if previous_total > 0:
+            percentage_change = ((total - previous_total) / previous_total) * 100
+            change_symbol = "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+        else:
+            percentage_text = ""
+
         response = (
-            f"⛽ Tổng kết đổ xăng {month_display}:\n"
-            f"💰 {total:,.0f} VND\n"
-            f"📝 {count} giao dịch\n"
-            f"📄 Sheet: {target_month}")
+            f"⛽ Tổng kết đổ xăng {month_display}\n"
+            f"💰 Tổng chi: {total:,.0f} VND\n"
+            f"📝 Giao dịch: {count}\n"
+            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+        )
         
         if details:
-            response += f"\n\n📝 Chi tiết:{details}"
+            response += f"\n📝 Chi tiết:{details}"
 
         await update.message.reply_text(response)
         logger.info(f"Gas summary sent successfully to user {update.effective_user.id}")
@@ -1104,6 +1117,27 @@ async def gas(update, context):
             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in gas command: {reply_error}")
+
+def get_gas_total(month):
+    """Helper to get total gas expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+        
+        gas_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if "đổ xăng" in note:
+                amount = r.get("VND", 0)
+                if amount:
+                    gas_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return gas_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting gas total for {month}: {e}", exc_info=True)
+        return [], 0
 
 @safe_async_handler
 async def handle_message(update, context):
