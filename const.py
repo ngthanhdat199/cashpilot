@@ -3,26 +3,25 @@ from utils.version import get_version
 
 # Global variable to store bot application - initialize it immediately
 bot_app = None
-
-# Simple circuit breaker for webhook failures
 webhook_failures = 0
 last_failure_time = None
-MAX_FAILURES = 10
-FAILURE_RESET_TIME = 300  # 5 minutes
 use_fresh_bots = True  # Flag to enable/disable fresh bot instances
 
+# Simple circuit breaker for webhook failures
+MAX_FAILURES = 10
+FAILURE_RESET_TIME = 300  # 5 minutes
 TOKEN = config["telegram"]["bot_token"]
 WEBHOOK_URL = config["telegram"]["webhook_url"]
 PROJECT_HOME = '/home/thanhdat19/track-money'
 
 # Get month name in Vietnamese
-month_names = {
+MONTH_NAMES = {
     "01": "Tháng 1", "02": "Tháng 2", "03": "Tháng 3", "04": "Tháng 4",
     "05": "Tháng 5", "06": "Tháng 6", "07": "Tháng 7", "08": "Tháng 8", 
     "09": "Tháng 9", "10": "Tháng 10", "11": "Tháng 11", "12": "Tháng 12"
 }
 
-help_msg = f"""
+HELP_MSG = f"""
 📖 Hướng dẫn sử dụng Money Tracker Bot:
 
 ⚡ ULTRA-FAST TYPING MODES:
@@ -60,7 +59,7 @@ help_msg = f"""
 📌 Phiên bản: {get_version()}
 """
 
-log_expense_msg = """
+LOG_EXPENSE_MSG = """
 ❌ Định dạng không đúng!
 
 📖 Cách nhập hợp lệ:
@@ -85,7 +84,7 @@ log_expense_msg = """
 🚌 b = bus
 """
 
-delete_expense_msg = """
+DELETE_EXPENSE_MSG = """
 ❌ Định dạng xóa không đúng!
 
 🗑️ Cách xóa giao dịch:
@@ -100,3 +99,6 @@ delete_expense_msg = """
 ⏱️ `del 08h30s45` → Hôm nay lúc 08:30:45
 ⏱️ `del 14/10 10h30s45` → Ngày 14/10 lúc 10:30:45
 """
+
+FOOD_KEYWORDS = ["ăn", "cơm", "phở", "bún", "mì", "bánh"]
+DATING_KEYWORDS = ["hanuri", "matcha"]

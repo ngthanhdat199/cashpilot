@@ -8,6 +8,7 @@ from utils.timezone import get_current_time
 from config import config, BASE_DIR
 from google.oauth2.service_account import Credentials
 from utils.logger import logger
+from const import FOOD_KEYWORDS, DATING_KEYWORDS
 
 # Google Sheets setup
 try:
@@ -129,6 +130,18 @@ def normalize_time(time_str: str) -> str:
     
     return time_str
 
+def has_keyword(note: str, keywords: list[str]) -> bool:
+    """
+    Check if a note contains any keyword as a whole token.
+    Example:
+        note = "ăn sáng cơm gà"
+        keywords = ["ăn", "cơm"]
+        -> True
+    """
+    note = note.lower()
+    tokens = re.findall(r"\w+", note)  # split into words
+    return any(k in tokens for k in keywords)
+
 def get_or_create_monthly_sheet(target_month=None):
     """Get month's sheet or create a new one for target month"""
     try:
@@ -238,12 +251,12 @@ def get_food_total(month):
     try:
         sheet = get_or_create_monthly_sheet(month)
         records = sheet.get_all_records()
-        
+
         food_expenses = []
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if any(k in note for k in ["ăn", "cơm", "phở", "bún", "mì", "bánh"]):
+            if has_keyword(note, FOOD_KEYWORDS):
                 amount = r.get("VND", 0)
                 if amount:
                     food_expenses.append(r)
@@ -260,12 +273,12 @@ def get_dating_total(month):
     try:
         sheet = get_or_create_monthly_sheet(month)
         records = sheet.get_all_records()
-        
+
         date_expenses = []
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if any(k in note for k in ["hanuri", "matcha"]):
+            if has_keyword(note, DATING_KEYWORDS):
                 amount = r.get("VND", 0)
                 if amount:
                     date_expenses.append(r)

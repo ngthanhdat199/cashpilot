@@ -4,10 +4,10 @@ from telegram.ext import CallbackContext
 import datetime
 import asyncio
 from collections import defaultdict
-from const import month_names, help_msg
+from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
 from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total
-from const import log_expense_msg, delete_expense_msg
+from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -59,7 +59,7 @@ async def start(update, context):
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-        await update.message.reply_text(help_msg, reply_markup=reply_markup)
+        await update.message.reply_text(HELP_MSG, reply_markup=reply_markup)
         logger.info(f"Welcome message + keyboard sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
@@ -74,7 +74,7 @@ async def help(update, context):
     """Show help message"""
     try:
         logger.info(f"Help command requested by user {update.effective_user.id}")
-        await update.message.reply_text(help_msg)
+        await update.message.reply_text(HELP_MSG)
         logger.info(f"Help message sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
@@ -214,7 +214,7 @@ async def log_expense(update, context):
             target_month = f"{month}/{current_year}"
 
         else:
-            await update.message.reply_text(log_expense_msg)
+            await update.message.reply_text(LOG_EXPENSE_MSG)
             return
 
         # Smart amount multipliers for faster typing
@@ -369,7 +369,7 @@ async def delete_expense(update, context):
             entry_time = normalize_time(parts[2])
             logger.info(f"Attempting to delete expense: {entry_date} {entry_time}")
         else:
-            await update.message.reply_text(delete_expense_msg)
+            await update.message.reply_text(DELETE_EXPENSE_MSG)
             return
         
         # Determine target month
@@ -654,7 +654,7 @@ async def month(update, context: CallbackContext):
         
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
         
         _, food_total = get_food_total(target_month)
         logger.info(f"Total food expenses for {target_month}: {food_total} VND")
@@ -723,7 +723,7 @@ async def gas(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         grouped = defaultdict(list)
         for r in gas_expenses:
@@ -808,7 +808,7 @@ async def food(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         grouped = defaultdict(list)
         for r in food_expenses:
@@ -893,7 +893,7 @@ async def dating(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         grouped = defaultdict(list)
         for r in dating_expenses:
