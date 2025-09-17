@@ -1,5 +1,5 @@
 from config import config
-from main import __version__
+from helper import get_version
 
 # Global variable to store bot application - initialize it immediately
 bot_app = None
@@ -55,5 +55,5 @@ help_msg = f"""
 🗑️ Xóa: del dd/mm hh:mm
 
 🤖 Bot tự động sắp xếp theo thời gian!
-📌 Phiên bản: {__version__}
+📌 Phiên bản: {get_version()}
 """
