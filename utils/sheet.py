@@ -90,21 +90,43 @@ def normalize_date(date_str: str) -> str:
 def normalize_time(time_str: str) -> str:
     """
     Normalize time formats:
-    - '10h'   -> '10:00'
-    - '01h'   -> '01:00'
-    - '10h30' -> '10:30'
-    - '10h5'  -> '10:05'
-    - '10:05' -> '10:05' (unchanged)
+    - '10h'       -> '10:00:00'
+    - '01h'       -> '01:00:00'
+    - '10h30'     -> '10:30:00'
+    - '10h5'      -> '10:05:00'
+    - '10h30s45'  -> '10:30:45'
+    - '10:05'     -> '10:05:00'
+    - '10:05:30'  -> '10:05:30' (unchanged)
     """
     time_str = time_str.strip().lower().replace(" ", "")
     
     if "h" in time_str:
-        parts = time_str.split("h")
-        hour = parts[0].zfill(2) if parts[0] else "00"
-        minute = parts[1].zfill(2) if len(parts) > 1 and parts[1] else "00"
-        return f"{hour}:{minute}"
+        # Split by 'h' first
+        h_parts = time_str.split("h")
+        hour = h_parts[0].zfill(2) if h_parts[0] else "00"
+        
+        # Check if there's minute/second part after 'h'
+        if len(h_parts) > 1 and h_parts[1]:
+            remaining = h_parts[1]
+            
+            # Check if there's 's' for seconds
+            if "s" in remaining:
+                s_parts = remaining.split("s")
+                minute = s_parts[0].zfill(2) if s_parts[0] else "00"
+                second = s_parts[1].zfill(2) if len(s_parts) > 1 and s_parts[1] else "00"
+            else:
+                minute = remaining.zfill(2)
+                second = "00"
+        else:
+            minute = "00"
+            second = "00"
+        
+        return f"{hour}:{minute}:{second}"
     
-    # Already colon format
+    # Already colon format - add seconds if missing
+    if time_str.count(":") == 1:
+        return f"{time_str}:00"
+    
     return time_str
 
 def get_or_create_monthly_sheet(target_month=None):

@@ -172,7 +172,7 @@ async def log_expense(update, context):
             now = get_current_time()
             # now = get_current_time() + datetime.timedelta(days=63)
             entry_date = now.strftime("%d/%m")
-            entry_time = now.strftime("%H:%M")
+            entry_time = now.strftime("%H:%M:%S")
             target_month = now.strftime("%m/%Y")
             
         # Case B: Date Only - 02/09 5000 cafe or 02/09 5 cf
@@ -188,7 +188,7 @@ async def log_expense(update, context):
                 expanded_parts.append(shortcuts.get(part.lower(), part))
             note = " ".join(expanded_parts)
             
-            entry_time = "24:00"  # Default time
+            entry_time = "24:00:00"  # Default time
 
             day, month = entry_date.split("/")
             current_year = get_current_time().year
