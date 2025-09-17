@@ -1,8 +1,8 @@
-from config import config, logger
+from config import config, BASE_DIR
 import os
 from google.oauth2.service_account import Credentials
 import gspread
-from config import BASE_DIR
+from logger import logger
 
 # Google Sheets setup
 try:

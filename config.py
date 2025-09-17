@@ -1,7 +1,6 @@
 import os
 import json
 
-
 # Get the directory where this script is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

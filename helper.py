@@ -3,11 +3,10 @@ import unicodedata
 import re
 import datetime
 import pytz
-from config import config
+from config import config, BASE_DIR
 import asyncio
 from sheet import spreadsheet
 import gspread
-from config import BASE_DIR
 from logger import logger
 
 # Timezone setup
