@@ -54,7 +54,7 @@ async def start(update, context):
         keyboard = [
             ["/today", "/week", "/month"],
             ["/week -1", "/month -1"],
-            ["/gas", "/gas -1", "/food", "/food -1"],
+            ["/gas", "/gas -1", "/food", "/food -1", "/dating", "/dating -1"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
