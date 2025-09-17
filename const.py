@@ -58,3 +58,44 @@ help_msg = f"""
 🤖 Bot tự động sắp xếp theo thời gian!
 📌 Phiên bản: {get_version()}
 """
+
+log_expense_msg = """
+❌ Định dạng không đúng!
+
+📖 Cách nhập hợp lệ:
+
+🅰️ Case A: Mặc định (không ngày/giờ)
+➡️ `1000 t` → dd:mm hh:mm:ss 1000 VND 🍱 Ăn trưa  
+
+🅱️ Case B: Có ngày (mặc định 00:00:00)
+📅 `02/09 5000 c` → 02/09 00:00:00 ☕ 5000 VND Cafe  
+
+🅾️ Case C: Có ngày + giờ
+⏰ `02/09 08h30s10 15000 s` → 02/09 08:30:10 🍳 15000 VND Ăn sáng  
+
+🔑 Shortcuts:  
+☕ c = cafe  
+🍽️ a = ăn  
+🥐 s = ăn sáng  
+🍱 t = ăn trưa  
+🍲 o = ăn tối  
+⛽ x = xăng 
+🚗 g = grab  
+🚌 b = bus
+"""
+
+delete_expense_msg = """
+❌ Định dạng xóa không đúng!
+
+🗑️ Cách xóa giao dịch:
+
+🅰️ Case A: Chỉ nhập giờ (mặc định hôm nay)  
+⏰ `del 08h30` → Xóa hôm nay lúc 08:30:00
+
+🅱️ Case B: Ngày + Giờ  
+📅 `del 14/10 00h11` → Xóa giao dịch ngày 14/10 lúc 00:11:00
+
+🅾️ Case C: Ngày + Giờ + Giây (chính xác tuyệt đối)  
+⏱️ `del 08h30s45` → Hôm nay lúc 08:30:45
+⏱️ `del 14/10 10h30s45` → Ngày 14/10 lúc 10:30:45
+"""

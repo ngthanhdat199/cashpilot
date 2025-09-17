@@ -221,7 +221,7 @@ def get_gas_total(month):
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if "đổ xăng" in note:
+            if "xăng" in note:
                 amount = r.get("VND", 0)
                 if amount:
                     gas_expenses.append(r)

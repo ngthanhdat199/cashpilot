@@ -7,6 +7,7 @@ from collections import defaultdict
 from const import month_names, help_msg
 from utils.logger import logger
 from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total
+from const import log_expense_msg, delete_expense_msg
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -188,7 +189,7 @@ async def log_expense(update, context):
                 expanded_parts.append(shortcuts.get(part.lower(), part))
             note = " ".join(expanded_parts)
             
-            entry_time = "24:00:00"  # Default time
+            entry_time = "00:00:00"  # Default time
 
             day, month = entry_date.split("/")
             current_year = get_current_time().year
@@ -213,7 +214,7 @@ async def log_expense(update, context):
             target_month = f"{month}/{current_year}"
 
         else:
-            await update.message.reply_text("❌ Định dạng không đúng!\n\n� ULTRA-FAST MODES:\n\n⚡ CHỈ GÕ SỐ:\n• 5 → Chọn buttons\n• 15 → Buttons: Cafe/Ăn/Xăng/Grab\n\n⚡ SIÊU NGẮN:\n• 5 c → 5000 cafe\n• 15 t → 15000 ăn trưa\n• 200k x → 200000 xăng xe\n\n⚡ EMOJI:\n• 5 ☕ → 5000 cafe\n• 15 🍽️ → 15000 ăn\n\nShortcuts: c=cafe, a=ăn, s=ăn sáng, t=ăn trưa, o=ăn tối, x=xăng, g=grab, b=bus")
+            await update.message.reply_text(log_expense_msg)
             return
 
         # Smart amount multipliers for faster typing
@@ -368,8 +369,7 @@ async def delete_expense(update, context):
             entry_time = normalize_time(parts[2])
             logger.info(f"Attempting to delete expense: {entry_date} {entry_time}")
         else:
-            logger.warning(f"Invalid delete format from user {update.effective_user.id}: '{text}'")
-            await update.message.reply_text("❌ Định dạng: del dd/mm hh:mm")
+            await update.message.reply_text(delete_expense_msg)
             return
         
         # Determine target month
