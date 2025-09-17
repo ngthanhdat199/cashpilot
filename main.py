@@ -25,7 +25,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_version():
     try:
-        with open("VERSION") as f:
+        version_file = os.path.join(BASE_DIR, "VERSION")
+        with open(version_file) as f:
             return f.read().strip()
     except Exception:
         return "unknown"
