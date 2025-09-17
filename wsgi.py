@@ -1,13 +1,10 @@
 import sys
-import os
+from const import PROJECT_HOME
+from main import app
 
 # Add your project directory to the Python path
-project_home = '/home/thanhdat19/track-money'
-if project_home not in sys.path:
-    sys.path = [project_home] + sys.path
-
-# Import your Flask app and bot components
-from main import app
+if PROJECT_HOME not in sys.path:
+    sys.path = [PROJECT_HOME] + sys.path
 
 # For PythonAnywhere, the WSGI application should be called 'application'
 application = app

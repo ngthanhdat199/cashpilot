@@ -1,29 +1,34 @@
 import os
 import unicodedata
 import re
-import datetime
-import pytz
-from config import config, BASE_DIR
-import asyncio
-from sheet import spreadsheet
 import gspread
-from logger import logger
+import gspread
+from utils.logger import logger
+from sheet import spreadsheet
+from config import config
+from utils.timezone import get_current_time
+from config import config, BASE_DIR
+from google.oauth2.service_account import Credentials
+from utils.logger import logger
 
-# Timezone setup
-timezone = pytz.timezone(config["settings"]["timezone"])
+# Google Sheets setup
+try:
+    scope = config["google_sheets"]["scopes"]
+    credentials_path = os.path.join(BASE_DIR, config["google_sheets"]["credentials_file"])
+    creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
+    client = gspread.authorize(creds)
+    # Open the specific Google Sheet by ID from the URL
+    spreadsheet = client.open_by_key(config["google_sheets"]["spreadsheet_id"])
+    logger.info(f"Google Sheets connected successfully using credentials from {credentials_path}")
+except Exception as e:
+    logger.error(f"Failed to connect to Google Sheets: {e}")
+    print("⚠️  Please make sure you have:")
+    print(f"1. Created {config['google_sheets']['credentials_file']} file in {BASE_DIR}")
+    print(f"2. Shared the Google Sheet (ID: {config['google_sheets']['spreadsheet_id']}) with your service account email")
+    print("3. The sheet has the correct permissions")
+    exit(1)
 
-def get_version():
-    try:
-        version_file = os.path.join(BASE_DIR, "VERSION")
-        with open(version_file) as f:
-            return f.read().strip()
-    except Exception:
-        return "unknown"
-
-def get_current_time():
-    """Get current time in the configured timezone"""
-    return datetime.datetime.now(timezone)
-
+# Helper functions for parsing and formatting
 def parse_amount(value):
     """
     Convert an amount from int/float/str into a float (VND).
@@ -103,42 +108,6 @@ def normalize_time(time_str: str) -> str:
     
     # Already colon format
     return time_str
-
-def safe_async_handler(handler_func):
-    """Decorator to ensure handlers run in a safe async context"""
-    async def wrapper(update, context):
-        try:
-            # Get information about the current async context
-            try:
-                current_loop = asyncio.get_running_loop()
-                logger.debug(f"Handler {handler_func.__name__} running in loop: {id(current_loop)}")
-                
-                if current_loop.is_closed():
-                    logger.error(f"Current event loop is closed in {handler_func.__name__}")
-                    raise RuntimeError("Event loop is closed")
-                    
-            except RuntimeError as loop_error:
-                logger.error(f"Event loop issue in {handler_func.__name__}: {loop_error}")
-                # Try to send a basic error message without using the problematic loop
-                try:
-                    await update.message.reply_text("❌ Có lỗi hệ thống xảy ra. Vui lòng thử lại!")
-                except:
-                    pass
-                return
-            
-            # Execute the actual handler
-            return await handler_func(update, context)
-            
-        except Exception as e:
-            logger.error(f"Error in safe_async_handler for {handler_func.__name__}: {e}", exc_info=True)
-            try:
-                # Try to send error message, but don't fail if this also fails
-                await update.message.reply_text("❌ Có lỗi hệ thống xảy ra. Vui lòng thử lại sau!")
-            except Exception as reply_error:
-                logger.error(f"Failed to send error message in {handler_func.__name__}: {reply_error}")
-            
-    wrapper.__name__ = handler_func.__name__
-    return wrapper
 
 def get_or_create_monthly_sheet(target_month=None):
     """Get month's sheet or create a new one for target month"""

@@ -1,5 +1,5 @@
 from config import config
-from helper import get_version
+from utils.version import get_version
 
 # Global variable to store bot application - initialize it immediately
 bot_app = None
@@ -13,6 +13,7 @@ use_fresh_bots = True  # Flag to enable/disable fresh bot instances
 
 TOKEN = config["telegram"]["bot_token"]
 WEBHOOK_URL = config["telegram"]["webhook_url"]
+PROJECT_HOME = '/home/thanhdat19/track-money'
 
 # Get month name in Vietnamese
 month_names = {
