@@ -231,3 +231,48 @@ def get_gas_total(month):
     except Exception as e:
         logger.error(f"Error getting gas total for {month}: {e}", exc_info=True)
         return [], 0
+
+# helper for food totals
+def get_food_total(month):
+    """Helper to get total food expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+        
+        food_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if any(k in note for k in ["ăn", "cơm", "phở", "bún", "mì", "bánh"]):
+                amount = r.get("VND", 0)
+                if amount:
+                    food_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return food_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting food total for {month}: {e}", exc_info=True)
+        return [], 0
+    
+# helper for dating totals
+def get_dating_total(month):
+    """Helper to get total date expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+        
+        date_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if any(k in note for k in ["hanuri", "matcha"]):
+                amount = r.get("VND", 0)
+                if amount:
+                    date_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return date_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting dating total for {month}: {e}", exc_info=True)
+        return [], 0
+    

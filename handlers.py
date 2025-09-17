@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import month_names, help_msg
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total
 from const import log_expense_msg, delete_expense_msg
 
 def safe_async_handler(handler_func):
@@ -54,7 +54,7 @@ async def start(update, context):
         keyboard = [
             ["/today", "/week", "/month"],
             ["/week -1", "/month -1"],
-            ["/gas", "/gas -1"],
+            ["/gas", "/gas -1", "/food", "/food -1"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -586,7 +586,7 @@ async def week(update, context: CallbackContext):
         response = (
             f"📊 Tổng kết tuần này ({week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}):\n"
             f"💰 {total:,.0f} VND\n"
-            f"📝 {count} giao dịch"
+            f"📝 {count} giao dịch\n"
         )
 
         if details:
@@ -656,7 +656,21 @@ async def month(update, context: CallbackContext):
         current_year = now.strftime("%Y")
         month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
         
-        response = f"📊 Tổng kết {month_display}:\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {target_month}"
+        _, food_total = get_food_total(target_month)
+        logger.info(f"Total food expenses for {target_month}: {food_total} VND")
+
+        _, dating_total = get_dating_total(target_month)
+        logger.info(f"Total dating expenses for {target_month}: {dating_total} VND")
+
+        response = (
+            f"📊 Tổng kết {month_display}:\n"
+            f"💰 {total:,.0f} VND\n"
+            f"📝 {count} giao dịch\n"
+            f"📄 Sheet: {target_month}\n"
+            f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
+            f"🎉 Hẹn hò: {dating_total:,.0f} VND\n"
+        )
+
         await update.message.reply_text(response)
         logger.info(f"Month summary sent successfully to user {update.effective_user.id}")
         
@@ -677,7 +691,7 @@ async def gas(update, context):
         except ValueError:
             pass
 
-    """Get this month's total expenses"""
+    """Get this month's total gas expenses"""
     try:
         logger.info(f"Gas command requested by user {update.effective_user.id}")
 
@@ -722,7 +736,7 @@ async def gas(update, context):
             for i, r in enumerate(rows, start=1):
                 details += format_expense(r, i) + "\n"
 
-        previous_expenses, previous_total = get_gas_total(previous_month)
+        _, previous_total = get_gas_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
@@ -751,6 +765,177 @@ async def gas(update, context):
             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in gas command: {reply_error}")
+
+@safe_async_handler
+async def food(update, context):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    """Get this month's total food expenses"""
+    try:
+        logger.info(f"Food command requested by user {update.effective_user.id}")
+
+        now = get_current_time() + relativedelta(months=offset)    
+        target_month = now.strftime("%m/%Y")
+        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+        logger.info(f"Getting food expenses for sheet {target_month}")
+
+        try:
+            current_sheet = get_or_create_monthly_sheet(target_month)
+            logger.info(f"Successfully obtained sheet for {target_month}")
+        except Exception as sheet_error:
+            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            return
+    
+        try:
+            records = current_sheet.get_all_records()
+            logger.info(f"Retrieved {len(records)} records from sheet")
+        except Exception as records_error:
+            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            return
+
+        food_expenses, total = get_food_total(target_month)
+        count = len(food_expenses)
+        logger.info(f"Found {count} food expenses for this month with total {total} VND")
+
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+
+        grouped = defaultdict(list)
+        for r in food_expenses:
+            grouped[r.get("Date", "")].append(r)
+
+        details = ""
+        for day, rows in sorted(grouped.items()):
+            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+            for i, r in enumerate(rows, start=1):
+                details += format_expense(r, i) + "\n"
+
+        _, previous_total = get_food_total(previous_month)
+
+        # Calculate percentage change
+        if previous_total > 0:
+            percentage_change = ((total - previous_total) / previous_total) * 100
+            change_symbol = "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+        else:
+            percentage_text = ""
+
+        response = (
+            f"🍽️ Tổng kết chi tiêu ăn uống {month_display}\n"
+            f"💰 Tổng chi: {total:,.0f} VND\n"
+            f"📝 Giao dịch: {count}\n"
+            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+        )
+        
+        if details:
+            response += f"\n📝 Chi tiết:{details}"
+
+        await update.message.reply_text(response)
+        logger.info(f"Food summary sent successfully to user {update.effective_user.id}")
+    
+    except Exception as e:
+        logger.error(f"Error in food command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in food command: {reply_error}")
+
+@safe_async_handler
+async def dating(update, context):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    """Get this month's total dating expenses"""
+    try:
+        logger.info(f"Dating command requested by user {update.effective_user.id}")
+
+        now = get_current_time() + relativedelta(months=offset)    
+        target_month = now.strftime("%m/%Y")
+        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+        logger.info(f"Getting dating expenses for sheet {target_month}")
+
+        try:
+            current_sheet = get_or_create_monthly_sheet(target_month)
+            logger.info(f"Successfully obtained sheet for {target_month}")
+        except Exception as sheet_error:
+            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            return
+    
+        try:
+            records = current_sheet.get_all_records()
+            logger.info(f"Retrieved {len(records)} records from sheet")
+        except Exception as records_error:
+            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            return
+
+        dating_expenses, total = get_dating_total(target_month)
+        count = len(dating_expenses)
+        logger.info(f"Found {count} dating expenses for this month with total {total} VND")
+
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{month_names.get(current_month, current_month)}/{current_year}"
+
+        grouped = defaultdict(list)
+        for r in dating_expenses:
+            grouped[r.get("Date", "")].append(r)
+
+        details = ""
+        for day, rows in sorted(grouped.items()):
+            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+            for i, r in enumerate(rows, start=1):
+                details += format_expense(r, i) + "\n"
+
+        _, previous_total = get_dating_total(previous_month)
+
+        # Calculate percentage change
+        if previous_total > 0:
+            percentage_change = ((total - previous_total) / previous_total) * 100
+            change_symbol = "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+        else:
+            percentage_text = ""
+
+        response = (
+            f"🍽️ Tổng kết chi tiêu hẹn hò {month_display}\n"
+            f"💰 Tổng chi: {total:,.0f} VND\n"
+            f"📝 Giao dịch: {count}\n"
+            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+        )
+        
+        if details:
+            response += f"\n📝 Chi tiết:{details}"
+
+        await update.message.reply_text(response)
+        logger.info(f"Dating summary sent successfully to user {update.effective_user.id}")
+    
+    except Exception as e:
+        logger.error(f"Error in dating command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in food command: {reply_error}")
+
 
 @safe_async_handler
 async def handle_message(update, context):

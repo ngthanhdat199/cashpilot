@@ -1,7 +1,7 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, CallbackQueryHandler
 from const import TOKEN
 from utils.logger import logger
-from handlers import start, help, today, week, month, gas, handle_message, handle_quick_expense
+from handlers import start, help, today, week, month, gas, food, dating, handle_message, handle_quick_expense
 
 # Initialize bot application immediately
 def setup_bot():
@@ -16,6 +16,8 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["week", "w"], week))
         bot_app.add_handler(CommandHandler(["month", "m"], month))
         bot_app.add_handler(CommandHandler(["gas", "g"], gas))
+        bot_app.add_handler(CommandHandler(["food", "f"], food))
+        bot_app.add_handler(CommandHandler(["dating", "d"], dating))
 
         # Callback handler for quick expense buttons
         bot_app.add_handler(CallbackQueryHandler(handle_quick_expense))
@@ -55,6 +57,9 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["week", "w"], week))
         fresh_app.add_handler(CommandHandler(["month", "m"], month))
         fresh_app.add_handler(CommandHandler(["gas", "g"], gas))
+        fresh_app.add_handler(CommandHandler(["food", "f"], food))
+        fresh_app.add_handler(CommandHandler(["dating", "d"], dating))
+
         fresh_app.add_handler(CallbackQueryHandler(handle_quick_expense))
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
