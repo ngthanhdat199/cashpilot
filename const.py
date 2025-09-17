@@ -24,6 +24,7 @@ month_names = {
 
 help_msg = f"""
 📖 Hướng dẫn sử dụng Money Tracker Bot:
+
 ⚡ ULTRA-FAST TYPING MODES:
 • 5 → Hiện buttons: Cafe/Ăn/Xăng/Grab
 • 15 → Chọn 1 click, xong!
