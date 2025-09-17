@@ -2,9 +2,7 @@ import os
 import unicodedata
 import re
 import gspread
-import gspread
 from utils.logger import logger
-from sheet import spreadsheet
 from config import config
 from utils.timezone import get_current_time
 from config import config, BASE_DIR
