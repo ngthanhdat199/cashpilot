@@ -3,11 +3,12 @@ import unicodedata
 import re
 import datetime
 import pytz
-from config import config, logger
+from config import config
 import asyncio
 from sheet import spreadsheet
 import gspread
 from config import BASE_DIR
+from logger import logger
 
 # Timezone setup
 timezone = pytz.timezone(config["settings"]["timezone"])
