@@ -590,7 +590,7 @@ async def week(update, context: CallbackContext):
         )
 
         if details:
-            response += f"\n\n📝 Chi tiết:{details}"
+            response += f"\n📝 Chi tiết:{details}"
 
         await update.message.reply_text(response)
         logger.info(f"Week summary sent successfully to user {update.effective_user.id}")
@@ -662,13 +662,16 @@ async def month(update, context: CallbackContext):
         _, dating_total = get_dating_total(target_month)
         logger.info(f"Total dating expenses for {target_month}: {dating_total} VND")
 
+        _, gas_total = get_gas_total(target_month)
+        logger.info(f"Total gas expenses for {target_month}: {gas_total} VND")
+
         response = (
             f"📊 Tổng kết {month_display}:\n"
             f"💰 {total:,.0f} VND\n"
             f"📝 {count} giao dịch\n"
-            f"📄 Sheet: {target_month}\n"
             f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
             f"🎉 Hẹn hò: {dating_total:,.0f} VND\n"
+            f"⛽ Xăng: {gas_total:,.0f} VND\n"
         )
 
         await update.message.reply_text(response)

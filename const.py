@@ -100,5 +100,5 @@ DELETE_EXPENSE_MSG = """
 ⏱️ `del 14/10 10h30s45` → Ngày 14/10 lúc 10:30:45
 """
 
-FOOD_KEYWORDS = ["ăn", "cơm", "phở", "bún", "mì", "bánh"]
-DATING_KEYWORDS = ["hanuri", "matcha"]
+FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn"]
+DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem",]
