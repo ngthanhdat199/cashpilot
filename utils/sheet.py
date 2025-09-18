@@ -139,7 +139,7 @@ def has_keyword(note: str, keywords: list[str]) -> bool:
         -> True
     """
     note = note.lower()
-    tokens = re.findall(r"\w+", note)  # split into words
+    tokens = re.findall(r"[^\s]+", note)
     return any(k in tokens for k in keywords)
 
 def get_or_create_monthly_sheet(target_month=None):

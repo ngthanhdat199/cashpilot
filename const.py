@@ -16,9 +16,9 @@ PROJECT_HOME = '/home/thanhdat19/track-money'
 
 # Get month name in Vietnamese
 MONTH_NAMES = {
-    "01": "Tháng 1", "02": "Tháng 2", "03": "Tháng 3", "04": "Tháng 4",
-    "05": "Tháng 5", "06": "Tháng 6", "07": "Tháng 7", "08": "Tháng 8", 
-    "09": "Tháng 9", "10": "Tháng 10", "11": "Tháng 11", "12": "Tháng 12"
+    "01": "tháng 1", "02": "tháng 2", "03": "tháng 3", "04": "tháng 4",
+    "05": "tháng 5", "06": "tháng 6", "07": "tháng 7", "08": "tháng 8", 
+    "09": "tháng 9", "10": "tháng 10", "11": "tháng 11", "12": "tháng 12"
 }
 
 HELP_MSG = f"""
