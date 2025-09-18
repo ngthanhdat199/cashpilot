@@ -344,7 +344,13 @@ def get_other_total(month):
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if not (has_keyword(note, FOOD_KEYWORDS) or has_keyword(note, DATING_KEYWORDS) or has_keyword(note, TRANSPORT_KEYWORDS) or RENT_KEYWORD in note):
+            if not (
+                has_keyword(note, FOOD_KEYWORDS) or 
+                has_keyword(note, DATING_KEYWORDS) or
+                has_keyword(note, TRANSPORT_KEYWORDS) or
+                RENT_KEYWORD in note or 
+                has_keyword(note, INVEST_KEYWORDS)
+            ):
                 amount = r.get("VND", 0)
                 if amount:
                     other_expenses.append(r)
