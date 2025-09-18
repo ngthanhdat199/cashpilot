@@ -310,3 +310,25 @@ def get_rent_total(month):
     except Exception as e:
         logger.error(f"Error getting rent total for {month}: {e}", exc_info=True)
         return [], 0
+    
+# helper for other totals
+def get_other_total(month):
+    """Helper to get total other expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+
+        other_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if not (has_keyword(note, FOOD_KEYWORDS) or has_keyword(note, DATING_KEYWORDS) or "xăng" in note or "thuê nhà" in note):
+                amount = r.get("VND", 0)
+                if amount:
+                    other_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return other_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting other total for {month}: {e}", exc_info=True)
+        return [], 0

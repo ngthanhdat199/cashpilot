@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
 
 def safe_async_handler(handler_func):
@@ -54,7 +54,10 @@ async def start(update, context):
         keyboard = [
             ["/today", "/week", "/month"],
             ["/week -1", "/month -1"],
-            ["/gas", "/gas -1", "/food", "/food -1", "/dating", "/dating -1"],
+            ["/gas", "/gas -1"],
+            ["/food", "/food -1"],
+            ["/dating", "/dating -1"],
+            ["/other", "/other -1"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -944,6 +947,91 @@ async def dating(update, context):
             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in food command: {reply_error}")
+
+@safe_async_handler
+async def other(update, context):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    """Get this month's total other expenses"""
+    try:
+        logger.info(f"Other command requested by user {update.effective_user.id}")
+
+        now = get_current_time() + relativedelta(months=offset)    
+        target_month = now.strftime("%m/%Y")
+        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+        logger.info(f"Getting other expenses for sheet {target_month}")
+
+        try:
+            current_sheet = get_or_create_monthly_sheet(target_month)
+            logger.info(f"Successfully obtained sheet for {target_month}")
+        except Exception as sheet_error:
+            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            return
+    
+        try:
+            records = current_sheet.get_all_records()
+            logger.info(f"Retrieved {len(records)} records from sheet")
+        except Exception as records_error:
+            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            return
+
+        other_expenses, total = get_other_total(target_month)
+        count = len(other_expenses)
+        logger.info(f"Found {count} other expenses for this month with total {total} VND")
+
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
+
+        grouped = defaultdict(list)
+        for r in other_expenses:
+            grouped[r.get("Date", "")].append(r)
+
+        details = ""
+        for day, rows in sorted(grouped.items()):
+            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+            for i, r in enumerate(rows, start=1):
+                details += format_expense(r, i) + "\n"
+
+        _, previous_total = get_other_total(previous_month)
+
+        # Calculate percentage change
+        if previous_total > 0:
+            percentage_change = ((total - previous_total) / previous_total) * 100
+            change_symbol = "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+        else:
+            percentage_text = ""
+
+        response = (
+            f"🍽️ Tổng kết chi tiêu khác {month_display}\n"
+            f"💰 Tổng chi: {total:,.0f} VND\n"
+            f"📝 Giao dịch: {count}\n"
+            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+        )
+        
+        if details:
+            response += f"\n📝 Chi tiết:{details}"
+
+        await update.message.reply_text(response)
+        logger.info(f"Other summary sent successfully to user {update.effective_user.id}")
+    
+    except Exception as e:
+        logger.error(f"Error in other command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in other command: {reply_error}")
 
 
 @safe_async_handler
