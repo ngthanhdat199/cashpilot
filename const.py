@@ -52,6 +52,9 @@ HELP_MSG = f"""
 • /week - Chi tiêu tuần này  
 • /month - Chi tiêu tháng này
 • /gas - Chi tiêu xăng xe tháng này
+• /dating - Chi tiêu hẹn hò/giải trí tháng này
+• /other - Chi tiêu khác tháng này
+• /invest - Chi tiêu đầu tư tháng này
 
 🗑️ Xóa: del dd/mm hh:mm
 
@@ -103,4 +106,5 @@ DELETE_EXPENSE_MSG = """
 FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn", "uống", "nước"]
 DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum", "cafe"]
 TRANSPORT_KEYWORDS = ["grab", "giao hàng", "taxi", "bus", "gửi xe", "xăng"]
+INVEST_KEYWORDS = ["chứng khoán",  "cổ phiếu", "bitcoin", "eth", "crypto", "etf"]
 RENT_KEYWORD = "thuê nhà"

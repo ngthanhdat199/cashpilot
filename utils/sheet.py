@@ -8,7 +8,7 @@ from utils.timezone import get_current_time
 from config import config, BASE_DIR
 from google.oauth2.service_account import Credentials
 from utils.logger import logger
-from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD
+from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, INVEST_KEYWORDS
 
 # Google Sheets setup
 try:
@@ -353,4 +353,26 @@ def get_other_total(month):
         return other_expenses, total
     except Exception as e:
         logger.error(f"Error getting other total for {month}: {e}", exc_info=True)
+        return [], 0
+
+# helper for invest totals
+def get_investment_total(month):
+    """Helper to get total invest expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+
+        invest_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if has_keyword(note, INVEST_KEYWORDS):
+                amount = r.get("VND", 0)
+                if amount:
+                    invest_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return invest_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting invest total for {month}: {e}", exc_info=True)
         return [], 0

@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_investment_total
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
 
 def safe_async_handler(handler_func):
@@ -676,6 +676,9 @@ async def month(update, context: CallbackContext):
         _, other_total = get_other_total(target_month)
         logger.info(f"Total other expenses for {target_month}: {other_total} VND")
 
+        _, investment_total = get_investment_total(target_month)
+        logger.info(f"Total investment expenses for {target_month}: {investment_total} VND")
+
         response = (
             f"📊 Tổng kết {month_display}:\n"
             f"💰 {total:,.0f} VND\n"
@@ -685,6 +688,7 @@ async def month(update, context: CallbackContext):
             f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
             f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
             f"🛍️ Khác: {other_total:,.0f} VND\n"
+            f"📈 Đầu tư: {investment_total:,.0f} VND\n"
         )
 
         await update.message.reply_text(response)
@@ -933,7 +937,7 @@ async def dating(update, context):
             percentage_text = ""
 
         response = (
-            f"🍽️ Tổng kết chi tiêu hẹn hò / giải trí {month_display}\n"
+            f"🎉 Tổng kết chi tiêu hẹn hò / giải trí {month_display}\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -1018,7 +1022,7 @@ async def other(update, context):
             percentage_text = ""
 
         response = (
-            f"🍽️ Tổng kết chi tiêu khác {month_display}\n"
+            f"🛍️ Tổng kết chi tiêu khác {month_display}\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -1036,6 +1040,91 @@ async def other(update, context):
             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in other command: {reply_error}")
+
+@safe_async_handler
+async def invest(update, context):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    """Get this month's total investment expenses"""
+    try:
+        logger.info(f"Investment command requested by user {update.effective_user.id}")
+
+        now = get_current_time() + relativedelta(months=offset)    
+        target_month = now.strftime("%m/%Y")
+        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+        logger.info(f"Getting investment expenses for sheet {target_month}")
+
+        try:
+            current_sheet = get_or_create_monthly_sheet(target_month)
+            logger.info(f"Successfully obtained sheet for {target_month}")
+        except Exception as sheet_error:
+            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            return
+    
+        try:
+            records = current_sheet.get_all_records()
+            logger.info(f"Retrieved {len(records)} records from sheet")
+        except Exception as records_error:
+            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            return
+
+        investment_expenses, total = get_investment_total(target_month)
+        count = len(investment_expenses)
+        logger.info(f"Found {count} investment expenses for this month with total {total} VND")
+
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
+
+        grouped = defaultdict(list)
+        for r in investment_expenses:
+            grouped[r.get("Date", "")].append(r)
+
+        details = ""
+        for day, rows in sorted(grouped.items()):
+            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+            for i, r in enumerate(rows, start=1):
+                details += format_expense(r, i) + "\n"
+
+        _, previous_total = get_investment_total(previous_month)
+
+        # Calculate percentage change
+        if previous_total > 0:
+            percentage_change = ((total - previous_total) / previous_total) * 100
+            change_symbol = "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+        else:
+            percentage_text = ""
+
+        response = (
+            f"📈 Tổng kết chi tiêu đầu tư {month_display}\n"
+            f"💰 Tổng chi: {total:,.0f} VND\n"
+            f"📝 Giao dịch: {count}\n"
+            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+        )
+        
+        if details:
+            response += f"\n📝 Chi tiết:{details}"
+
+        await update.message.reply_text(response)
+        logger.info(f"Investment summary sent successfully to user {update.effective_user.id}")
+    
+    except Exception as e:
+        logger.error(f"Error in investment command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in investment command: {reply_error}")
 
 
 @safe_async_handler
