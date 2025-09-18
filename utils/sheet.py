@@ -132,15 +132,37 @@ def normalize_time(time_str: str) -> str:
 
 def has_keyword(note: str, keywords: list[str]) -> bool:
     """
-    Check if a note contains any keyword as a whole token.
-    Example:
-        note = "ăn sáng cơm gà"
-        keywords = ["ăn", "cơm"]
-        -> True
+    Check if a note contains any of the specified keywords.
+    
+    This function performs case-insensitive keyword matching with different strategies:
+    - For multi-word keywords (containing spaces): searches for exact substring match
+    - For single-word keywords: searches for exact word match in tokenized text
+    
+    Args:
+        note (str): The text to search for keywords
+        keywords (list[str]): List of keywords to search for in the note
+        
+    Returns:
+        bool: True if any keyword is found in the note, False otherwise
+        
+    Note:
+        The function tokenizes the note using regex pattern r"[^\s]+" which splits
+        on whitespace. Single-word keywords must match complete tokens to avoid
+        partial word matches (e.g., "cat" won't match "category").
     """
     note = note.lower()
     tokens = re.findall(r"[^\s]+", note)
-    return any(k in tokens for k in keywords)
+
+    for k in keywords:
+        k = k.lower()
+        if " " in k:  # multi-word keyword
+            if k in note:
+                return True
+        else:  # single-word keyword
+            if k in tokens:
+                return True
+    return False
+
 
 def get_or_create_monthly_sheet(target_month=None):
     """Get month's sheet or create a new one for target month"""
