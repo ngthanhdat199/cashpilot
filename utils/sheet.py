@@ -300,7 +300,7 @@ def get_rent_total(month):
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if has_keyword(note, ["thuê nhà"]):
+            if "thuê nhà" in note:
                 amount = r.get("VND", 0)
                 if amount:
                     rent_expenses.append(r)
