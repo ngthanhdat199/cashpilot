@@ -101,4 +101,4 @@ DELETE_EXPENSE_MSG = """
 """
 
 FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn"]
-DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem",]
+DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum"]
