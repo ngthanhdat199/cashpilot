@@ -673,6 +673,9 @@ async def month(update, context: CallbackContext):
         _, rent_total = get_rent_total(target_month)
         logger.info(f"Total rent expenses for {target_month}: {rent_total} VND")
 
+        _, other_total = get_other_total(target_month)
+        logger.info(f"Total other expenses for {target_month}: {other_total} VND")
+
         response = (
             f"📊 Tổng kết {month_display}:\n"
             f"💰 {total:,.0f} VND\n"
@@ -681,6 +684,7 @@ async def month(update, context: CallbackContext):
             f"🎉 Hẹn hò: {dating_total:,.0f} VND\n"
             f"⛽ Xăng: {gas_total:,.0f} VND\n"
             f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
+            f"🛍️ Khác: {other_total:,.0f} VND\n"
         )
 
         await update.message.reply_text(response)
