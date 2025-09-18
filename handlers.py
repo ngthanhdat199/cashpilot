@@ -681,8 +681,8 @@ async def month(update, context: CallbackContext):
             f"💰 {total:,.0f} VND\n"
             f"📝 {count} giao dịch\n"
             f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
-            f"🎉 Hẹn hò: {dating_total:,.0f} VND\n"
-            f"⛽ Xăng: {gas_total:,.0f} VND\n"
+            f"🎉 Giải trí / Hẹn hò: {dating_total:,.0f} VND\n"
+            f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
             f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
             f"🛍️ Khác: {other_total:,.0f} VND\n"
         )
@@ -763,7 +763,7 @@ async def gas(update, context):
             percentage_text = ""
 
         response = (
-            f"⛽ Tổng kết đổ xăng {month_display}\n"
+            f"⛽ Tổng kết đổ xăng / đi lại {month_display}\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -933,7 +933,7 @@ async def dating(update, context):
             percentage_text = ""
 
         response = (
-            f"🍽️ Tổng kết chi tiêu hẹn hò {month_display}\n"
+            f"🍽️ Tổng kết chi tiêu hẹn hò / giải trí {month_display}\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"

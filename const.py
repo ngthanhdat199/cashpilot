@@ -100,5 +100,7 @@ DELETE_EXPENSE_MSG = """
 ⏱️ `del 14/10 10h30s45` → Ngày 14/10 lúc 10:30:45
 """
 
-FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn"]
-DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum"]
+FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn", "uống", "nước"]
+DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum", "cafe"]
+TRANSPORT_KEYWORDS = ["grab", "giao hàng", "taxi", "bus", "gửi xe", "xăng"]
+RENT_KEYWORD = "thuê nhà"

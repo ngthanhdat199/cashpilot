@@ -8,7 +8,7 @@ from utils.timezone import get_current_time
 from config import config, BASE_DIR
 from google.oauth2.service_account import Credentials
 from utils.logger import logger
-from const import FOOD_KEYWORDS, DATING_KEYWORDS
+from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD
 
 # Google Sheets setup
 try:
@@ -256,7 +256,7 @@ def get_gas_total(month):
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if "xăng" in note:
+            if has_keyword(note, TRANSPORT_KEYWORDS):
                 amount = r.get("VND", 0)
                 if amount:
                     gas_expenses.append(r)
@@ -322,7 +322,7 @@ def get_rent_total(month):
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if "thuê nhà" in note:
+            if RENT_KEYWORD in note:
                 amount = r.get("VND", 0)
                 if amount:
                     rent_expenses.append(r)
@@ -344,7 +344,7 @@ def get_other_total(month):
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if not (has_keyword(note, FOOD_KEYWORDS) or has_keyword(note, DATING_KEYWORDS) or "xăng" in note or "thuê nhà" in note):
+            if not (has_keyword(note, FOOD_KEYWORDS) or has_keyword(note, DATING_KEYWORDS) or has_keyword(note, TRANSPORT_KEYWORDS) or RENT_KEYWORD in note):
                 amount = r.get("VND", 0)
                 if amount:
                     other_expenses.append(r)
