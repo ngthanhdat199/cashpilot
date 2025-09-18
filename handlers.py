@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
 
 def safe_async_handler(handler_func):
@@ -104,6 +104,7 @@ async def log_expense(update, context):
             "x": "xăng xe",
             "g": "grab",
             "b": "xe buýt",
+            "n": "thuê nhà",
             
             # Emoji shortcuts (copy-paste friendly)
             "☕": "cafe",
@@ -114,6 +115,7 @@ async def log_expense(update, context):
             "⛽": "xăng xe",
             "🚗": "grab",
             "🚌": "xe buýt",
+            "🏠": "thuê nhà",
             
             # Regular shortcuts  
             "cf": "cafe",
@@ -665,6 +667,9 @@ async def month(update, context: CallbackContext):
         _, gas_total = get_gas_total(target_month)
         logger.info(f"Total gas expenses for {target_month}: {gas_total} VND")
 
+        _, rent_total = get_rent_total(target_month)
+        logger.info(f"Total rent expenses for {target_month}: {rent_total} VND")
+
         response = (
             f"📊 Tổng kết {month_display}:\n"
             f"💰 {total:,.0f} VND\n"
@@ -672,6 +677,7 @@ async def month(update, context: CallbackContext):
             f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
             f"🎉 Hẹn hò: {dating_total:,.0f} VND\n"
             f"⛽ Xăng: {gas_total:,.0f} VND\n"
+            f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
         )
 
         await update.message.reply_text(response)

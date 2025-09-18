@@ -289,3 +289,24 @@ def get_dating_total(month):
         logger.error(f"Error getting dating total for {month}: {e}", exc_info=True)
         return [], 0
     
+# helper for rent totals
+def get_rent_total(month):
+    """Helper to get total rent expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+
+        rent_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if has_keyword(note, ["thuê nhà"]):
+                amount = r.get("VND", 0)
+                if amount:
+                    rent_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return rent_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting rent total for {month}: {e}", exc_info=True)
+        return [], 0
