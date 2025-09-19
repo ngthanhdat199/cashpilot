@@ -104,7 +104,7 @@ DELETE_EXPENSE_MSG = """
 """
 
 FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn", "uống", "nước"]
-DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum", "cafe"]
+DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum", "cafe", "xem phim", "cơm gà"]
 TRANSPORT_KEYWORDS = ["grab", "giao hàng", "taxi", "bus", "gửi xe", "xăng"]
 INVEST_KEYWORDS = ["chứng khoán",  "cổ phiếu", "bitcoin", "eth", "crypto", "etf"]
 RENT_KEYWORD = "thuê nhà"

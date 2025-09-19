@@ -382,3 +382,41 @@ def get_investment_total(month):
     except Exception as e:
         logger.error(f"Error getting invest total for {month}: {e}", exc_info=True)
         return [], 0
+    
+# helper for totals summary
+def get_month_summary(records):
+    """Helper to get total expenses summary for a given month"""
+    totals = {
+        "expenses": [],
+        "total": 0,
+        "food": 0,
+        "dating": 0,
+        "gas": 0,
+        "rent": 0,
+        "other": 0,
+        "investment": 0,
+    }
+
+    for r in records:
+        note = r.get("Note", "").lower()
+        amount = parse_amount(r.get("VND", 0))
+
+        if amount == 0:
+            continue
+
+        totals["expenses"].append(r)
+        totals["total"] += amount
+        if has_keyword(note, FOOD_KEYWORDS):
+            totals["food"] += amount
+        elif has_keyword(note, DATING_KEYWORDS):
+            totals["dating"] += amount
+        elif has_keyword(note, TRANSPORT_KEYWORDS):
+            totals["gas"] += amount
+        elif RENT_KEYWORD in note:
+            totals["rent"] += amount
+        elif has_keyword(note, INVEST_KEYWORDS):
+            totals["investment"] += amount
+        else:
+            totals["other"] += amount
+
+    return totals

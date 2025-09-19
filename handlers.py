@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_investment_total
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_investment_total, get_month_summary
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
 
 def safe_async_handler(handler_func):
@@ -628,7 +628,8 @@ async def month(update, context: CallbackContext):
         logger.info(f"Getting month expenses for sheet {target_month}")
         
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            # current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -636,49 +637,52 @@ async def month(update, context: CallbackContext):
             return
         
         try:
-            records = current_sheet.get_all_records()
+            # records = current_sheet.get_all_records()
+            records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
             await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
             return
         
-        month_expenses = []
-        total = 0
-        
-        for r in records:
-            # Only count records with valid date and amount (not empty rows)
-            record_date = r.get("Date", "").strip().lstrip("'")
-            record_amount = r.get("VND", 0)
+        # month_expenses = []
+        # total = 0
 
-            if record_date and record_amount:  # Only count if both date and amount exist and are not empty
-                month_expenses.append(r)
-                total += parse_amount(record_amount)
+        month_expenses, total, food_total, dating_total, gas_total, rent_total, other_total, investment_total = get_month_summary(records)
+
+        # for r in records:
+        #     # Only count records with valid date and amount (not empty rows)
+        #     record_date = r.get("Date", "").strip().lstrip("'")
+        #     record_amount = r.get("VND", 0)
+
+        #     if record_date and record_amount:  # Only count if both date and amount exist and are not empty
+        #         month_expenses.append(r)
+        #         total += parse_amount(record_amount)
 
         count = len(month_expenses)
-        logger.info(f"Found {count} expenses for this month with total {total} VND")
+        # logger.info(f"Found {count} expenses for this month with total {total} VND")
         
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
         
-        _, food_total = get_food_total(target_month)
-        logger.info(f"Total food expenses for {target_month}: {food_total} VND")
+        # _, food_total = get_food_total(target_month)
+        # logger.info(f"Total food expenses for {target_month}: {food_total} VND")
 
-        _, dating_total = get_dating_total(target_month)
-        logger.info(f"Total dating expenses for {target_month}: {dating_total} VND")
+        # _, dating_total = get_dating_total(target_month)
+        # logger.info(f"Total dating expenses for {target_month}: {dating_total} VND")
 
-        _, gas_total = get_gas_total(target_month)
-        logger.info(f"Total gas expenses for {target_month}: {gas_total} VND")
+        # _, gas_total = get_gas_total(target_month)
+        # logger.info(f"Total gas expenses for {target_month}: {gas_total} VND")
 
-        _, rent_total = get_rent_total(target_month)
-        logger.info(f"Total rent expenses for {target_month}: {rent_total} VND")
+        # _, rent_total = get_rent_total(target_month)
+        # logger.info(f"Total rent expenses for {target_month}: {rent_total} VND")
 
-        _, other_total = get_other_total(target_month)
-        logger.info(f"Total other expenses for {target_month}: {other_total} VND")
+        # _, other_total = get_other_total(target_month)
+        # logger.info(f"Total other expenses for {target_month}: {other_total} VND")
 
-        _, investment_total = get_investment_total(target_month)
-        logger.info(f"Total investment expenses for {target_month}: {investment_total} VND")
+        # _, investment_total = get_investment_total(target_month)
+        # logger.info(f"Total investment expenses for {target_month}: {investment_total} VND")
 
         response = (
             f"📊 Tổng kết {month_display}:\n"
