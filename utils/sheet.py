@@ -399,11 +399,12 @@ def get_month_summary(records):
 
     for r in records:
         note = r.get("Note", "").lower()
-        amount = parse_amount(r.get("VND", 0))
-
-        if amount == 0:
+        amount = r.get("VND", 0)
+        
+        if not amount:
             continue
 
+        amount = parse_amount(amount)
         totals["expenses"].append(r)
         totals["total"] += amount
         if has_keyword(note, FOOD_KEYWORDS):
