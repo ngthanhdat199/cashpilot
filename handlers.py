@@ -648,7 +648,15 @@ async def month(update, context: CallbackContext):
         # month_expenses = []
         # total = 0
 
-        month_expenses, total, food_total, dating_total, gas_total, rent_total, other_total, investment_total = get_month_summary(records)
+        summary = get_month_summary(records)
+        month_expenses = summary["expenses"]
+        total = summary["total"]
+        food_total = summary["food"]
+        dating_total = summary["dating"]
+        gas_total = summary["gas"]
+        rent_total = summary["rent"]
+        other_total = summary["other"]
+        investment_total = summary["investment"]
 
         # for r in records:
         #     # Only count records with valid date and amount (not empty rows)
