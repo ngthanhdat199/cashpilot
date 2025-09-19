@@ -393,7 +393,7 @@ async def delete_expense(update, context):
         
         # Get the appropriate monthly sheet
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -452,7 +452,7 @@ async def today(update, context):
         logger.info(f"Getting today's expenses for {today_str} in sheet {target_month}")
         
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -460,7 +460,7 @@ async def today(update, context):
             return
         
         try:
-            records = current_sheet.get_all_records()
+            records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -501,112 +501,203 @@ async def today(update, context):
         except Exception as reply_error:
             logger.error(f"Failed to send error message in today command: {reply_error}")
 
+# @safe_async_handler
+# async def week(update, context: CallbackContext):
+#     args = context.args
+#     offset = 0
+#     if args:
+#         try:
+#             offset = int(args[0])
+#         except ValueError:
+#             pass
+
+#     """Get this week's total expenses"""
+#     try:
+#         logger.info(f"Week command requested by user {update.effective_user.id}")
+        
+#         now = get_current_time() + datetime.timedelta(weeks=offset)
+        
+#         # Calculate week start (Monday)
+#         days_since_monday = now.weekday()
+#         week_start = now - datetime.timedelta(days=days_since_monday)
+#         week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+#         week_end = week_start + datetime.timedelta(days=6, hours=23, minutes=59, seconds=59)
+        
+#         logger.info(f"Getting week expenses from {week_start.strftime('%d/%m')} to {week_end.strftime('%d/%m')}")
+        
+#         # Get months that this week spans
+#         months_to_check = set()
+#         current_date = week_start
+#         while current_date <= week_end:
+#             months_to_check.add(current_date.strftime("%m/%Y"))
+#             current_date += datetime.timedelta(days=1)
+        
+#         logger.info(f"Checking sheets for months: {list(months_to_check)}")
+        
+#         week_expenses = []
+#         total = 0
+        
+#         for target_month in months_to_check:
+#             try:
+#                 current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+#                 logger.info(f"Successfully obtained sheet for {target_month}")
+                
+#                 records = await asyncio.to_thread(current_sheet.get_all_records)
+#                 logger.info(f"Retrieved {len(records)} records from sheet {target_month}")
+                
+#                 for r in records:
+#                     try:
+#                         day_month = r.get("Date", "")
+#                         if "/" in day_month:
+#                             # Parse the date from the record
+#                             date_parts = day_month.split("/")
+#                             if len(date_parts) == 2:
+#                                 day, month = date_parts
+#                                 year = target_month.split("/")[1]  # Get year from sheet name
+#                                 date_obj = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y").date()
+#                                 expense_date = datetime.datetime.combine(date_obj, datetime.time(0, 0, 0, tzinfo=week_start.tzinfo))
+                                
+#                                 logger.info("week_start: %s, expense_date: %s, week_end: %s", week_start, expense_date, week_end)  # Debug info
+
+#                                 # Check if this date falls within our week
+#                                 if week_start <= expense_date <= week_end:
+#                                     week_expenses.append(r)
+#                                     amount = r.get("VND", 0)
+#                                     total += parse_amount(amount)
+#                                 else:
+#                                     logger.info(f"Skipping date {expense_date} not in week range")
+
+#                     except Exception as date_parse_error:
+#                         logger.warning(f"Could not parse date '{day_month}' from sheet {target_month}: {date_parse_error}")
+#                         continue
+                        
+#             except Exception as sheet_error:
+#                 logger.warning(f"Could not access sheet {target_month}: {sheet_error}")
+#                 continue
+                
+#         count = len(week_expenses)
+#         logger.info(f"Found {count} expenses for this week with total {total} VND")
+
+#         grouped = defaultdict(list)
+#         for r in week_expenses:
+#             grouped[r.get("Date", "")].append(r)
+
+#         details = ""
+#         for day, rows in sorted(grouped.items()):
+#             day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+#             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+#             for i, r in enumerate(rows, start=1):
+#                 details += format_expense(r, i) + "\n"
+
+#         response = (
+#             f"📊 Tổng kết tuần này ({week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}):\n"
+#             f"💰 {total:,.0f} VND\n"
+#             f"📝 {count} giao dịch\n"
+#         )
+
+#         if details:
+#             response += f"\n📝 Chi tiết:{details}"
+
+#         await update.message.reply_text(response)
+#         logger.info(f"Week summary sent successfully to user {update.effective_user.id}")
+        
+#     except Exception as e:
+#         logger.error(f"Error in week command for user {update.effective_user.id}: {e}", exc_info=True)
+#         try:
+#             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+#         except Exception as reply_error:
+#             logger.error(f"Failed to send error message in week command: {reply_error}")
+
 @safe_async_handler
 async def week(update, context: CallbackContext):
     args = context.args
-    offset = 0
-    if args:
-        try:
-            offset = int(args[0])
-        except ValueError:
-            pass
+    offset = int(args[0]) if args and args[0].isdigit() else 0
 
-    """Get this week's total expenses"""
     try:
-        logger.info(f"Week command requested by user {update.effective_user.id}")
-        
         now = get_current_time() + datetime.timedelta(weeks=offset)
-        
-        # Calculate week start (Monday)
-        days_since_monday = now.weekday()
-        week_start = now - datetime.timedelta(days=days_since_monday)
+
+        # Calculate week boundaries
+        week_start = now - datetime.timedelta(days=now.weekday())  # Monday
         week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
         week_end = week_start + datetime.timedelta(days=6, hours=23, minutes=59, seconds=59)
-        
-        logger.info(f"Getting week expenses from {week_start.strftime('%d/%m')} to {week_end.strftime('%d/%m')}")
-        
-        # Get months that this week spans
-        months_to_check = set()
-        current_date = week_start
-        while current_date <= week_end:
-            months_to_check.add(current_date.strftime("%m/%Y"))
-            current_date += datetime.timedelta(days=1)
-        
-        logger.info(f"Checking sheets for months: {list(months_to_check)}")
-        
+
+        logger.info(f"Getting week expenses from {week_start:%d/%m} to {week_end:%d/%m}")
+
+        # Collect all months the week spans
+        months_to_check = {
+            (week_start + datetime.timedelta(days=i)).strftime("%m/%Y")
+            for i in range(7)
+        }
+
         week_expenses = []
-        total = 0
-        
+        total = 0.0
+
+        # Process each relevant sheet
         for target_month in months_to_check:
             try:
-                current_sheet = get_or_create_monthly_sheet(target_month)
-                logger.info(f"Successfully obtained sheet for {target_month}")
-                
-                records = current_sheet.get_all_records()
-                logger.info(f"Retrieved {len(records)} records from sheet {target_month}")
-                
+                current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+                records = await asyncio.to_thread(current_sheet.get_all_records)
+
+                year = target_month.split("/")[1]
+
                 for r in records:
-                    try:
-                        day_month = r.get("Date", "")
-                        if "/" in day_month:
-                            # Parse the date from the record
-                            date_parts = day_month.split("/")
-                            if len(date_parts) == 2:
-                                day, month = date_parts
-                                year = target_month.split("/")[1]  # Get year from sheet name
-                                date_obj = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y").date()
-                                expense_date = datetime.datetime.combine(date_obj, datetime.time(0, 0, 0, tzinfo=week_start.tzinfo))
-                                
-                                logger.info("week_start: %s, expense_date: %s, week_end: %s", week_start, expense_date, week_end)  # Debug info
+                    raw_date = (r.get("Date") or "").strip()
+                    raw_amount = r.get("VND", 0)
 
-                                # Check if this date falls within our week
-                                if week_start <= expense_date <= week_end:
-                                    week_expenses.append(r)
-                                    amount = r.get("VND", 0)
-                                    total += parse_amount(amount)
-                                else:
-                                    logger.info(f"Skipping date {expense_date} not in week range")
-
-                    except Exception as date_parse_error:
-                        logger.warning(f"Could not parse date '{day_month}' from sheet {target_month}: {date_parse_error}")
+                    if not raw_date or not raw_amount:
                         continue
-                        
+
+                    try:
+                        # Parse dd/mm with inferred year
+                        if "/" not in raw_date:
+                            continue
+                        day, month = raw_date.split("/")[:2]
+                        date_obj = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y")
+                        expense_date = date_obj.replace(tzinfo=week_start.tzinfo)
+
+                        if week_start <= expense_date <= week_end:
+                            amount = parse_amount(raw_amount)
+                            if amount == 0:
+                                continue
+                            week_expenses.append(r)
+                            total += amount
+                    except Exception as e:
+                        logger.debug(f"Skipping invalid date {raw_date} in {target_month}: {e}")
+                        continue
+
             except Exception as sheet_error:
                 logger.warning(f"Could not access sheet {target_month}: {sheet_error}")
                 continue
-                
+
+        # Prepare grouped details
         count = len(week_expenses)
-        logger.info(f"Found {count} expenses for this week with total {total} VND")
+        logger.info(f"Found {count} expenses with total {total} VND")
 
         grouped = defaultdict(list)
         for r in week_expenses:
             grouped[r.get("Date", "")].append(r)
 
-        details = ""
+        details_lines = []
         for day, rows in sorted(grouped.items()):
             day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
-            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
-            for i, r in enumerate(rows, start=1):
-                details += format_expense(r, i) + "\n"
+            details_lines.append(f"\n📅 {day}: {day_total:,.0f} VND")
+            details_lines.extend(format_expense(r, i) for i, r in enumerate(rows, start=1))
 
-        response = (
-            f"📊 Tổng kết tuần này ({week_start.strftime('%d/%m')} - {week_end.strftime('%d/%m')}):\n"
-            f"💰 {total:,.0f} VND\n"
-            f"📝 {count} giao dịch\n"
-        )
+        response_parts = [
+            f"📊 Tổng kết tuần này ({week_start:%d/%m} - {week_end:%d/%m}):",
+            f"💰 {total:,.0f} VND",
+            f"📝 {count} giao dịch",
+        ]
+        if details_lines:
+            response_parts.append("\n📝 Chi tiết:")
+            response_parts.extend(details_lines)
 
-        if details:
-            response += f"\n📝 Chi tiết:{details}"
+        await update.message.reply_text("\n".join(response_parts))
 
-        await update.message.reply_text(response)
-        logger.info(f"Week summary sent successfully to user {update.effective_user.id}")
-        
     except Exception as e:
-        logger.error(f"Error in week command for user {update.effective_user.id}: {e}", exc_info=True)
-        try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
-        except Exception as reply_error:
-            logger.error(f"Failed to send error message in week command: {reply_error}")
+        logger.error(f"Error in week command: {e}", exc_info=True)
+        await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+
 
 @safe_async_handler
 async def month(update, context: CallbackContext):
@@ -628,7 +719,6 @@ async def month(update, context: CallbackContext):
         logger.info(f"Getting month expenses for sheet {target_month}")
         
         try:
-            # current_sheet = get_or_create_monthly_sheet(target_month)
             current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
@@ -637,7 +727,6 @@ async def month(update, context: CallbackContext):
             return
         
         try:
-            # records = current_sheet.get_all_records()
             records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
@@ -645,9 +734,6 @@ async def month(update, context: CallbackContext):
             await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
             return
         
-        # month_expenses = []
-        # total = 0
-
         summary = get_month_summary(records)
         month_expenses = summary["expenses"]
         total = summary["total"]
@@ -658,39 +744,12 @@ async def month(update, context: CallbackContext):
         other_total = summary["other"]
         investment_total = summary["investment"]
 
-        # for r in records:
-        #     # Only count records with valid date and amount (not empty rows)
-        #     record_date = r.get("Date", "").strip().lstrip("'")
-        #     record_amount = r.get("VND", 0)
-
-        #     if record_date and record_amount:  # Only count if both date and amount exist and are not empty
-        #         month_expenses.append(r)
-        #         total += parse_amount(record_amount)
 
         count = len(month_expenses)
-        # logger.info(f"Found {count} expenses for this month with total {total} VND")
         
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-        
-        # _, food_total = get_food_total(target_month)
-        # logger.info(f"Total food expenses for {target_month}: {food_total} VND")
-
-        # _, dating_total = get_dating_total(target_month)
-        # logger.info(f"Total dating expenses for {target_month}: {dating_total} VND")
-
-        # _, gas_total = get_gas_total(target_month)
-        # logger.info(f"Total gas expenses for {target_month}: {gas_total} VND")
-
-        # _, rent_total = get_rent_total(target_month)
-        # logger.info(f"Total rent expenses for {target_month}: {rent_total} VND")
-
-        # _, other_total = get_other_total(target_month)
-        # logger.info(f"Total other expenses for {target_month}: {other_total} VND")
-
-        # _, investment_total = get_investment_total(target_month)
-        # logger.info(f"Total investment expenses for {target_month}: {investment_total} VND")
 
         response = (
             f"📊 Tổng kết {month_display}:\n"
@@ -735,7 +794,7 @@ async def gas(update, context):
         logger.info(f"Getting gas expenses for sheet {target_month}")
 
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -743,7 +802,7 @@ async def gas(update, context):
             return
     
         try:
-            records = current_sheet.get_all_records()
+            records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -820,7 +879,7 @@ async def food(update, context):
         logger.info(f"Getting food expenses for sheet {target_month}")
 
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -828,7 +887,7 @@ async def food(update, context):
             return
     
         try:
-            records = current_sheet.get_all_records()
+            records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -905,7 +964,7 @@ async def dating(update, context):
         logger.info(f"Getting dating expenses for sheet {target_month}")
 
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -913,7 +972,7 @@ async def dating(update, context):
             return
     
         try:
-            records = current_sheet.get_all_records()
+            records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -990,7 +1049,7 @@ async def other(update, context):
         logger.info(f"Getting other expenses for sheet {target_month}")
 
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -998,7 +1057,7 @@ async def other(update, context):
             return
     
         try:
-            records = current_sheet.get_all_records()
+            records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -1075,7 +1134,7 @@ async def invest(update, context):
         logger.info(f"Getting investment expenses for sheet {target_month}")
 
         try:
-            current_sheet = get_or_create_monthly_sheet(target_month)
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
@@ -1083,7 +1142,7 @@ async def invest(update, context):
             return
     
         try:
-            records = current_sheet.get_all_records()
+            records = await asyncio.to_thread(current_sheet.get_all_records)
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
