@@ -8,7 +8,7 @@ from utils.timezone import get_current_time
 from config import config, BASE_DIR
 from google.oauth2.service_account import Credentials
 from utils.logger import logger
-from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, INVEST_KEYWORDS
+from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS
 
 # Google Sheets setup
 try:
@@ -348,8 +348,10 @@ def get_other_total(month):
                 has_keyword(note, FOOD_KEYWORDS) or 
                 has_keyword(note, DATING_KEYWORDS) or
                 has_keyword(note, TRANSPORT_KEYWORDS) or
-                RENT_KEYWORD in note or 
-                has_keyword(note, INVEST_KEYWORDS)
+                has_keyword(note, LONG_INVEST_KEYWORDS) or 
+                has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or
+                has_keyword(note, SUPPORT_PARENT_KEYWORDS)  or
+                RENT_KEYWORD in note 
             ):
                 amount = r.get("VND", 0)
                 if amount:
@@ -362,7 +364,7 @@ def get_other_total(month):
         return [], 0
 
 # helper for invest totals
-def get_investment_total(month):
+def get_long_investment_total(month):
     """Helper to get total invest expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
@@ -372,7 +374,7 @@ def get_investment_total(month):
         total = 0
         for r in records:
             note = r.get("Note", "").lower()
-            if has_keyword(note, INVEST_KEYWORDS):
+            if has_keyword(note, LONG_INVEST_KEYWORDS):
                 amount = r.get("VND", 0)
                 if amount:
                     invest_expenses.append(r)
@@ -381,6 +383,49 @@ def get_investment_total(month):
         return invest_expenses, total
     except Exception as e:
         logger.error(f"Error getting invest total for {month}: {e}", exc_info=True)
+        return [], 0
+
+def get_opportunity_investment_total(month):
+    """Helper to get total opportunity invest expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+
+        invest_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
+                amount = r.get("VND", 0)
+                if amount:
+                    invest_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return invest_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting opportunity invest total for {month}: {e}", exc_info=True)
+        return [], 0
+
+# helper for support parent totals
+def get_support_parent_total(month):
+    """Helper to get total support parent expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records()
+
+        support_parent_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if has_keyword(note, SUPPORT_PARENT_KEYWORDS):
+                amount = r.get("VND", 0)
+                if amount:
+                    support_parent_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return support_parent_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting support parent total for {month}: {e}", exc_info=True)
         return [], 0
     
 # helper for totals summary
@@ -394,8 +439,17 @@ def get_month_summary(records):
         "gas": 0,
         "rent": 0,
         "other": 0,
-        "investment": 0,
+        "long_invest": 0,
+        "opportunity_invest": 0,
+        "essential": 0, # total of food + dating + gas + rent + other
+        "invest": 0,  # total of long_invest + opportunity_invest
+        "support_parent": 0,
+        "income": 0, # salary + freelance
     }
+
+    salary = config["income"]["salary"]
+    freelance = config["income"]["freelance"]
+    totals["income"] = salary + freelance
 
     for r in records:
         note = r.get("Note", "").lower()
@@ -409,15 +463,26 @@ def get_month_summary(records):
 
         if has_keyword(note, FOOD_KEYWORDS):
             totals["food"] += amount
+            totals["essential"] += amount
         elif has_keyword(note, DATING_KEYWORDS):
             totals["dating"] += amount
+            totals["essential"] += amount
         elif has_keyword(note, TRANSPORT_KEYWORDS):
             totals["gas"] += amount
+            totals["essential"] += amount
         elif RENT_KEYWORD in note:
             totals["rent"] += amount
-        elif has_keyword(note, INVEST_KEYWORDS):
-            totals["investment"] += amount
+            totals["essential"] += amount
+        elif has_keyword(note, LONG_INVEST_KEYWORDS):
+            totals["long_invest"] += amount
+            totals["invest"] += amount
+        elif has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
+            totals["opportunity_invest"] += amount
+            totals["invest"] += amount
+        elif has_keyword(note, SUPPORT_PARENT_KEYWORDS):
+            totals["support_parent"] += amount
         else:
             totals["other"] += amount
+            totals["essential"] += amount
 
     return totals

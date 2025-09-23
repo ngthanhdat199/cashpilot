@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_investment_total, get_month_summary
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
 from config import config, save_config
 
@@ -641,8 +641,18 @@ async def month(update, context: CallbackContext):
         gas_total = summary["gas"]
         rent_total = summary["rent"]
         other_total = summary["other"]
-        investment_total = summary["investment"]
+        # investment_total = summary["investment"]
+        essential_total = summary["essential"]
+        long_invest_total = summary["long_investment"]
+        opportunity_invest_total = summary["opportunity_investment"]
+        support_parent_total = summary["support_parent"]
+        income_total = summary["income"]
 
+        essential_budget = config["budgets"].get("essential", 0)
+        long_invest_budget = config["budgets"].get("long_investment", 0)
+        opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
+        support_parent_budget = config["budgets"].get("support_parent", 0)
+        dating_budget = config["budgets"].get("dating", 0)
 
         count = len(month_expenses)
         
@@ -650,16 +660,38 @@ async def month(update, context: CallbackContext):
         current_year = now.strftime("%Y")
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
+        # Calculate estimated amounts based on percentages and income
+        essential_estimate = income_total * (essential_budget / 100) if income_total > 0 else 0
+        long_invest_estimate = income_total * (long_invest_budget / 100) if income_total > 0 else 0
+        opportunity_invest_estimate = income_total * (opportunity_invest_budget / 100) if income_total > 0 else 0
+        support_parent_estimate = income_total * (support_parent_budget / 100) if income_total > 0 else 0
+        dating_estimate = income_total * (dating_budget / 100) if income_total > 0 else 0
+
         response = (
             f"📊 Tổng kết {month_display}:\n"
-            f"💰 {total:,.0f} VND\n"
-            f"📝 {count} giao dịch\n"
+            f"💰 Chi tiêu: {total:,.0f} VND\n"
+            f"💵 Thu nhập: {income_total:,.0f} VND\n"
+            f"📝 {count} giao dịch\n\n"
+
+            f"📌 Ngân sách dự kiến (% thu nhập):\n"
+            f"🏠 Thiết yếu: {essential_budget:.0f}% = {essential_estimate:,.0f} VND\n"
+            f"📈 Đầu tư dài hạn: {long_invest_budget:.0f}% = {long_invest_estimate:,.0f} VND\n"
+            f"🚀 Đầu tư cơ hội: {opportunity_invest_budget:.0f}% = {opportunity_invest_estimate:,.0f} VND\n"
+            f"👪 Hỗ trợ ba mẹ: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
+            f"💖 Hẹn hò: {dating_budget:.0f}% = {dating_estimate:,.0f} VND\n\n"
+
+            f"💸 Chi tiêu thực tế:\n"
+            f"🏠 Thiết yếu: {essential_total:,.0f} VND ({essential_estimate - essential_total:+,.0f})\n"
+            f"📈 Đầu tư dài hạn: {long_invest_total:,.0f} VND ({long_invest_estimate - long_invest_total:+,.0f})\n"
+            f"🚀 Đầu tư cơ hội: {opportunity_invest_total:,.0f} VND ({opportunity_invest_estimate - opportunity_invest_total:+,.0f})\n"
+            f"👪 Hỗ trợ ba mẹ: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
+            f"💖 Hẹn hò: {dating_total:,.0f} VND ({dating_estimate - dating_total:+,.0f})\n\n"
+
+            f"📋 Chi tiết:\n"
             f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
-            f"🎉 Giải trí / Hẹn hò: {dating_total:,.0f} VND\n"
             f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
             f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
             f"🛍️ Khác: {other_total:,.0f} VND\n"
-            f"📈 Đầu tư: {investment_total:,.0f} VND\n"
         )
 
         await update.message.reply_text(response)
@@ -1048,7 +1080,7 @@ async def invest(update, context):
             await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
             return
 
-        investment_expenses, total = get_investment_total(target_month)
+        investment_expenses, total = get_long_investment_total(target_month)
         count = len(investment_expenses)
         logger.info(f"Found {count} investment expenses for this month with total {total} VND")
 
@@ -1067,7 +1099,7 @@ async def invest(update, context):
             for i, r in enumerate(rows, start=1):
                 details += format_expense(r, i) + "\n"
 
-        _, previous_total = get_investment_total(previous_month)
+        _, previous_total = get_long_investment_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
