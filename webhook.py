@@ -5,7 +5,7 @@ from flask import Flask, request
 from utils.logger import logger
 from telegram import Update
 from bot import setup_bot, create_fresh_bot
-from const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME 
+from const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME, WSGI_FILE
 
 # Flask app for webhook
 app = Flask(__name__)
@@ -27,10 +27,11 @@ def deploy():
         project_dir = os.path.dirname(os.path.abspath(__file__))
         
         # Execute deployment commands
+        wsgi_path = f"/var/www/{WSGI_FILE}"
         commands = [
             ['git', 'pull', 'origin', '--no-ff'],
             ['bash', '-c', 'echo $(git rev-parse --short HEAD) > VERSION'],
-            ['touch', '/var/www/thanhdat19_pythonanywhere_com_wsgi.py']
+            ['touch', wsgi_path]
         ]
         
         results = []
