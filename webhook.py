@@ -14,6 +14,64 @@ app = Flask(__name__)
 def home():
     return "Money Tracker Bot is running with webhooks!"
 
+@app.route('/deploy', methods=['POST'])
+def deploy():
+    """Handle deployment webhook requests"""
+    import subprocess
+    import os
+    
+    try:
+        logger.info("Deploy webhook request received")
+        
+        # Change to the project directory (assuming the script is in the project root)
+        project_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Execute deployment commands
+        commands = [
+            ['git', 'pull', 'origin', '--no-ff'],
+            ['bash', '-c', 'echo $(git rev-parse --short HEAD) > VERSION'],
+            ['touch', '/var/www/thanhdat19_pythonanywhere_com_wsgi.py']
+        ]
+        
+        results = []
+        for cmd in commands:
+            try:
+                logger.info(f"Executing command: {' '.join(cmd)}")
+                result = subprocess.run(
+                    cmd, 
+                    cwd=project_dir,
+                    capture_output=True, 
+                    text=True, 
+                    timeout=30
+                )
+                
+                if result.returncode == 0:
+                    logger.info(f"Command succeeded: {' '.join(cmd)}")
+                    results.append(f"✓ {' '.join(cmd)}: Success")
+                    if result.stdout:
+                        results.append(f"  stdout: {result.stdout.strip()}")
+                else:
+                    logger.error(f"Command failed: {' '.join(cmd)}, return code: {result.returncode}")
+                    results.append(f"✗ {' '.join(cmd)}: Failed (code {result.returncode})")
+                    if result.stderr:
+                        results.append(f"  stderr: {result.stderr.strip()}")
+                        
+            except subprocess.TimeoutExpired:
+                logger.error(f"Command timed out: {' '.join(cmd)}")
+                results.append(f"✗ {' '.join(cmd)}: Timeout")
+            except Exception as cmd_error:
+                logger.error(f"Error executing command {' '.join(cmd)}: {cmd_error}")
+                results.append(f"✗ {' '.join(cmd)}: Error - {str(cmd_error)}")
+        
+        # Return deployment results
+        response_text = "Deployment completed:\n" + "\n".join(results)
+        logger.info("Deploy webhook completed")
+        return response_text, 200
+        
+    except Exception as e:
+        logger.error(f"Error in deploy webhook: {e}", exc_info=True)
+        return f"Deployment failed: {str(e)}", 500
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """Handle incoming webhook requests from Telegram"""
