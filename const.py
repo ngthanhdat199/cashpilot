@@ -49,16 +49,19 @@ HELP_MSG = f"""
 • 02/09 08:30 15 t → 02/09 08:30 15000 VND ăn trưa
 
 📊 Lệnh thống kê:
-• /today - Chi tiêu hôm nay (/t)
-• /week - Chi tiêu tuần này  (/w)
-• /month - Chi tiêu tháng này (/m)
-• /gas - Chi tiêu xăng xe tháng này (/g)
-• /food - Chi tiêu ăn uống tháng này (/f)
-• /dating - Chi tiêu hẹn hò/giải trí tháng này (/d)
-• /other - Chi tiêu khác tháng này (/o)
-• /invest - Chi tiêu đầu tư tháng này (/i)
-• /freelance [amount] - Ghi nhận thu nhập freelance (/fl [số tiền])
-• /income - Hiện tổng thu nhập tháng này (/inc)
+• /today - Chi tiêu hôm nay (/t) 📅
+• /week - Chi tiêu tuần này  (/w) 🗓️
+• /month - Chi tiêu tháng này (/m) 📆
+
+• /gas - Chi tiêu xăng xe tháng này (/g) ⛽
+• /food - Chi tiêu ăn uống tháng này (/f) 🍜
+• /dating - Chi tiêu hẹn hò/giải trí tháng này (/d) 🎉
+• /other - Chi tiêu khác tháng này (/o) 🛒
+• /invest - Chi tiêu đầu tư tháng này (/i) 📈
+
+• /freelance [amount] - Ghi nhận thu nhập freelance (/fl [số tiền]) 💻
+• /income - Hiện tổng thu nhập tháng này (/inc) 💰
+
 
 🗑️ Xóa: del dd/mm hh:mm
 

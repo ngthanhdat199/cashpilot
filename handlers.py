@@ -1101,12 +1101,12 @@ async def freelance(update, context):
     try:
         logger.info(f"Freelance income logging requested by user {update.effective_user.id}: '{text}'")
         
-        parts = text.split()
-        if not parts:
-            await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '200'")
+        parts = text.split(maxsplit=1)
+        if len(parts) < 2:
+            await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'")
             return
 
-        amount_str = parts[0].replace(",", "").replace(".", "")
+        amount_str = parts[1]
         if not amount_str.isdigit():
             await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
             return
@@ -1117,11 +1117,14 @@ async def freelance(update, context):
             return
 
         amount = amount * 1000
-        config["income"]["freelance"] =  amount
+        config["income"]["freelance"] += amount  # cộng dồn thay vì ghi đè
         save_config()
 
         logger.info(f"Successfully logged freelance income of {amount} VND. Total is now {config['income']['freelance']} VND")
-        await update.message.reply_text(f"✅ Đã ghi nhận thu nhập freelance: {amount:,.0f} VND\nTổng thu nhập freelance hiện tại: {config['income']['freelance']:,.0f} VND")
+        await update.message.reply_text(
+            f"✅ Đã ghi nhận thu nhập freelance: {amount:,.0f} VND\n"
+            f"💰 Tổng thu nhập freelance hiện tại: {config['income']['freelance']:,.0f} VND"
+        )
 
     except Exception as e:
         logger.error(f"Error in freelance command for user {update.effective_user.id}: {e}", exc_info=True)
@@ -1129,6 +1132,7 @@ async def freelance(update, context):
             await update.message.reply_text("❌ Có lỗi xảy ra khi ghi nhận thu nhập. Vui lòng thử lại!")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in freelance command: {reply_error}")
+
 
 @safe_async_handler
 async def income(update, context):
