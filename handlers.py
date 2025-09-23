@@ -499,7 +499,7 @@ async def today(update, context):
         try:
             await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
         except Exception as reply_error:
-            logger.error(f"Failed to send error message in today command: {reply_error}")
+            logger.error(f"Failed to send error message in today command 1: {reply_error}")
 
 @safe_async_handler
 async def week(update, context: CallbackContext):
