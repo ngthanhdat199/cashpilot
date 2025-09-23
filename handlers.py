@@ -647,7 +647,7 @@ async def month(update, context: CallbackContext):
         investment_total = summary["investment"]
         support_parent_total = summary["support_parent"]
         income_total = summary["income"]
-        food_and_travel_total = food_total + gas_total 
+        food_and_travel_total = food_total + gas_total + other_total
 
         food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
         rent_budget = config["budgets"].get("rent", 0)
@@ -663,7 +663,7 @@ async def month(update, context: CallbackContext):
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         # Calculate estimated amounts based on percentages and income
-        essential_estimate = income_total * (essential_budget / 100) if income_total > 0 else 0
+        # essential_estimate = income_total * (essential_budget / 100) if income_total > 0 else 0
         food_and_travel_estimate = income_total * (food_and_travel_budget / 100) if income_total > 0 else 0
         rent_estimate = income_total * (rent_budget / 100) if income_total > 0 else 0
         long_invest_estimate = income_total * (long_invest_budget / 100) if income_total > 0 else 0
