@@ -641,10 +641,10 @@ async def month(update, context: CallbackContext):
         gas_total = summary["gas"]
         rent_total = summary["rent"]
         other_total = summary["other"]
-        # investment_total = summary["investment"]
         essential_total = summary["essential"]
         long_invest_total = summary["long_investment"]
         opportunity_invest_total = summary["opportunity_investment"]
+        investment_total = summary["investment"]
         support_parent_total = summary["support_parent"]
         income_total = summary["income"]
 
@@ -692,6 +692,7 @@ async def month(update, context: CallbackContext):
             f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
             f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
             f"🛍️ Khác: {other_total:,.0f} VND\n"
+            f"💹 Đầu tư: {investment_total:,.0f} VND\n"
         )
 
         await update.message.reply_text(response)
