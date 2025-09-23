@@ -4,6 +4,7 @@ from const import bot_app, WEBHOOK_URL
 from utils.logger import logger
 from webhook import app
 from bot import setup_bot
+from config import load_config
 
 def main():
     """Main function to run the bot with webhook"""
@@ -48,4 +49,5 @@ def main():
 
 if __name__ == "__main__":
     __version__ = get_version()
+    load_config()
     main()

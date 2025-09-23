@@ -8,6 +8,7 @@ from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
 from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_investment_total, get_month_summary
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
+from config import config, save_config
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -1091,6 +1092,73 @@ async def invest(update, context):
         except Exception as reply_error:
             logger.error(f"Failed to send error message in investment command: {reply_error}")
 
+@safe_async_handler
+# 200
+async def freelance(update, context):
+    """Log freelance income to config.json"""
+    text = update.message.text.strip()
+    
+    try:
+        logger.info(f"Freelance income logging requested by user {update.effective_user.id}: '{text}'")
+        
+        parts = text.split()
+        if not parts:
+            await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '200'")
+            return
+
+        amount_str = parts[0].replace(",", "").replace(".", "")
+        if not amount_str.isdigit():
+            await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
+            return
+
+        amount = int(amount_str)
+        if amount <= 0:
+            await update.message.reply_text("❌ Số tiền phải lớn hơn 0.")
+            return
+
+        amount = amount * 1000
+        config["income"]["freelance"] =  amount
+        save_config()
+
+        logger.info(f"Successfully logged freelance income of {amount} VND. Total is now {config['income']['freelance']} VND")
+        await update.message.reply_text(f"✅ Đã ghi nhận thu nhập freelance: {amount:,.0f} VND\nTổng thu nhập freelance hiện tại: {config['income']['freelance']:,.0f} VND")
+
+    except Exception as e:
+        logger.error(f"Error in freelance command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Có lỗi xảy ra khi ghi nhận thu nhập. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in freelance command: {reply_error}")
+
+@safe_async_handler
+async def income(update, context):
+    """Show total income from config.json"""
+    try:
+        logger.info(f"Income summary requested by user {update.effective_user.id}")
+        
+        freelance_income = config["income"].get("freelance", 0)
+        salary_income = config["income"].get("salary", 0)
+        other_income = config["income"].get("other", 0)
+        total_income = freelance_income + salary_income + other_income
+        
+        response = (
+            f"💼 Tổng thu nhập:\n"
+            f"💰 Lương: {salary_income:,.0f} VND\n"
+            f"💰 Freelance: {freelance_income:,.0f} VND\n"
+            f"💰 Khác: {other_income:,.0f} VND\n"
+            f"-----------------------\n"
+            f"💵 Tổng cộng: {total_income:,.0f} VND"
+        )
+        
+        await update.message.reply_text(response)
+        logger.info(f"Income summary sent successfully to user {update.effective_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error in income command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Có lỗi xảy ra khi lấy dữ liệu thu nhập. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in income command: {reply_error}")
 
 @safe_async_handler
 async def handle_message(update, context):
