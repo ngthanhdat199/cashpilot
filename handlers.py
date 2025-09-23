@@ -71,7 +71,7 @@ async def start(update, context):
         try:
             await update.message.reply_text("❌ Có lỗi xảy ra khi khởi động. Vui lòng thử lại!")
         except Exception as reply_error:
-            logger.error(f"Failed to send error message in start command: {reply_error}")
+            logger.error(f"Failed to send error message in start command 12: {reply_error}")
 
 @safe_async_handler
 async def help(update, context):
