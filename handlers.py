@@ -1117,7 +1117,7 @@ async def freelance(update, context):
             return
 
         amount = amount * 1000
-        config["income"]["freelance"] += amount  # cộng dồn thay vì ghi đè
+        config["income"]["freelance"] = amount  
         save_config()
 
         logger.info(f"Successfully logged freelance income of {amount} VND. Total is now {config['income']['freelance']} VND")
