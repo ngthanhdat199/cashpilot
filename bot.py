@@ -1,7 +1,7 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, CallbackQueryHandler
 from const import TOKEN
 from utils.logger import logger
-from handlers import start, help, today, week, month, gas, food, dating, other, invest, handle_message, handle_quick_expense, freelance, income
+from handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, handle_quick_expense, freelance, income
 
 # Initialize bot application immediately
 def setup_bot():
@@ -19,7 +19,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["food", "f"], food))
         bot_app.add_handler(CommandHandler(["dating", "d"], dating))
         bot_app.add_handler(CommandHandler(["other", "o"], other))
-        bot_app.add_handler(CommandHandler(["invest", "i"], invest))
+        bot_app.add_handler(CommandHandler(["investment", "i"], investment))
         bot_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
         bot_app.add_handler(CommandHandler(["income", "inc"], income))
 
@@ -64,7 +64,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["food", "f"], food))
         fresh_app.add_handler(CommandHandler(["dating", "d"], dating))
         fresh_app.add_handler(CommandHandler(["other", "o"], other))
-        fresh_app.add_handler(CommandHandler(["invest", "i"], invest))
+        fresh_app.add_handler(CommandHandler(["investment", "i"], investment))
         fresh_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
         fresh_app.add_handler(CommandHandler(["income", "inc"], income))
 

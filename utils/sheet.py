@@ -363,9 +363,9 @@ def get_other_total(month):
         logger.error(f"Error getting other total for {month}: {e}", exc_info=True)
         return [], 0
 
-# helper for invest totals
+# helper for investment totals
 def get_long_investment_total(month):
-    """Helper to get total invest expenses for a given month"""
+    """Helper to get total investment expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
         records = sheet.get_all_records()
@@ -382,11 +382,11 @@ def get_long_investment_total(month):
         
         return invest_expenses, total
     except Exception as e:
-        logger.error(f"Error getting invest total for {month}: {e}", exc_info=True)
+        logger.error(f"Error getting investment total for {month}: {e}", exc_info=True)
         return [], 0
 
 def get_opportunity_investment_total(month):
-    """Helper to get total opportunity invest expenses for a given month"""
+    """Helper to get total opportunity investment expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
         records = sheet.get_all_records()
@@ -403,7 +403,7 @@ def get_opportunity_investment_total(month):
         
         return invest_expenses, total
     except Exception as e:
-        logger.error(f"Error getting opportunity invest total for {month}: {e}", exc_info=True)
+        logger.error(f"Error getting opportunity investment total for {month}: {e}", exc_info=True)
         return [], 0
 
 # helper for support parent totals
@@ -442,7 +442,7 @@ def get_month_summary(records):
         "long_investment": 0,
         "opportunity_investment": 0,
         "essential": 0, # total of food + gas + rent + other
-        "invest": 0,  # total of long_investment + opportunity_investment
+        "investment": 0,  # total of long_investment + opportunity_investment
         "support_parent": 0,
         "income": 0, # salary + freelance
     }
@@ -474,10 +474,10 @@ def get_month_summary(records):
             totals["dating"] += amount
         elif has_keyword(note, LONG_INVEST_KEYWORDS):
             totals["long_investment"] += amount
-            totals["invest"] += amount
+            totals["investment"] += amount
         elif has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
             totals["opportunity_investment"] += amount
-            totals["invest"] += amount
+            totals["investment"] += amount
         elif has_keyword(note, SUPPORT_PARENT_KEYWORDS):
             totals["support_parent"] += amount
         else:

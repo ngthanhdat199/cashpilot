@@ -57,7 +57,7 @@ HELP_MSG = f"""
 • /food - Chi tiêu ăn uống tháng này (/f) 🍜
 • /dating - Chi tiêu hẹn hò/giải trí tháng này (/d) 🎉
 • /other - Chi tiêu khác tháng này (/o) 🛒
-• /invest - Chi tiêu đầu tư tháng này (/i) 📈
+• /investment - Chi tiêu đầu tư tháng này (/i) 📈
 
 • /freelance [amount] - Ghi nhận thu nhập freelance (/fl [số tiền]) 💻
 • /income - Hiện tổng thu nhập tháng này (/inc) 💰

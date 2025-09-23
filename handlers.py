@@ -59,7 +59,7 @@ async def start(update, context):
             ["/food", "/food -1"],
             ["/dating", "/dating -1"],
             ["/other", "/other -1"],
-            ["/invest", "/invest -1"],
+            ["/investment", "/investment -1"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -1046,7 +1046,7 @@ async def other(update, context):
             logger.error(f"Failed to send error message in other command: {reply_error}")
 
 @safe_async_handler
-async def invest(update, context):
+async def investment(update, context):
     args = context.args
     offset = 0
     if args:
