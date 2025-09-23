@@ -351,7 +351,7 @@ def get_other_total(month):
                 has_keyword(note, LONG_INVEST_KEYWORDS) or 
                 has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or
                 has_keyword(note, SUPPORT_PARENT_KEYWORDS)  or
-                RENT_KEYWORD in note 
+                has_keyword(note, RENT_KEYWORD)
             ):
                 amount = r.get("VND", 0)
                 if amount:
@@ -467,7 +467,7 @@ def get_month_summary(records):
         elif has_keyword(note, TRANSPORT_KEYWORDS):
             totals["gas"] += amount
             totals["essential"] += amount
-        elif RENT_KEYWORD in note:
+        elif has_keyword(note, RENT_KEYWORD):
             totals["rent"] += amount
             totals["essential"] += amount
         elif has_keyword(note, DATING_KEYWORDS):

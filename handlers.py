@@ -647,21 +647,25 @@ async def month(update, context: CallbackContext):
         investment_total = summary["investment"]
         support_parent_total = summary["support_parent"]
         income_total = summary["income"]
+        food_and_travel_total = food_total + gas_total 
 
-        essential_budget = config["budgets"].get("essential", 0)
+        food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
+        rent_budget = config["budgets"].get("rent", 0)
+        essential_budget = food_and_travel_budget + rent_budget
         long_invest_budget = config["budgets"].get("long_investment", 0)
         opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
         support_parent_budget = config["budgets"].get("support_parent", 0)
         dating_budget = config["budgets"].get("dating", 0)
 
         count = len(month_expenses)
-        
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         # Calculate estimated amounts based on percentages and income
         essential_estimate = income_total * (essential_budget / 100) if income_total > 0 else 0
+        food_and_travel_estimate = income_total * (food_and_travel_budget / 100) if income_total > 0 else 0
+        rent_estimate = income_total * (rent_budget / 100) if income_total > 0 else 0
         long_invest_estimate = income_total * (long_invest_budget / 100) if income_total > 0 else 0
         opportunity_invest_estimate = income_total * (opportunity_invest_budget / 100) if income_total > 0 else 0
         support_parent_estimate = income_total * (support_parent_budget / 100) if income_total > 0 else 0
@@ -674,14 +678,18 @@ async def month(update, context: CallbackContext):
             f"📝 {count} giao dịch\n\n"
 
             f"📌 Ngân sách dự kiến (% thu nhập):\n"
-            f"🏠 Thiết yếu: {essential_budget:.0f}% = {essential_estimate:,.0f} VND\n"
+            # f"🏠 Thiết yếu: {essential_budget:.0f}% = {essential_estimate:,.0f} VND\n"
+            f"🏠 Thuê nhà: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
+            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
             f"📈 Đầu tư dài hạn: {long_invest_budget:.0f}% = {long_invest_estimate:,.0f} VND\n"
             f"🚀 Đầu tư cơ hội: {opportunity_invest_budget:.0f}% = {opportunity_invest_estimate:,.0f} VND\n"
             f"👪 Hỗ trợ ba mẹ: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
             f"💖 Hẹn hò: {dating_budget:.0f}% = {dating_estimate:,.0f} VND\n\n"
 
             f"💸 Chi tiêu thực tế:\n"
-            f"🏠 Thiết yếu: {essential_total:,.0f} VND ({essential_estimate - essential_total:+,.0f})\n"
+            # f"🏠 Thiết yếu: {essential_total:,.0f} VND ({essential_estimate - essential_total:+,.0f})\n"
+            f"🏠 Thuê nhà: {rent_total:,.0f} VND ({rent_estimate - rent_total:+,.0f})\n"
+            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
             f"📈 Đầu tư dài hạn: {long_invest_total:,.0f} VND ({long_invest_estimate - long_invest_total:+,.0f})\n"
             f"🚀 Đầu tư cơ hội: {opportunity_invest_total:,.0f} VND ({opportunity_invest_estimate - opportunity_invest_total:+,.0f})\n"
             f"👪 Hỗ trợ ba mẹ: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
