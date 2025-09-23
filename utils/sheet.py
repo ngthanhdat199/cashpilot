@@ -439,10 +439,10 @@ def get_month_summary(records):
         "gas": 0,
         "rent": 0,
         "other": 0,
-        "long_invest": 0,
-        "opportunity_invest": 0,
+        "long_investment": 0,
+        "opportunity_investment": 0,
         "essential": 0, # total of food + dating + gas + rent + other
-        "invest": 0,  # total of long_invest + opportunity_invest
+        "invest": 0,  # total of long_investment + opportunity_investment
         "support_parent": 0,
         "income": 0, # salary + freelance
     }
@@ -474,10 +474,10 @@ def get_month_summary(records):
             totals["rent"] += amount
             totals["essential"] += amount
         elif has_keyword(note, LONG_INVEST_KEYWORDS):
-            totals["long_invest"] += amount
+            totals["long_investment"] += amount
             totals["invest"] += amount
         elif has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
-            totals["opportunity_invest"] += amount
+            totals["opportunity_investment"] += amount
             totals["invest"] += amount
         elif has_keyword(note, SUPPORT_PARENT_KEYWORDS):
             totals["support_parent"] += amount
