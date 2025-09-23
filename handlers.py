@@ -505,7 +505,12 @@ async def today(update, context):
 @safe_async_handler
 async def week(update, context: CallbackContext):
     args = context.args
-    offset = int(args[0]) if args and args[0].isdigit() else 0
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
 
     try:
         now = get_current_time() + datetime.timedelta(weeks=offset)
