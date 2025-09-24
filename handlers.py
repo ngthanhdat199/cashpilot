@@ -109,25 +109,6 @@ async def log_expense(update, context):
         # Case A: Default Entry (No Date/Time) - 1000 ăn trưa or 5 cf or just "5"
         if parts[0].isdigit():
             amount = int(parts[0])
-            
-            # # Super-fast mode: Just number, no description
-            # if len(parts) == 1:
-            #     # User typed only a number, provide quick buttons
-            #     display_amount = amount * 1000
-
-            #     keyboard = [
-            #         [InlineKeyboardButton(f"🍽️ Ăn sáng ({display_amount:,})", callback_data=f"log_{amount}_s")],
-            #         [InlineKeyboardButton(f"🌅 Ăn trưa ({display_amount:,})", callback_data=f"log_{amount}_t")],
-            #         [InlineKeyboardButton(f"🌙 Ăn tối ({display_amount:,})", callback_data=f"log_{amount}_t")],
-            #     ]
-            #     reply_markup = InlineKeyboardMarkup(keyboard)
-                
-            #     await update.message.reply_text(
-            #         f"💰 {display_amount:,} VND - Chọn loại chi tiêu:",
-            #         reply_markup=reply_markup
-            #     )
-            #     return
-            
             raw_note = " ".join(parts[1:])
             
             # Apply shortcuts to note
