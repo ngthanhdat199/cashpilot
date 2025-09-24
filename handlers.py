@@ -1224,36 +1224,38 @@ async def freelance(update, context):
 @safe_async_handler
 # 200
 async def salary(update, context):
-    """Log salary income to sheet"""
-    text = update.message.text.strip()
-    
+    args = context.args
+    offset = 0
+    amount = 0
+
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            offset = 0
+
+        if len(args) > 1:
+            amount = safe_int(args[1])
+    else:
+        await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/sl 200' hoặc '/sl 1 200'")
+        return
+
+    if amount <= 0:
+        await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
+        return
+
     try:
-        logger.info(f"Salary income logging requested by user {update.effective_user.id}: '{text}'")
-        
-        parts = text.split(maxsplit=1)
-        if len(parts) < 2:
-            await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'")
-            return
-
-        amount_str = parts[1]
-        if not amount_str.isdigit():
-            await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
-            return
-
-        amount = int(amount_str)
-        if amount <= 0:
-            await update.message.reply_text("❌ Số tiền phải lớn hơn 0.")
-            return
-
-        target_month = get_current_time().strftime("%m/%Y")
+        now = get_current_time() + relativedelta(months=offset)
+        target_month = now.strftime("%m/%Y")
         sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
         amount = amount * 1000
         sheet.update_acell(SALARY_CELL, amount)
 
-        # Update config
-        config["income"]["salary"] = amount
-        save_config()
+        if offset == 0:
+            # Update config
+            config["income"]["salary"] = amount
+            save_config()
 
         logger.info(f"Salary income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
@@ -1357,7 +1359,7 @@ async def income(update, context):
             f"💼 Tổng thu nhập {month_display}:\n"
             f"💰 Lương: {salary_income:,.0f} VND\n"
             f"💰 Freelance: {freelance_income:,.0f} VND\n"
-            f"💵 Tổng cộng: {total_income:,.0f} VND"
+            f"💵 Tổng cộng: {total_income:,.0f} VND\n"
             f"📊 So với {previous_month}: {total_income - prev_total_income:+,.0f} VND {percentage_text}\n"
         )
         
