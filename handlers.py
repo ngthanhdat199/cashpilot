@@ -7,7 +7,7 @@ from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
 from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary
-from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG
+from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL
 from config import config, save_config
 
 def safe_async_handler(handler_func):
@@ -230,7 +230,8 @@ async def log_expense(update, context):
         logger.info(f"Parsed expense: {amount} VND on {entry_date} {entry_time} - {note} (sheet: {target_month})")
 
         # Get or create the target month's sheet
-        sheet = get_or_create_monthly_sheet(target_month)
+        # sheet = get_or_create_monthly_sheet(target_month)
+        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
         # Always append the data to columns A-D, then sort if needed
         # Find the next empty row in columns A-D
@@ -1141,7 +1142,7 @@ async def investment(update, context):
 @safe_async_handler
 # 200
 async def freelance(update, context):
-    """Log freelance income to config.json"""
+    """Log freelance income to sheet"""
     text = update.message.text.strip()
     
     try:
@@ -1162,14 +1163,22 @@ async def freelance(update, context):
             await update.message.reply_text("❌ Số tiền phải lớn hơn 0.")
             return
 
-        amount = amount * 1000
-        config["income"]["freelance"] = amount  
-        save_config()
+        target_month = get_current_time().strftime("%m/%Y")
+        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
-        logger.info(f"Successfully logged freelance income of {amount} VND. Total is now {config['income']['freelance']} VND")
+        amount = amount * 1000
+        sheet.update_acell(FREELANCE_CELL, amount)
+
+        # read value from cell J2 to confirm
+        confirmed_amount = sheet.acell(FREELANCE_CELL).value
+
+        # config["income"]["freelance"] = amount  
+        # save_config()
+
+        logger.info(f"Freelance income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
             f"✅ Đã ghi nhận thu nhập freelance: {amount:,.0f} VND\n"
-            f"💰 Tổng thu nhập freelance hiện tại: {config['income']['freelance']:,.0f} VND"
+            f"💰 Tổng thu nhập freelance hiện tại: {confirmed_amount:,.0f} VND"
         )
 
     except Exception as e:

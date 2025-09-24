@@ -8,7 +8,7 @@ from utils.timezone import get_current_time
 from config import config, BASE_DIR
 from google.oauth2.service_account import Credentials
 from utils.logger import logger
-from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS
+from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL
 
 # Google Sheets setup
 try:
@@ -198,17 +198,27 @@ def get_or_create_monthly_sheet(target_month=None):
                     
                     # Clear only the data rows, keep headers and formatting
                     # Get all values to identify where data starts (after headers)
-                    try:
-                        all_values = new_sheet.get_all_values()
+                    # try:
+                    #     all_values = new_sheet.get_all_values()
                         
-                        if len(all_values) > 1:  # If there's more than just headers
-                            # Clear data from row 2 onwards (keep row 1 as headers)
-                            range_to_clear = f"A2:Z{len(all_values)}"
-                            new_sheet.batch_clear([range_to_clear])
-                            logger.info(f"Cleared data rows from new sheet: {range_to_clear}")
-                    except Exception as clear_error:
-                        logger.warning(f"Could not clear template data: {clear_error}")
-                    
+                    #     if len(all_values) > 1:  # If there's more than just headers
+                    #         # Clear data from row 2 onwards (keep row 1 as headers)
+                    #         range_to_clear = f"A2:Z{len(all_values)}"
+                    #         new_sheet.batch_clear([range_to_clear])
+                    #         logger.info(f"Cleared data rows from new sheet: {range_to_clear}")
+                    # except Exception as clear_error:
+                    #     logger.warning(f"Could not clear template data: {clear_error}")
+
+                    salary_cell = new_sheet.acell(SALARY_CELL).value
+                    if salary_cell == "":    
+                        salary_income = config["income"]["salary"]
+                        new_sheet.update_acell(SALARY_CELL, salary_income)
+
+                    freelance_cell = new_sheet.acell(FREELANCE_CELL).value
+                    if freelance_cell == "":    
+                        freelance_income = config["income"]["freelance"]
+                        new_sheet.update_acell(FREELANCE_CELL, freelance_income)
+
                     logger.info(f"Created new sheet from template: {sheet_name}")
                     return new_sheet
                     

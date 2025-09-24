@@ -117,3 +117,5 @@ LONG_INVEST_KEYWORDS = ["chứng khoán",  "cổ phiếu",  "etf"]
 OPPORTUNITY_INVEST_KEYWORDS = ["bitcoin", "eth", "crypto"]
 RENT_KEYWORD = ["thuê nhà"]
 SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
+SALARY_CELL = "I2"
+FREELANCE_CELL = "J2"
