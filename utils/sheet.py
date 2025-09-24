@@ -163,6 +163,14 @@ def has_keyword(note: str, keywords: list[str]) -> bool:
                 return True
     return False
 
+def safe_int(value):
+    """Convert a value to int safely, removing non-digit characters"""
+    if not value:
+        return 0
+    text = str(value).strip()
+    text = re.sub(r"[^\d]", "", text)
+    return int(text) if text.isdigit() else 0
+
 
 def get_or_create_monthly_sheet(target_month=None):
     """Get month's sheet or create a new one for target month"""
@@ -209,13 +217,13 @@ def get_or_create_monthly_sheet(target_month=None):
                     # except Exception as clear_error:
                     #     logger.warning(f"Could not clear template data: {clear_error}")
 
-                    salary_cell = new_sheet.acell(SALARY_CELL).value
-                    if not salary_cell or salary_cell.strip() == "":
+                    salary_income = new_sheet.acell(SALARY_CELL).value
+                    if not salary_income or salary_income.strip() == "":
                         salary_income = config["income"]["salary"]
                         new_sheet.update_acell(SALARY_CELL, salary_income)
 
-                    freelance_cell = new_sheet.acell(FREELANCE_CELL).value
-                    if not freelance_cell or freelance_cell.strip() == "":
+                    freelance_income = new_sheet.acell(FREELANCE_CELL).value
+                    if not freelance_income or freelance_income.strip() == "":
                         freelance_income = config["income"]["freelance"]
                         new_sheet.update_acell(FREELANCE_CELL, freelance_income)
 

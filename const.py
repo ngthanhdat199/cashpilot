@@ -59,7 +59,7 @@ HELP_MSG = f"""
 • /other - Chi tiêu khác tháng này (/o) 🛒
 • /investment - Chi tiêu đầu tư tháng này (/i) 📈
 
-• /salary [amount] - Ghi nhận thu nhập lương (/sal [số tiền]) 🏢
+• /salary [amount] - Ghi nhận thu nhập lương (/sl [số tiền]) 🏢
 • /freelance [amount] - Ghi nhận thu nhập freelance (/fl [số tiền]) 💻
 • /income - Hiện tổng thu nhập tháng này (/inc) 💰
 

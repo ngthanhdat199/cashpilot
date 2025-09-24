@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS
 from config import config, save_config
 
@@ -669,15 +669,8 @@ async def month(update, context: CallbackContext):
             freelance = config["income"].get("freelance", 0)
 
         # convert safely to int
-        try:
-            salary = int(str(salary).strip())
-        except ValueError:
-            salary = 0
-
-        try:
-            freelance = int(str(freelance).strip())
-        except ValueError:
-            freelance = 0
+        salary = safe_int(salary)
+        freelance = safe_int(freelance)
 
         total_income = salary + freelance
 
@@ -814,7 +807,7 @@ async def gas(update, context):
             percentage_text = ""
 
         response = (
-            f"⛽ Tổng kết đổ xăng / đi lại {month_display}\n"
+            f"⛽ Tổng kết đổ xăng / đi lại {month_display}:\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -901,7 +894,7 @@ async def food(update, context):
             percentage_text = ""
 
         response = (
-            f"🍽️ Tổng kết chi tiêu ăn uống {month_display}\n"
+            f"🍽️ Tổng kết chi tiêu ăn uống {month_display}:\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -988,7 +981,7 @@ async def dating(update, context):
             percentage_text = ""
 
         response = (
-            f"🎉 Tổng kết chi tiêu hẹn hò / giải trí {month_display}\n"
+            f"🎉 Tổng kết chi tiêu hẹn hò / giải trí {month_display}:\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -1075,7 +1068,7 @@ async def other(update, context):
             percentage_text = ""
 
         response = (
-            f"🛍️ Tổng kết chi tiêu khác {month_display}\n"
+            f"🛍️ Tổng kết chi tiêu khác {month_display}:\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -1162,7 +1155,7 @@ async def investment(update, context):
             percentage_text = ""
 
         response = (
-            f"📈 Tổng kết chi tiêu đầu tư {month_display}\n"
+            f"📈 Tổng kết chi tiêu đầu tư {month_display}:\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
@@ -1325,15 +1318,8 @@ async def income(update, context):
             await update.message.reply_text("⚠️ Thu nhập lương chưa được ghi nhận trong tháng này. Vui lòng sử dụng lệnh /sl để cập nhật.")
             return
 
-        try:
-            freelance_income = int(freelance_income)
-        except (ValueError, TypeError):
-            freelance_income = 0
-        
-        try:
-            salary_income = int(salary_income)
-        except (ValueError, TypeError):
-            salary_income = 0
+        freelance_income = safe_int(freelance_income)
+        salary_income = safe_int(salary_income)
 
         # Get income from previous month's sheet for comparison
         prev_freelance_income = previous_sheet.acell(FREELANCE_CELL).value
@@ -1349,6 +1335,8 @@ async def income(update, context):
         except (ValueError, TypeError):
             prev_salary_income = 0
 
+        prev_freelance_income = safe_int(prev_freelance_income)
+        prev_salary_income = safe_int(prev_salary_income)
 
         prev_total_income = prev_freelance_income + prev_salary_income
         total_income = freelance_income + salary_income
@@ -1361,8 +1349,12 @@ async def income(update, context):
         else:
             percentage_text = ""
         
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
+
         response = (
-            f"💼 Tổng thu nhập:\n"
+            f"💼 Tổng thu nhập {month_display}:\n"
             f"💰 Lương: {salary_income:,.0f} VND\n"
             f"💰 Freelance: {freelance_income:,.0f} VND\n"
             f"💵 Tổng cộng: {total_income:,.0f} VND"

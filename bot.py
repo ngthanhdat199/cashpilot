@@ -21,7 +21,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["other", "o"], other))
         bot_app.add_handler(CommandHandler(["investment", "i"], investment))
         bot_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
-        bot_app.add_handler(CommandHandler(["salary", "sal"], salary))
+        bot_app.add_handler(CommandHandler(["salary", "sl"], salary))
         bot_app.add_handler(CommandHandler(["income", "inc"], income))
 
         # Callback handler for quick expense buttons
@@ -67,7 +67,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["other", "o"], other))
         fresh_app.add_handler(CommandHandler(["investment", "i"], investment))
         fresh_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
-        fresh_app.add_handler(CommandHandler(["salary", "sal"], salary))
+        fresh_app.add_handler(CommandHandler(["salary", "sl"], salary))
         fresh_app.add_handler(CommandHandler(["income", "inc"], income))
 
         fresh_app.add_handler(CallbackQueryHandler(handle_quick_expense))
