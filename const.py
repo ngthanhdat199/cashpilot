@@ -1,11 +1,6 @@
 from config import config
 from utils.version import get_version
 
-def format_shortcuts():
-    lines = []
-    for k, v in SHORTCUTS.items():
-        lines.append(f"• {k} → {v}")
-    return "\n".join(lines)
 
 
 # Global variable to store bot application - initialize it immediately
@@ -28,6 +23,24 @@ MONTH_NAMES = {
     "05": "tháng 5", "06": "tháng 6", "07": "tháng 7", "08": "tháng 8", 
     "09": "tháng 9", "10": "tháng 10", "11": "tháng 11", "12": "tháng 12"
 }
+
+SHORTCUTS = {
+    "a": "ăn",
+    "s": "ăn sáng", 
+    "t": "ăn trưa",
+    "o": "ăn tối",
+    "c": "cafe",
+    "x": "xăng xe",
+    "g": "grab",
+    "b": "xe buýt",
+    "n": "thuê nhà",
+}
+
+def format_shortcuts():
+    lines = []
+    for k, v in SHORTCUTS.items():
+        lines.append(f"• {k} → {v}")
+    return "\n".join(lines)
 
 HELP_MSG = f"""
 📖 Hướng dẫn sử dụng Money Tracker Bot
@@ -105,14 +118,3 @@ SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
 SALARY_CELL = "I2"
 FREELANCE_CELL = "J2"
 EXPECTED_HEADERS = ["Date", "Time", "VND", "Note", "Total per day", "SALARY", "FREELANCE"]
-SHORTCUTS = {
-    "a": "ăn",
-    "s": "ăn sáng", 
-    "t": "ăn trưa",
-    "o": "ăn tối",
-    "c": "cafe",
-    "x": "xăng xe",
-    "g": "grab",
-    "b": "xe buýt",
-    "n": "thuê nhà",
-}
