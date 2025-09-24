@@ -1,6 +1,13 @@
 from config import config
 from utils.version import get_version
 
+def format_shortcuts():
+    lines = []
+    for k, v in SHORTCUTS.items():
+        lines.append(f"• {k} → {v}")
+    return "\n".join(lines)
+
+
 # Global variable to store bot application - initialize it immediately
 bot_app = None
 webhook_failures = 0
@@ -23,50 +30,37 @@ MONTH_NAMES = {
 }
 
 HELP_MSG = f"""
-📖 Hướng dẫn sử dụng Money Tracker Bot:
+📖 Hướng dẫn sử dụng Money Tracker Bot
 
-⚡ ULTRA-FAST TYPING MODES:
-• 5 → Hiện buttons: Cafe/Ăn/Xăng/Grab
-• 15 → Chọn 1 click, xong!
-• 200 → Tự động nhân 1000 nếu cần
+⚡ Danh sách shortcut:
+{format_shortcuts()}
 
-⚡ Mode 2: SIÊU NGẮN (1-2 ký tự)
-• 5 c → 5000 VND cafe
-• 15 s → 15000 VND ăn sang  
-• 30 t → 30000 VND ăn trưa
-• 50 o → 50000 VND ăn tối
-• 200 x → 200000 VND xăng xe
-• 2m g → 2000000 VND grab
-
-⚡ Mode 3: EMOJI SHORTCUTS
-• 5 ☕ → 5000 VND cafe
-• 15 🍽️ → 15000 VND ăn
-• 200 ⛽ → 200000 VND xăng xe
-• 50 🚗 → 50000 VND grab
-
-⏰ Với ngày/giờ:
-• 02/09 5 c → 02/09 5000 VND cafe
-• 02/09 08:30 15 t → 02/09 08:30 15000 VND ăn trưa
+⏰ Ví dụ nhập nhanh:
+• `5 c` → 5000 VND cafe  
+• `15 t` → 15000 VND ăn trưa  
+• `02/09 5 c` → 02/09 5000 VND cafe  
+• `02/09 08:30 15 t` → 02/09 08:30 15000 VND ăn trưa  
 
 📊 Lệnh thống kê:
-• /today - Chi tiêu hôm nay (/t) 📅
-• /week - Chi tiêu tuần này  (/w) 🗓️
-• /month - Chi tiêu tháng này (/m) 📆
+• /today → Chi tiêu hôm nay (/t) 📅  
+• /week → Chi tiêu tuần này (/w) 🗓️  
+• /month → Chi tiêu tháng này (/m) 📆  
 
-• /gas - Chi tiêu xăng xe tháng này (/g) ⛽
-• /food - Chi tiêu ăn uống tháng này (/f) 🍜
-• /dating - Chi tiêu hẹn hò/giải trí tháng này (/d) 🎉
-• /other - Chi tiêu khác tháng này (/o) 🛒
-• /investment - Chi tiêu đầu tư tháng này (/i) 📈
+• /gas → Xăng xe (/g) ⛽  
+• /food → Ăn uống (/f) 🍜  
+• /dating → Hẹn hò/giải trí (/d) 🎉  
+• /other → Khác (/o) 🛒  
+• /investment → Đầu tư (/i) 📈  
 
-• /salary - Ghi nhận thu nhập lương (/sl [số tiền]) 🏢
-• /freelance - Ghi nhận thu nhập freelance (/fl [số tiền]) 💻
-• /income - Hiện tổng thu nhập tháng này (/inc) 💰
+💰 Thu nhập:
+• /salary [số tiền] → Ghi nhận lương (/sl) 🏢  
+• /freelance [số tiền] → Ghi nhận freelance (/fl) 💻  
+• /income → Tổng thu nhập (/inc) 💰  
 
+🗑️ Xóa:
+• del dd/mm hh:mm  
 
-🗑️ Xóa: del dd/mm hh:mm
-
-🤖 Bot tự động sắp xếp theo thời gian!
+🤖 Bot tự động sắp xếp theo thời gian!  
 📌 Phiên bản: {get_version()}
 """
 
@@ -83,16 +77,6 @@ LOG_EXPENSE_MSG = """
 
 🅾️ Case C: Có ngày + giờ
 ⏰ `02/09 08h30s10 10000 s` → 02/09 08:30:10 10000 VND 
-
-🔑 Shortcuts:  
-☕ c = cafe  
-🍽️ a = ăn  
-🥐 s = ăn sáng  
-🍱 t = ăn trưa  
-🍲 o = ăn tối  
-⛽ x = xăng 
-🚗 g = grab  
-🚌 b = bus
 """
 
 DELETE_EXPENSE_MSG = """
@@ -121,3 +105,14 @@ SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
 SALARY_CELL = "I2"
 FREELANCE_CELL = "J2"
 EXPECTED_HEADERS = ["Date", "Time", "VND", "Note", "Total per day", "SALARY", "FREELANCE"]
+SHORTCUTS = {
+    "a": "ăn",
+    "s": "ăn sáng", 
+    "t": "ăn trưa",
+    "o": "ăn tối",
+    "c": "cafe",
+    "x": "xăng xe",
+    "g": "grab",
+    "b": "xe buýt",
+    "n": "thuê nhà",
+}

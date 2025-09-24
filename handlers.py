@@ -7,7 +7,7 @@ from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
 from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int
-from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS
+from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
 from config import config, save_config
 
 def safe_async_handler(handler_func):
@@ -97,43 +97,7 @@ async def log_expense(update, context):
         logger.info(f"Log expense requested by user {update.effective_user.id}: '{text}'")
         
         # Quick shortcuts for common expenses
-        shortcuts = {
-            # Ultra-fast single characters
-            "c": "cafe",
-            "a": "ăn",
-            "s": "ăn sáng", 
-            "t": "ăn trưa",
-            "o": "ăn tối",
-            "x": "xăng xe",
-            "g": "grab",
-            "b": "xe buýt",
-            "n": "thuê nhà",
-            
-            # Emoji shortcuts (copy-paste friendly)
-            "☕": "cafe",
-            "🍽️": "ăn",
-            "🌅": "ăn sáng",
-            "🌞": "ăn trưa", 
-            "🌙": "ăn tối",
-            "⛽": "xăng xe",
-            "🚗": "grab",
-            "🚌": "xe buýt",
-            "🏠": "thuê nhà",
-            
-            # Regular shortcuts  
-            "cf": "cafe",
-            "an": "ăn",
-            "sang": "ăn sáng", 
-            "trua": "ăn trưa",
-            "toi": "ăn tối",
-            "xang": "xăng xe",
-            "grab": "grab",
-            "bus": "xe buýt",
-            "com": "cơm",
-            "pho": "phở",
-            "bun": "bún",
-            "mien": "miến"
-        }
+        shortcuts = SHORTCUTS
         
         # Parse different input formats
         entry_date = None
@@ -146,25 +110,23 @@ async def log_expense(update, context):
         if parts[0].isdigit():
             amount = int(parts[0])
             
-            # Super-fast mode: Just number, no description
-            if len(parts) == 1:
-                # User typed only a number, provide quick buttons
-                display_amount = amount * 1000
+            # # Super-fast mode: Just number, no description
+            # if len(parts) == 1:
+            #     # User typed only a number, provide quick buttons
+            #     display_amount = amount * 1000
 
-                keyboard = [
-                    [InlineKeyboardButton(f"🍽️ Ăn sáng ({display_amount:,})", callback_data=f"log_{amount}_s")],
-                    [InlineKeyboardButton(f"🌅 Ăn trưa ({display_amount:,})", callback_data=f"log_{amount}_t")],
-                    [InlineKeyboardButton(f"🌙 Ăn tối ({display_amount:,})", callback_data=f"log_{amount}_t")],
-                    [InlineKeyboardButton(f"⛽ Xăng ({display_amount:,})", callback_data=f"log_{amount}_x")],
-                    [InlineKeyboardButton(f"🚗 Grab ({display_amount:,})", callback_data=f"log_{amount}_g")],
-                ]
-                reply_markup = InlineKeyboardMarkup(keyboard)
+            #     keyboard = [
+            #         [InlineKeyboardButton(f"🍽️ Ăn sáng ({display_amount:,})", callback_data=f"log_{amount}_s")],
+            #         [InlineKeyboardButton(f"🌅 Ăn trưa ({display_amount:,})", callback_data=f"log_{amount}_t")],
+            #         [InlineKeyboardButton(f"🌙 Ăn tối ({display_amount:,})", callback_data=f"log_{amount}_t")],
+            #     ]
+            #     reply_markup = InlineKeyboardMarkup(keyboard)
                 
-                await update.message.reply_text(
-                    f"💰 {display_amount:,} VND - Chọn loại chi tiêu:",
-                    reply_markup=reply_markup
-                )
-                return
+            #     await update.message.reply_text(
+            #         f"💰 {display_amount:,} VND - Chọn loại chi tiêu:",
+            #         reply_markup=reply_markup
+            #     )
+            #     return
             
             raw_note = " ".join(parts[1:])
             
