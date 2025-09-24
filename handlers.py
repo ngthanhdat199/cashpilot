@@ -1229,12 +1229,20 @@ async def salary(update, context):
     amount = 0
 
     if args:
-        try:
-            offset = int(args[0])
-        except ValueError:
-            offset = 0
-
-        if len(args) > 1:
+        if len(args) == 1:
+            # Single argument: /sl 2000 -> offset=0, amount=2000
+            try:
+                amount = int(args[0])
+                offset = 0
+            except ValueError:
+                await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
+                return
+        elif len(args) >= 2:
+            # Two arguments: /sl 1 2000 -> offset=1, amount=2000
+            try:
+                offset = int(args[0])
+            except ValueError:
+                offset = 0
             amount = safe_int(args[1])
     else:
         await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/sl 200' hoặc '/sl 1 200'")
