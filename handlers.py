@@ -656,13 +656,23 @@ async def month(update, context: CallbackContext):
         salary = current_sheet.acell(SALARY_CELL).value
         freelance = current_sheet.acell(FREELANCE_CELL).value
 
-        if not salary or not salary.strip().isdigit():
-            salary = config["income"].get("salary", "0")
-        if not freelance or not freelance.strip().isdigit():
-            freelance = config["income"].get("freelance", "0")
+        # fallback from config if empty/invalid
+        if not salary or not str(salary).strip().isdigit():
+            salary = config["income"].get("salary", 0)
+        if not freelance or not str(freelance).strip().isdigit():
+            freelance = config["income"].get("freelance", 0)
 
-        salary = int(salary.strip()) if str(salary).strip().isdigit() else 0
-        freelance = int(freelance.strip()) if str(freelance).strip().isdigit() else 0
+        # convert safely to int
+        try:
+            salary = int(str(salary).strip())
+        except ValueError:
+            salary = 0
+
+        try:
+            freelance = int(str(freelance).strip())
+        except ValueError:
+            freelance = 0
+
         total_income = salary + freelance
 
         food_and_travel_total = food_total + gas_total + other_total
