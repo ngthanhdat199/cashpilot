@@ -1171,9 +1171,6 @@ async def freelance(update, context):
         amount = amount * 1000
         sheet.update_acell(FREELANCE_CELL, amount)
 
-        # read value from cell to confirm
-        confirmed_amount = sheet.acell(FREELANCE_CELL).value
-
         # Update config
         config["income"]["freelance"] = amount  
         save_config()
@@ -1181,7 +1178,7 @@ async def freelance(update, context):
         logger.info(f"Freelance income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
             f"✅ Đã ghi nhận thu nhập freelance: {amount:,.0f} VND\n"
-            f"💰 Tổng thu nhập freelance hiện tại: {confirmed_amount:,.0f} VND"
+            f"💰 Tổng thu nhập freelance hiện tại: {config['income']['freelance']:,.0f} VND"
         )
 
     except Exception as e:
@@ -1221,9 +1218,6 @@ async def salary(update, context):
         amount = amount * 1000
         sheet.update_acell(SALARY_CELL, amount)
 
-        # read value from cell to confirm
-        confirmed_amount = sheet.acell(SALARY_CELL).value
-
         # Update config
         config["income"]["salary"] = amount
         save_config()
@@ -1231,7 +1225,7 @@ async def salary(update, context):
         logger.info(f"Salary income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
             f"✅ Đã ghi nhận thu nhập lương: {amount:,.0f} VND\n"
-            f"💰 Tổng thu nhập lương hiện tại: {confirmed_amount:,.0f} VND"
+            f"💰 Tổng thu nhập lương hiện tại: {config['income']['salary']:,.0f} VND"
         )
 
     except Exception as e:
