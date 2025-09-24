@@ -454,12 +454,7 @@ def get_month_summary(records):
         "essential": 0, # total of food + gas + rent + other
         "investment": 0,  # total of long_investment + opportunity_investment
         "support_parent": 0,
-        "income": 0, # salary + freelance
     }
-
-    salary = config["income"]["salary"]
-    freelance = config["income"]["freelance"]
-    totals["income"] = salary + freelance
 
     for r in records:
         note = r.get("Note", "").lower()

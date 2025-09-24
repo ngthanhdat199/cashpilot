@@ -649,9 +649,21 @@ async def month(update, context: CallbackContext):
         opportunity_invest_total = summary["opportunity_investment"]
         investment_total = summary["investment"]
         support_parent_total = summary["support_parent"]
-        income_total = summary["income"]
-        food_and_travel_total = food_total + gas_total + other_total
 
+        # Get income from sheet
+        salary = current_sheet.acell(SALARY_CELL).value
+        freelance = current_sheet.acell(FREELANCE_CELL).value
+
+        if not salary or not salary.strip().isdigit():
+            salary = config["income"].get("salary", "0")
+        if not freelance or not freelance.strip().isdigit():
+            freelance = config["income"].get("freelance", "0")
+
+        salary = int(salary.strip()) if str(salary).strip().isdigit() else 0
+        freelance = int(freelance.strip()) if str(freelance).strip().isdigit() else 0
+        total_income = salary + freelance
+
+        food_and_travel_total = food_total + gas_total + other_total
         food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
         rent_budget = config["budgets"].get("rent", 0)
         essential_budget = food_and_travel_budget + rent_budget
@@ -666,18 +678,18 @@ async def month(update, context: CallbackContext):
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         # Calculate estimated amounts based on percentages and income
-        # essential_estimate = income_total * (essential_budget / 100) if income_total > 0 else 0
-        food_and_travel_estimate = income_total * (food_and_travel_budget / 100) if income_total > 0 else 0
-        rent_estimate = income_total * (rent_budget / 100) if income_total > 0 else 0
-        long_invest_estimate = income_total * (long_invest_budget / 100) if income_total > 0 else 0
-        opportunity_invest_estimate = income_total * (opportunity_invest_budget / 100) if income_total > 0 else 0
-        support_parent_estimate = income_total * (support_parent_budget / 100) if income_total > 0 else 0
-        dating_estimate = income_total * (dating_budget / 100) if income_total > 0 else 0
+        # essential_estimate = total_income * (essential_budget / 100) if total_income > 0 else 0
+        food_and_travel_estimate = total_income * (food_and_travel_budget / 100) if total_income > 0 else 0
+        rent_estimate = total_income * (rent_budget / 100) if total_income > 0 else 0
+        long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
+        opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
+        support_parent_estimate = total_income * (support_parent_budget / 100) if total_income > 0 else 0
+        dating_estimate = total_income * (dating_budget / 100) if total_income > 0 else 0
 
         response = (
             f"📊 Tổng kết {month_display}:\n"
             f"💰 Chi tiêu: {total:,.0f} VND\n"
-            f"💵 Thu nhập: {income_total:,.0f} VND\n"
+            f"💵 Thu nhập: {total_income:,.0f} VND\n"
             f"📝 {count} giao dịch\n\n"
 
             f"📌 Ngân sách dự kiến (% thu nhập):\n"
