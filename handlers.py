@@ -1222,7 +1222,7 @@ async def freelance(update, context):
 
         logger.info(f"Freelance income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
-            f"✅ Đã ghi nhận thu nhập freelance {month_display}: {amount:,.0f} VND\n"
+            f"✅ Đã ghi nhận thu nhập freelance {month_display}: {amount:,.0f} VND"
         )
 
     except Exception as e:
@@ -1280,7 +1280,7 @@ async def salary(update, context):
 
         logger.info(f"Salary income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
-            f"✅ Đã ghi nhận thu nhập lương {month_display}: {amount:,.0f} VND\n"
+            f"✅ Đã ghi nhận thu nhập lương {month_display}: {amount:,.0f} VND"
         )
 
     except Exception as e:
