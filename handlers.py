@@ -53,15 +53,11 @@ async def start(update, context):
     try:
         logger.info(f"Start command requested by user {update.effective_user.id}")
         keyboard = [
-            ["/today", "/week", "/month"],
-            ["/week -1", "/month -1"],
-            ["/gas", "/gas -1"],
-            ["/food", "/food -1"],
+            ["/today", "/week", "/month", "/week -1", "/month -1"],
+            ["/gas", "/gas -1", "/food", "/food -1", "/other", "/other -1"],
             ["/dating", "/dating -1"],
-            ["/other", "/other -1"],
             ["/investment", "/investment -1"],
-            ["/freelance [amount]", "/salary [amount]"],
-            ["/income"],
+            ["/income", "/income -1", "/fl", "/sl"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
