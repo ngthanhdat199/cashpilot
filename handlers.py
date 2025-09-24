@@ -7,7 +7,7 @@ from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
 from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary
-from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL
+from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL
 from config import config, save_config
 
 def safe_async_handler(handler_func):
@@ -60,6 +60,8 @@ async def start(update, context):
             ["/dating", "/dating -1"],
             ["/other", "/other -1"],
             ["/investment", "/investment -1"],
+            ["/freelance [amount]", "/salary [amount]"],
+            ["/income"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -1169,11 +1171,12 @@ async def freelance(update, context):
         amount = amount * 1000
         sheet.update_acell(FREELANCE_CELL, amount)
 
-        # read value from cell J2 to confirm
+        # read value from cell to confirm
         confirmed_amount = sheet.acell(FREELANCE_CELL).value
 
-        # config["income"]["freelance"] = amount  
-        # save_config()
+        # Update config
+        config["income"]["freelance"] = amount  
+        save_config()
 
         logger.info(f"Freelance income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
@@ -1188,6 +1191,55 @@ async def freelance(update, context):
         except Exception as reply_error:
             logger.error(f"Failed to send error message in freelance command: {reply_error}")
 
+@safe_async_handler
+# 200
+async def salary(update, context):
+    """Log salary income to sheet"""
+    text = update.message.text.strip()
+    
+    try:
+        logger.info(f"Salary income logging requested by user {update.effective_user.id}: '{text}'")
+        
+        parts = text.split(maxsplit=1)
+        if len(parts) < 2:
+            await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'")
+            return
+
+        amount_str = parts[1]
+        if not amount_str.isdigit():
+            await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
+            return
+
+        amount = int(amount_str)
+        if amount <= 0:
+            await update.message.reply_text("❌ Số tiền phải lớn hơn 0.")
+            return
+
+        target_month = get_current_time().strftime("%m/%Y")
+        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+
+        amount = amount * 1000
+        sheet.update_acell(SALARY_CELL, amount)
+
+        # read value from cell to confirm
+        confirmed_amount = sheet.acell(SALARY_CELL).value
+
+        # Update config
+        config["income"]["salary"] = amount
+        save_config()
+
+        logger.info(f"Salary income of {amount} VND logged successfully for user {update.effective_user.id}")
+        await update.message.reply_text(
+            f"✅ Đã ghi nhận thu nhập lương: {amount:,.0f} VND\n"
+            f"💰 Tổng thu nhập lương hiện tại: {confirmed_amount:,.0f} VND"
+        )
+
+    except Exception as e:
+        logger.error(f"Error in salary command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text("❌ Có lỗi xảy ra khi ghi nhận thu nhập. Vui lòng thử lại!")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in salary command: {reply_error}")
 
 @safe_async_handler
 async def income(update, context):
