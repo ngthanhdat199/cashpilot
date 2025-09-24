@@ -1177,41 +1177,52 @@ async def investment(update, context):
 @safe_async_handler
 # 200
 async def freelance(update, context):
-    """Log freelance income to sheet"""
-    text = update.message.text.strip()
+    args = context.args
+    offset = 0
+    amount = 0
+
+    if args:
+        if len(args) == 1:
+            # Single argument: /fl 200 -> offset=0, amount=200
+            try:
+                amount = int(args[0])
+                offset = 0
+            except ValueError:
+                await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
+                return
+        elif len(args) >= 2:
+            # Two arguments: /fl 1 200 -> offset=1, amount=200
+            try:
+                offset = int(args[0])
+            except ValueError:
+                offset = 0
+            amount = safe_int(args[1])
+    else:
+        await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'")
+        return
     
+    if amount <= 0:
+        await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
+        return
+
     try:
-        logger.info(f"Freelance income logging requested by user {update.effective_user.id}: '{text}'")
-        
-        parts = text.split(maxsplit=1)
-        if len(parts) < 2:
-            await update.message.reply_text("❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'")
-            return
-
-        amount_str = parts[1]
-        if not amount_str.isdigit():
-            await update.message.reply_text("❌ Số tiền không hợp lệ. Vui lòng nhập số nguyên dương.")
-            return
-
-        amount = int(amount_str)
-        if amount <= 0:
-            await update.message.reply_text("❌ Số tiền phải lớn hơn 0.")
-            return
-
-        target_month = get_current_time().strftime("%m/%Y")
+        now = get_current_time() + relativedelta(months=offset)
+        target_month = now.strftime("%m/%Y")
+        target_year = now.strftime("%Y")
+        month_display = f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
         amount = amount * 1000
         sheet.update_acell(FREELANCE_CELL, amount)
 
         # Update config
-        config["income"]["freelance"] = amount  
-        save_config()
+        if offset == 0:
+            config["income"]["freelance"] = amount  
+            save_config()
 
         logger.info(f"Freelance income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
-            f"✅ Đã ghi nhận thu nhập freelance: {amount:,.0f} VND\n"
-            f"💰 Tổng thu nhập freelance hiện tại: {config['income']['freelance']:,.0f} VND"
+            f"✅ Đã ghi nhận thu nhập freelance {month_display}: {amount:,.0f} VND\n"
         )
 
     except Exception as e:
@@ -1255,6 +1266,8 @@ async def salary(update, context):
     try:
         now = get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
+        target_year = now.strftime("%Y")
+        month_display = f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
         amount = amount * 1000
@@ -1267,8 +1280,7 @@ async def salary(update, context):
 
         logger.info(f"Salary income of {amount} VND logged successfully for user {update.effective_user.id}")
         await update.message.reply_text(
-            f"✅ Đã ghi nhận thu nhập lương: {amount:,.0f} VND\n"
-            f"💰 Tổng thu nhập lương hiện tại: {config['income']['salary']:,.0f} VND"
+            f"✅ Đã ghi nhận thu nhập lương {month_display}: {amount:,.0f} VND\n"
         )
 
     except Exception as e:
