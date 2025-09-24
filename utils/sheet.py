@@ -8,7 +8,7 @@ from utils.timezone import get_current_time
 from config import config, BASE_DIR
 from google.oauth2.service_account import Credentials
 from utils.logger import logger
-from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL
+from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS
 
 # Google Sheets setup
 try:
@@ -260,7 +260,7 @@ def get_gas_total(month):
     """Helper to get total gas expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
         
         gas_expenses = []
         total = 0
@@ -282,7 +282,7 @@ def get_food_total(month):
     """Helper to get total food expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
         food_expenses = []
         total = 0
@@ -304,7 +304,7 @@ def get_dating_total(month):
     """Helper to get total date expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
         date_expenses = []
         total = 0
@@ -326,7 +326,7 @@ def get_rent_total(month):
     """Helper to get total rent expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
         rent_expenses = []
         total = 0
@@ -348,7 +348,7 @@ def get_other_total(month):
     """Helper to get total other expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
         other_expenses = []
         total = 0
@@ -378,7 +378,7 @@ def get_long_investment_total(month):
     """Helper to get total investment expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
         invest_expenses = []
         total = 0
@@ -399,7 +399,7 @@ def get_opportunity_investment_total(month):
     """Helper to get total opportunity investment expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
         invest_expenses = []
         total = 0
@@ -421,7 +421,7 @@ def get_support_parent_total(month):
     """Helper to get total support parent expenses for a given month"""
     try:
         sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records()
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
 
         support_parent_expenses = []
         total = 0

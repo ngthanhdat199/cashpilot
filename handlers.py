@@ -406,7 +406,9 @@ async def delete_expense(update, context):
         
         # Find and delete the matching row
         try:
-            all_records = current_sheet.get_all_records()
+            all_records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
             logger.info(f"Retrieved {len(all_records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -464,7 +466,9 @@ async def today(update, context):
             return
         
         try:
-            records = await asyncio.to_thread(current_sheet.get_all_records)
+            records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -538,7 +542,9 @@ async def week(update, context: CallbackContext):
         for target_month in months_to_check:
             try:
                 current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-                records = await asyncio.to_thread(current_sheet.get_all_records)
+                records = await asyncio.to_thread(
+                    lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+                )
 
                 year = target_month.split("/")[1]
 
@@ -769,7 +775,9 @@ async def gas(update, context):
             return
     
         try:
-            records = await asyncio.to_thread(current_sheet.get_all_records)
+            records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -854,7 +862,9 @@ async def food(update, context):
             return
     
         try:
-            records = await asyncio.to_thread(current_sheet.get_all_records)
+            records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -939,7 +949,9 @@ async def dating(update, context):
             return
     
         try:
-            records = await asyncio.to_thread(current_sheet.get_all_records)
+            records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -1024,7 +1036,9 @@ async def other(update, context):
             return
     
         try:
-            records = await asyncio.to_thread(current_sheet.get_all_records)
+            records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
@@ -1109,7 +1123,9 @@ async def investment(update, context):
             return
     
         try:
-            records = await asyncio.to_thread(current_sheet.get_all_records)
+            records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
