@@ -210,12 +210,12 @@ def get_or_create_monthly_sheet(target_month=None):
                     #     logger.warning(f"Could not clear template data: {clear_error}")
 
                     salary_cell = new_sheet.acell(SALARY_CELL).value
-                    if salary_cell == "":    
+                    if not salary_cell or salary_cell.strip() == "":
                         salary_income = config["income"]["salary"]
                         new_sheet.update_acell(SALARY_CELL, salary_income)
 
                     freelance_cell = new_sheet.acell(FREELANCE_CELL).value
-                    if freelance_cell == "":    
+                    if not freelance_cell or freelance_cell.strip() == "":
                         freelance_income = config["income"]["freelance"]
                         new_sheet.update_acell(FREELANCE_CELL, freelance_income)
 
