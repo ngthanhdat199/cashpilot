@@ -1277,22 +1277,96 @@ async def salary(update, context):
 
 @safe_async_handler
 async def income(update, context):
-    """Show total income from config.json"""
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    """Show total income from sheet"""
     try:
         logger.info(f"Income summary requested by user {update.effective_user.id}")
         
-        freelance_income = config["income"].get("freelance", 0)
-        salary_income = config["income"].get("salary", 0)
-        other_income = config["income"].get("other", 0)
-        total_income = freelance_income + salary_income + other_income
+        now = get_current_time() + relativedelta(months=offset)
+        target_month = now.strftime("%m/%Y")
+        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+        logger.info(f"Getting income summary for sheet {target_month}")
+
+        try:
+            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+            logger.info(f"Successfully obtained sheet for {target_month}")
+        except Exception as sheet_error:
+            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            return
+        
+        try:
+            previous_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, previous_month)
+            logger.info(f"Successfully obtained sheet for {previous_month}")
+        except Exception as prev_sheet_error:
+            logger.error(f"Error getting/creating sheet {previous_month}: {prev_sheet_error}", exc_info=True)
+            await update.message.reply_text("❌ Không thể truy cập Google Sheets tháng trước. Vui lòng thử lại!")
+            return
+            
+        # Get income from current month's sheet
+        freelance_income = current_sheet.acell(FREELANCE_CELL).value
+        salary_income = current_sheet.acell(SALARY_CELL).value
+
+        if not freelance_income or freelance_income.strip() == "":
+            logger.info("Freelance income cell is empty, using config fallback")
+            await update.message.reply_text("⚠️ Thu nhập freelance chưa được ghi nhận trong tháng này. Vui lòng sử dụng lệnh /fl để cập nhật.")
+            return
+
+        if not salary_income or salary_income.strip() == "":    
+            logger.info("Salary income cell is empty, using config fallback")
+            await update.message.reply_text("⚠️ Thu nhập lương chưa được ghi nhận trong tháng này. Vui lòng sử dụng lệnh /sl để cập nhật.")
+            return
+
+        try:
+            freelance_income = int(freelance_income)
+        except (ValueError, TypeError):
+            freelance_income = 0
+        
+        try:
+            salary_income = int(salary_income)
+        except (ValueError, TypeError):
+            salary_income = 0
+
+        # Get income from previous month's sheet for comparison
+        prev_freelance_income = previous_sheet.acell(FREELANCE_CELL).value
+        prev_salary_income = previous_sheet.acell(SALARY_CELL).value
+
+        try:
+            prev_freelance_income = int(str(prev_freelance_income).strip()) if prev_freelance_income and str(prev_freelance_income).strip().isdigit() else 0
+        except (ValueError, TypeError):
+            prev_freelance_income = 0
+        
+        try:
+            prev_salary_income = int(str(prev_salary_income).strip()) if prev_salary_income and str(prev_salary_income).strip().isdigit() else 0
+        except (ValueError, TypeError):
+            prev_salary_income = 0
+
+
+        prev_total_income = prev_freelance_income + prev_salary_income
+        total_income = freelance_income + salary_income
+
+        # Calculate percentage change
+        if prev_total_income > 0:
+            percentage_change = ((total_income - prev_total_income) / prev_total_income) * 100
+            change_symbol = "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+        else:
+            percentage_text = ""
         
         response = (
             f"💼 Tổng thu nhập:\n"
             f"💰 Lương: {salary_income:,.0f} VND\n"
             f"💰 Freelance: {freelance_income:,.0f} VND\n"
-            f"💰 Khác: {other_income:,.0f} VND\n"
-            f"-----------------------\n"
             f"💵 Tổng cộng: {total_income:,.0f} VND"
+            f"📊 So với {previous_month}: {total_income - prev_total_income:+,.0f} VND {percentage_text}\n"
         )
         
         await update.message.reply_text(response)
