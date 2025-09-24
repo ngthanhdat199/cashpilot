@@ -120,3 +120,4 @@ RENT_KEYWORD = ["thuê nhà"]
 SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
 SALARY_CELL = "I2"
 FREELANCE_CELL = "J2"
+EXPECTED_HEADERS = ["Date", "Time", "VND", "Note", "Total per day", "SALARY", "FREELANCE"]
