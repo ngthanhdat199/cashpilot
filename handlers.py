@@ -629,9 +629,9 @@ async def month(update, context: CallbackContext):
             return
         
         try:
-            records = await asyncio.to_thread(current_sheet.get_all_records(
+            records = await asyncio.to_thread(
                 lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            ))
+            )
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
