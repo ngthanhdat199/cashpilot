@@ -1121,7 +1121,8 @@ async def investment(update, context):
 
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 Phân bổ danh mục\n"
-            "━━━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+
             f"📈 Đầu tư dài hạn: {long_invest_estimate:,.0f} VND\n"
             f"   • 📊 ETF (60%) → {long_invest_estimate * 0.6:,.0f} VND\n"
             f"   • ₿ BTC/ETH (40%) → {long_invest_estimate * 0.4:,.0f} VND\n"
