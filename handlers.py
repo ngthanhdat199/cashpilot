@@ -1114,25 +1114,33 @@ async def investment(update, context):
 
 
         response = (
-            f"📈 Tổng kết chi tiêu đầu tư {month_display}:\n"
+            f"📈 Tổng kết chi tiêu đầu tư {month_display}\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
             f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n\n"
 
-            f"1. 📈 Đầu tư dài hạn ({long_invest_estimate:,.0f} VND)\n"
-            f"   • ETF (60%) → {long_invest_estimate * 0.6:,.0f} VND\n"
-            f"   • BTC/ETH (40%) → {long_invest_estimate * 0.4:,.0f} VND\n"
-            f"     - BTC (70%) → {long_invest_estimate * 0.4 * 0.7:,.0f} VND\n"
-            f"     - ETH (30%) → {long_invest_estimate * 0.4 * 0.3:,.0f} VND\n\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📌 Phân bổ danh mục\n"
+            "━━━━━━━━━━━━━━━━━━\n"
+            f"📈 Đầu tư dài hạn: {long_invest_estimate:,.0f} VND\n"
+            f"   • 📊 ETF (60%) → {long_invest_estimate * 0.6:,.0f} VND\n"
+            f"   • ₿ BTC/ETH (40%) → {long_invest_estimate * 0.4:,.0f} VND\n"
+            f"      - ₿ BTC (70%) → {long_invest_estimate * 0.4 * 0.7:,.0f} VND\n"
+            f"      - Ξ ETH (30%) → {long_invest_estimate * 0.4 * 0.3:,.0f} VND\n\n"
 
-            f"2. 🚀 Đầu tư cơ hội ({opportunity_invest_estimate:,.0f} VND)\n"
-            f"   • Altcoin (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n"
-            f"   • Cổ phiếu tăng trưởng / small-cap ETF / thematic ETF (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n"
+            f"🚀 Đầu tư cơ hội: {opportunity_invest_estimate:,.0f} VND\n"
+            f"   • 🪙 Altcoin (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n"
+            f"   • 📈 Growth Stocks / Thematic ETF (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n\n"
+
+            "━━━━━━━━━━━━━━━━━━\n"
+            "📌 Lịch sử giao dịch\n"
+            "━━━━━━━━━━━━━━━━━━\n"
         )
-
         
         if details:
-            response += f"\n📝 Chi tiết:{details}"
+            # response += f"\n📝 Chi tiết:{details}"
+            response += details
+
 
         await update.message.reply_text(response)
         logger.info(f"Investment summary sent successfully to user {update.effective_user.id}")
