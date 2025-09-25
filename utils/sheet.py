@@ -423,6 +423,27 @@ def get_opportunity_investment_total(month):
     except Exception as e:
         logger.error(f"Error getting opportunity investment total for {month}: {e}", exc_info=True)
         return [], 0
+    
+def get_investment_total(month):
+    """Helper to get total investment expenses for a given month"""
+    try:
+        sheet = get_or_create_monthly_sheet(month)
+        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+        invest_expenses = []
+        total = 0
+        for r in records:
+            note = r.get("Note", "").lower()
+            if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or has_keyword(note, LONG_INVEST_KEYWORDS):
+                amount = r.get("VND", 0)
+                if amount:
+                    invest_expenses.append(r)
+                    total += parse_amount(amount)
+        
+        return invest_expenses, total
+    except Exception as e:
+        logger.error(f"Error getting opportunity investment total for {month}: {e}", exc_info=True)
+        return [], 0
+
 
 # helper for support parent totals
 def get_support_parent_total(month):

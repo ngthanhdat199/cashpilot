@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int, get_investment_total
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
 from config import config, save_config
 
@@ -1064,7 +1064,7 @@ async def investment(update, context):
             await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
             return
 
-        investment_expenses, total = get_long_investment_total(target_month)
+        investment_expenses, total = get_investment_total(target_month)
         count = len(investment_expenses)
         logger.info(f"Found {count} investment expenses for this month with total {total} VND")
 
@@ -1083,7 +1083,7 @@ async def investment(update, context):
             for i, r in enumerate(rows, start=1):
                 details += format_expense(r, i) + "\n"
 
-        _, previous_total = get_long_investment_total(previous_month)
+        _, previous_total = get_investment_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
@@ -1093,12 +1093,43 @@ async def investment(update, context):
         else:
             percentage_text = ""
 
+
+        # Get income from sheet
+        salary = current_sheet.acell(SALARY_CELL).value
+        freelance = current_sheet.acell(FREELANCE_CELL).value
+
+        # fallback from config if empty/invalid
+        if not salary or not str(salary).strip().isdigit():
+            salary = config["income"].get("salary", 0)
+        if not freelance or not str(freelance).strip().isdigit():
+            freelance = config["income"].get("freelance", 0)
+        salary = safe_int(salary)
+        freelance = safe_int(freelance)
+        total_income = salary + freelance
+
+        long_invest_budget = config["budgets"].get("long_investment", 0)
+        opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
+        long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
+        opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
+
+
         response = (
             f"📈 Tổng kết chi tiêu đầu tư {month_display}:\n"
             f"💰 Tổng chi: {total:,.0f} VND\n"
             f"📝 Giao dịch: {count}\n"
-            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n\n"
+
+            f"1. 📈 Đầu tư dài hạn ({long_invest_estimate:,.0f} VND)\n"
+            f"   • ETF (60%) → {long_invest_estimate * 0.6:,.0f} VND\n"
+            f"   • BTC/ETH (40%) → {long_invest_estimate * 0.4:,.0f} VND\n"
+            f"     - BTC (70%) → {long_invest_estimate * 0.4 * 0.7:,.0f} VND\n"
+            f"     - ETH (30%) → {long_invest_estimate * 0.4 * 0.3:,.0f} VND\n\n"
+
+            f"2. 🚀 Đầu tư cơ hội ({opportunity_invest_estimate:,.0f} VND)\n"
+            f"   • Altcoin (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n"
+            f"   • Cổ phiếu tăng trưởng / small-cap ETF / thematic ETF (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n"
         )
+
         
         if details:
             response += f"\n📝 Chi tiết:{details}"
