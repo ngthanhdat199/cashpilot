@@ -519,3 +519,23 @@ def get_month_summary(records):
             totals["essential"] += amount
 
     return totals
+
+# helper for get total income
+def get_total_income(sheet):
+    """Helper to get total income from salary and freelance"""
+    try:
+        salary = sheet.acell(SALARY_CELL).value
+        freelance = sheet.acell(FREELANCE_CELL).value
+
+        if not salary or salary.strip() == "":
+            salary = config["income"]["salary"]
+        if not freelance or freelance.strip() == "":
+            freelance = config["income"]["freelance"]
+        
+        salary = safe_int(salary)
+        freelance = safe_int(freelance)
+        total_income = salary + freelance
+        return total_income
+    except Exception as e:
+        logger.error(f"Error getting total income: {e}", exc_info=True)
+        return 0, 0, 0

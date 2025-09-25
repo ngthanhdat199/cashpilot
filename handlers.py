@@ -6,7 +6,7 @@ import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int, get_investment_total
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int, get_investment_total, get_total_income
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
 from config import config, save_config
 
@@ -1095,23 +1095,11 @@ async def investment(update, context):
 
 
         # Get income from sheet
-        salary = current_sheet.acell(SALARY_CELL).value
-        freelance = current_sheet.acell(FREELANCE_CELL).value
-
-        # fallback from config if empty/invalid
-        if not salary or not str(salary).strip().isdigit():
-            salary = config["income"].get("salary", 0)
-        if not freelance or not str(freelance).strip().isdigit():
-            freelance = config["income"].get("freelance", 0)
-        salary = safe_int(salary)
-        freelance = safe_int(freelance)
-        total_income = salary + freelance
-
+        total_income = get_total_income(current_sheet)
         long_invest_budget = config["budgets"].get("long_investment", 0)
         opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
         long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
         opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
-
 
         response = (
             f"📈 Tổng kết chi tiêu đầu tư {month_display}\n"
@@ -1139,7 +1127,6 @@ async def investment(update, context):
         )
         
         if details:
-            # response += f"\n📝 Chi tiết:{details}"
             response += details
 
 

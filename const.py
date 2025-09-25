@@ -109,8 +109,14 @@ DELETE_EXPENSE_MSG = """
 FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn", "uống", "nước"]
 DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum", "cafe", "xem phim", "cơm gà", "pizza", "hẹn hò", "date"]
 TRANSPORT_KEYWORDS = ["grab", "giao hàng", "taxi", "bus", "gửi xe", "xăng"]
-LONG_INVEST_KEYWORDS = ["chứng khoán",  "cổ phiếu",  "etf"]
-OPPORTUNITY_INVEST_KEYWORDS = ["bitcoin", "eth", "crypto"]
+LONG_INVEST_KEYWORDS = [
+    "chứng khoán", "cổ phiếu", "etf",
+    "bitcoin", "btc", "ethereum", "eth"
+]
+OPPORTUNITY_INVEST_KEYWORDS = [
+    "crypto", "altcoin", "sol", "avax", "link",
+    "growth stock", "small-cap", "thematic etf", "cổ phiếu tăng trưởng"
+]
 RENT_KEYWORD = ["thuê nhà"]
 SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
 SALARY_CELL = "I2"
