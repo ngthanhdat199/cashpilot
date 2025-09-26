@@ -1,7 +1,7 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, CallbackQueryHandler
 from const import TOKEN
 from utils.logger import logger
-from handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary
+from handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort
 
 # Initialize bot application immediately
 def setup_bot():
@@ -23,6 +23,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
         bot_app.add_handler(CommandHandler(["salary", "sl"], salary))
         bot_app.add_handler(CommandHandler(["income", "inc"], income))
+        bot_app.add_handler(CommandHandler(["sort", "sort"], sort))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -66,6 +67,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
         fresh_app.add_handler(CommandHandler(["salary", "sl"], salary))
         fresh_app.add_handler(CommandHandler(["income", "inc"], income))
+        fresh_app.add_handler(CommandHandler(["sort", "sort"], sort))
 
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         

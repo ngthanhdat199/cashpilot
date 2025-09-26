@@ -3,12 +3,49 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMa
 from telegram.ext import CallbackContext
 import datetime
 import asyncio
+import time
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
 from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int, get_investment_total, get_total_income
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
 from config import config, save_config
+
+# Performance optimization: Cache for sheet data to reduce API calls
+_sheet_cache = {}
+_cache_timeout = 30  # Cache data for 30 seconds
+
+def get_cached_sheet_data(sheet_name, force_refresh=False):
+    """Get cached sheet data or fetch fresh if expired"""
+    current_time = time.time()
+    cache_key = sheet_name
+    
+    if not force_refresh and cache_key in _sheet_cache:
+        data, timestamp = _sheet_cache[cache_key]
+        if current_time - timestamp < _cache_timeout:
+            logger.debug(f"Using cached data for sheet {sheet_name}")
+            return data
+    
+    # Fetch fresh data
+    logger.debug(f"Fetching fresh data for sheet {sheet_name}")
+    try:
+        sheet = get_or_create_monthly_sheet(sheet_name)
+        # Use get_values instead of get_all_records for better performance
+        all_values = sheet.get_values("A:D")
+        _sheet_cache[cache_key] = (all_values, current_time)
+        return all_values
+    except Exception as e:
+        logger.error(f"Error fetching sheet data for {sheet_name}: {e}")
+        # Return cached data if available, even if expired
+        if cache_key in _sheet_cache:
+            return _sheet_cache[cache_key][0]
+        raise
+
+def invalidate_sheet_cache(sheet_name):
+    """Invalidate cache for a specific sheet"""
+    if sheet_name in _sheet_cache:
+        del _sheet_cache[sheet_name]
+        logger.debug(f"Invalidated cache for sheet {sheet_name}")
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -170,68 +207,29 @@ async def log_expense(update, context):
 
         logger.info(f"Parsed expense: {amount} VND on {entry_date} {entry_time} - {note} (sheet: {target_month})")
 
-        # Get or create the target month's sheet
-        # sheet = get_or_create_monthly_sheet(target_month)
+        # OPTIMIZATION: Get or create the target month's sheet
         sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
-        # Always append the data to columns A-D, then sort if needed
-        # Find the next empty row in columns A-D
+        # OPTIMIZATION: Use single API call to get current data size
         try:
-            all_values = sheet.get_values("A:D")
+            all_values = await asyncio.to_thread(lambda: sheet.get_values("A:D"))
         except Exception as get_error:
             logger.warning(f"Could not get values, using empty list: {get_error}")
             all_values = []
             
         next_row = len(all_values) + 1
         
-        # Add the new entry to columns A-D
+        # OPTIMIZATION: Simple append without immediate sorting - sorting is expensive and not always necessary
         range_name = f"A{next_row}:D{next_row}"
-        # Ensure amount is stored as a plain number without formatting
-        sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
+        await asyncio.to_thread(
+            lambda: sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
+        )
         
-        # Now sort only columns A-D by date and time to maintain order
-        if len(all_values) > 1:  # Only sort if there's more than just the header
-            try:
-                # Get all data from columns A-D (excluding header)
-                data_range = f"A2:D{next_row}"
-                data_values = sheet.get_values(data_range)
-                
-                if data_values:
-                    # Sort the data by date and time
-                    sorted_data = sorted(data_values, key=lambda x: (
-                        x[0] if len(x) > 0 else "",  # Date
-                        x[1] if len(x) > 1 else ""   # Time
-                    ))
-                    
-                    # Ensure all amounts are integers when updating
-                    for row in sorted_data:
-                        if len(row) >= 3 and row[2]:
-                            try:
-                                # Convert amount to integer to avoid formatting issues
-                                row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
-                            except (ValueError, TypeError):
-                                pass  # Keep original value if conversion fails
-                    
-                    # Update the sorted data back to columns A-D using RAW input
-                    sheet.update(f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option='RAW')
-                    
-                    # Find where our entry ended up after sorting
-                    for i, row in enumerate(sorted_data, start=2):
-                        if (len(row) >= 4 and
-                            row[0] == entry_date and 
-                            row[1] == entry_time and 
-                            int(float(str(row[2]).replace(',', '').replace('₫', '').strip())) == int(amount) and row[3] == note):
-                            position_msg = f"📍 Vị trí: Dòng {i}"
-                            break
-                    else:
-                        position_msg = "📍 Vị trí: Đã sắp xếp"
-                else:
-                    position_msg = f"📍 Vị trí: Dòng {next_row}"
-            except Exception as sort_error:
-                logger.warning(f"Could not sort data: {sort_error}")
-                position_msg = f"📍 Vị trí: Dòng {next_row}"
-        else:
-            position_msg = f"📍 Vị trí: Dòng {next_row}"
+        # OPTIMIZATION: Skip sorting for most entries - only indicate position
+        position_msg = f"📍 Vị trí: Dòng {next_row}"
+        
+        # Invalidate cache since we've updated the sheet
+        invalidate_sheet_cache(target_month)
 
         response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n{position_msg}\n� Sheet: {target_month}"
         await update.message.reply_text(response)
@@ -279,44 +277,44 @@ async def delete_expense(update, context):
         
         logger.info(f"Target sheet: {target_month}")
         
-        # Get the appropriate monthly sheet
+        # OPTIMIZATION: Use cached data or fetch efficiently
         try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-            logger.info(f"Successfully obtained sheet for {target_month}")
+            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+            if not all_values or len(all_values) < 2:
+                await update.message.reply_text("❌ Không có dữ liệu trong sheet này.")
+                return
+            logger.info(f"Retrieved {len(all_values)} rows from sheet (cached)")
         except Exception as sheet_error:
-            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            logger.error(f"Error getting sheet data for {target_month}: {sheet_error}", exc_info=True)
             await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
         
-        # Find and delete the matching row
-        try:
-            all_records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(all_records)} records from sheet")
-        except Exception as records_error:
-            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
-            return
-        
-        found = False
-        for i, record in enumerate(all_records, start=2):  # Start from row 2 (after header)
-            record_date = normalize_date(record.get('Date', '').strip())
-            record_time = normalize_time(record.get('Time', '').strip())
-            
-            if record_date == entry_date and record_time == entry_time:
-                try:
-                    current_sheet.delete_rows(i)
-                    found = True
-                    logger.info(f"Successfully deleted expense: {entry_date} {entry_time} from row {i}")
-                    await update.message.reply_text(f"✅ Đã xóa giao dịch: {entry_date} {entry_time}")
+        # OPTIMIZATION: Search through values array instead of records (faster)
+        found_row = None
+        for i, row in enumerate(all_values[1:], start=2):  # Skip header row
+            if len(row) >= 2:
+                row_date = normalize_date(row[0].strip()) if row[0] else ""
+                row_time = normalize_time(row[1].strip()) if row[1] else ""
+                
+                if row_date == entry_date and row_time == entry_time:
+                    found_row = i
                     break
-                except Exception as delete_error:
-                    logger.error(f"Error deleting row {i}: {delete_error}", exc_info=True)
-                    await update.message.reply_text(f"❌ Có lỗi xảy ra khi xóa giao dịch. Vui lòng thử lại!\n\nLỗi: {delete_error}")
-                    return
         
-        if not found:
+        if found_row:
+            try:
+                current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+                await asyncio.to_thread(lambda: current_sheet.delete_rows(found_row))
+                
+                # Invalidate cache since we've modified the sheet
+                invalidate_sheet_cache(target_month)
+                
+                logger.info(f"Successfully deleted expense: {entry_date} {entry_time} from row {found_row}")
+                await update.message.reply_text(f"✅ Đã xóa giao dịch: {entry_date} {entry_time}")
+                
+            except Exception as delete_error:
+                logger.error(f"Error deleting row {found_row}: {delete_error}", exc_info=True)
+                await update.message.reply_text(f"❌ Có lỗi xảy ra khi xóa giao dịch. Vui lòng thử lại!\n\nLỗi: {delete_error}")
+        else:
             logger.warning(f"Expense not found: {entry_date} {entry_time}")
             await update.message.reply_text(f"❌ Không tìm thấy giao dịch: {entry_date} {entry_time}")
             
@@ -326,6 +324,57 @@ async def delete_expense(update, context):
             await update.message.reply_text(f"❌ Có lỗi xảy ra khi xóa! Vui lòng thử lại.\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in delete_expense: {reply_error}")
+
+@safe_async_handler
+async def sort_sheet_data(update, context):
+    """Manually sort sheet data when needed (can be called periodically with /sort command)"""
+    try:
+        now = get_current_time()
+        target_month = now.strftime("%m/%Y")
+        
+        # Allow specifying different month: /sort 09/2025
+        if context.args and len(context.args) > 0:
+            target_month = context.args[0]
+        
+        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+        
+        # Get all data
+        all_values = await asyncio.to_thread(lambda: sheet.get_values("A:D"))
+        
+        if len(all_values) > 2:  # More than header + 1 row
+            headers = all_values[0]
+            data_rows = all_values[1:]
+            
+            # Sort by date and time
+            sorted_data = sorted(data_rows, key=lambda x: (
+                x[0] if len(x) > 0 else "",  # Date
+                x[1] if len(x) > 1 else ""   # Time
+            ))
+            
+            # Clean up amounts
+            for row in sorted_data:
+                if len(row) >= 3 and row[2]:
+                    try:
+                        row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Update the sorted data
+            await asyncio.to_thread(
+                lambda: sheet.update(f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option='RAW')
+            )
+            
+            # Invalidate cache
+            invalidate_sheet_cache(target_month)
+            
+            await update.message.reply_text(f"✅ Đã sắp xếp {len(sorted_data)} dòng dữ liệu trong sheet {target_month}")
+            logger.info(f"Manually sorted {len(sorted_data)} rows in sheet {target_month}")
+        else:
+            await update.message.reply_text("📋 Sheet không cần sắp xếp (ít hơn 2 dòng dữ liệu)")
+            
+    except Exception as e:
+        logger.error(f"Error sorting sheet data: {e}")
+        await update.message.reply_text(f"❌ Có lỗi khi sắp xếp dữ liệu: {e}")
 
 @safe_async_handler
 async def today(update, context):
@@ -340,39 +389,42 @@ async def today(update, context):
         
         logger.info(f"Getting today's expenses for {today_str} in sheet {target_month}")
         
+        # OPTIMIZATION: Use cached data for better performance
         try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-            logger.info(f"Successfully obtained sheet for {target_month}")
+            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+            if not all_values or len(all_values) < 2:
+                await update.message.reply_text(f"📊 Hôm nay chưa có giao dịch nào ({today_str})")
+                return
+            logger.info(f"Retrieved {len(all_values)} rows from sheet (cached)")
         except Exception as sheet_error:
-            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            logger.error(f"Error getting sheet data for {target_month}: {sheet_error}", exc_info=True)
             await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
         
-        try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
-        except Exception as records_error:
-            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
-            return
-        
+        # OPTIMIZATION: Process data directly from values array
         today_expenses = []
         total = 0
         
-        for r in records:
-            # Make sure we have valid data in the record
-            record_date = r.get("Date", "").strip().lstrip("'")
-            record_amount = r.get("VND", 0)
-            
-            if record_date == today_str and record_amount:  # Only count if both date and amount exist
-                today_expenses.append(r)
-                total += parse_amount(record_amount)
+        # Skip header row (index 0)
+        for row in all_values[1:]:
+            if len(row) >= 3:  # Need at least date, time, amount
+                record_date = row[0].strip().lstrip("'") if row[0] else ""
+                record_amount = row[2] if len(row) > 2 else 0
+                
+                if record_date == today_str and record_amount:
+                    # Convert row to record format for compatibility
+                    record = {
+                        "Date": record_date,
+                        "Time": row[1] if len(row) > 1 else "",
+                        "VND": record_amount,
+                        "Note": row[3] if len(row) > 3 else ""
+                    }
+                    today_expenses.append(record)
+                    total += parse_amount(record_amount)
         
         count = len(today_expenses)
         logger.info(f"Found {count} expenses for today with total {total} VND")
-        logger.info(f"Today date string: '{today_str}', Records found: {[r.get('Date') for r in records[:5]]}")  # Debug info
+        logger.info(f"Today date string: '{today_str}', Rows processed: {len(all_values)}")  # Debug info
         
         response = f"📊 Tổng kết hôm nay ({today_str}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {target_month}"
         
