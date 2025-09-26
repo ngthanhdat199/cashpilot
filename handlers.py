@@ -326,7 +326,7 @@ async def delete_expense(update, context):
             logger.error(f"Failed to send error message in delete_expense: {reply_error}")
 
 @safe_async_handler
-async def sort_sheet_data(update, context):
+async def sort(update, context):
     """Manually sort sheet data when needed (can be called periodically with /sort command)"""
     try:
         now = get_current_time()
