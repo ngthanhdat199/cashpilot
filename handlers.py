@@ -27,7 +27,7 @@ def safe_async_handler(handler_func):
                 logger.error(f"Event loop issue in {handler_func.__name__}: {loop_error}")
                 # Try to send a basic error message without using the problematic loop
                 try:
-                    await update.message.reply_text("❌ Có lỗi hệ thống xảy ra. Vui lòng thử lại!")
+                    await update.message.reply_text(f"❌ Có lỗi hệ thống xảy ra. Vui lòng thử lại!\n\nLỗi: {loop_error}")
                 except:
                     pass
                 return
@@ -39,7 +39,7 @@ def safe_async_handler(handler_func):
             logger.error(f"Error in safe_async_handler for {handler_func.__name__}: {e}", exc_info=True)
             try:
                 # Try to send error message, but don't fail if this also fails
-                await update.message.reply_text("❌ Có lỗi hệ thống xảy ra. Vui lòng thử lại sau!")
+                await update.message.reply_text(f"❌ Có lỗi hệ thống xảy ra. Vui lòng thử lại sau!\n\nLỗi: {e}")
             except Exception as reply_error:
                 logger.error(f"Failed to send error message in {handler_func.__name__}: {reply_error}")
             
@@ -68,7 +68,7 @@ async def start(update, context):
     except Exception as e:
         logger.error(f"Error in start command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Có lỗi xảy ra khi khởi động. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Có lỗi xảy ra khi khởi động. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in start command 12: {reply_error}")
 
@@ -83,7 +83,7 @@ async def help(update, context):
     except Exception as e:
         logger.error(f"Error in help for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Có lỗi xảy ra khi hiển thị hướng dẫn. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Có lỗi xảy ra khi hiển thị hướng dẫn. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in help: {reply_error}")
 
@@ -240,7 +240,7 @@ async def log_expense(update, context):
         await update.message.reply_text("❌ Lỗi định dạng số tiền!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
     except Exception as e:
         logger.error(f"Error logging expense: {e}")
-        await update.message.reply_text("❌ Có lỗi xảy ra. Vui lòng thử lại!")
+        await update.message.reply_text(f"❌ Có lỗi xảy ra. Vui lòng thử lại!\n\nLỗi: {e}")
 
 @safe_async_handler  
 async def handle_quick_expense(update, context):
@@ -295,7 +295,7 @@ async def handle_quick_expense(update, context):
     except Exception as e:
         logger.error(f"Error in handle_quick_expense: {e}", exc_info=True)
         try:
-            await update.callback_query.edit_message_text("❌ Có lỗi xảy ra. Vui lòng thử lại!")
+            await update.callback_query.edit_message_text(f"❌ Có lỗi xảy ra. Vui lòng thử lại!\n\nLỗi: {e}")
         except:
             pass
 
@@ -340,7 +340,7 @@ async def delete_expense(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
         
         # Find and delete the matching row
@@ -351,7 +351,7 @@ async def delete_expense(update, context):
             logger.info(f"Retrieved {len(all_records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
         
         found = False
@@ -369,7 +369,7 @@ async def delete_expense(update, context):
                     break
                 except Exception as delete_error:
                     logger.error(f"Error deleting row {i}: {delete_error}", exc_info=True)
-                    await update.message.reply_text("❌ Có lỗi xảy ra khi xóa giao dịch. Vui lòng thử lại!")
+                    await update.message.reply_text(f"❌ Có lỗi xảy ra khi xóa giao dịch. Vui lòng thử lại!\n\nLỗi: {delete_error}")
                     return
         
         if not found:
@@ -379,7 +379,7 @@ async def delete_expense(update, context):
     except Exception as e:
         logger.error(f"Error in delete_expense for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Có lỗi xảy ra khi xóa! Vui lòng thử lại.")
+            await update.message.reply_text(f"❌ Có lỗi xảy ra khi xóa! Vui lòng thử lại.\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in delete_expense: {reply_error}")
 
@@ -401,7 +401,7 @@ async def today(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
         
         try:
@@ -411,7 +411,7 @@ async def today(update, context):
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
         
         today_expenses = []
@@ -444,7 +444,7 @@ async def today(update, context):
     except Exception as e:
         logger.error(f"Error in today command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in today command 1: {reply_error}")
 
@@ -543,7 +543,7 @@ async def week(update, context: CallbackContext):
 
     except Exception as e:
         logger.error(f"Error in week command: {e}", exc_info=True)
-        await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+        await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
 
 
 @safe_async_handler
@@ -570,7 +570,7 @@ async def month(update, context: CallbackContext):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
         
         try:
@@ -580,7 +580,7 @@ async def month(update, context: CallbackContext):
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
         
         summary = get_month_summary(records)
@@ -674,7 +674,7 @@ async def month(update, context: CallbackContext):
     except Exception as e:
         logger.error(f"Error in month command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in month command: {reply_error}")
 
@@ -703,7 +703,7 @@ async def gas(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
     
         try:
@@ -713,7 +713,7 @@ async def gas(update, context):
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
 
         gas_expenses, total = get_gas_total(target_month)
@@ -761,7 +761,7 @@ async def gas(update, context):
     except Exception as e:
         logger.error(f"Error in gas command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in gas command: {reply_error}")
 
@@ -790,7 +790,7 @@ async def food(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
     
         try:
@@ -800,7 +800,7 @@ async def food(update, context):
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
 
         food_expenses, total = get_food_total(target_month)
@@ -848,7 +848,7 @@ async def food(update, context):
     except Exception as e:
         logger.error(f"Error in food command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in food command: {reply_error}")
 
@@ -877,7 +877,7 @@ async def dating(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
     
         try:
@@ -887,7 +887,7 @@ async def dating(update, context):
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
 
         dating_expenses, total = get_dating_total(target_month)
@@ -935,7 +935,7 @@ async def dating(update, context):
     except Exception as e:
         logger.error(f"Error in dating command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in food command: {reply_error}")
 
@@ -964,7 +964,7 @@ async def other(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
     
         try:
@@ -974,7 +974,7 @@ async def other(update, context):
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
 
         other_expenses, total = get_other_total(target_month)
@@ -1022,7 +1022,7 @@ async def other(update, context):
     except Exception as e:
         logger.error(f"Error in other command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in other command: {reply_error}")
 
@@ -1051,7 +1051,7 @@ async def investment(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
     
         try:
@@ -1061,7 +1061,7 @@ async def investment(update, context):
             logger.info(f"Retrieved {len(records)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
 
         investment_expenses, total = get_investment_total(target_month)
@@ -1136,7 +1136,7 @@ async def investment(update, context):
     except Exception as e:
         logger.error(f"Error in investment command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Không thể lấy dữ liệu. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in investment command: {reply_error}")
 
@@ -1194,7 +1194,7 @@ async def freelance(update, context):
     except Exception as e:
         logger.error(f"Error in freelance command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Có lỗi xảy ra khi ghi nhận thu nhập. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Có lỗi xảy ra khi ghi nhận thu nhập. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in freelance command: {reply_error}")
 
@@ -1252,7 +1252,7 @@ async def salary(update, context):
     except Exception as e:
         logger.error(f"Error in salary command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Có lỗi xảy ra khi ghi nhận thu nhập. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Có lỗi xảy ra khi ghi nhận thu nhập. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in salary command: {reply_error}")
 
@@ -1281,7 +1281,7 @@ async def income(update, context):
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
             return
         
         try:
@@ -1289,7 +1289,7 @@ async def income(update, context):
             logger.info(f"Successfully obtained sheet for {previous_month}")
         except Exception as prev_sheet_error:
             logger.error(f"Error getting/creating sheet {previous_month}: {prev_sheet_error}", exc_info=True)
-            await update.message.reply_text("❌ Không thể truy cập Google Sheets tháng trước. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets tháng trước. Vui lòng thử lại!\n\nLỗi: {prev_sheet_error}")
             return
             
         # Get income from current month's sheet
@@ -1355,7 +1355,7 @@ async def income(update, context):
     except Exception as e:
         logger.error(f"Error in income command for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Có lỗi xảy ra khi lấy dữ liệu thu nhập. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Có lỗi xảy ra khi lấy dữ liệu thu nhập. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in income command: {reply_error}")
 
@@ -1377,6 +1377,6 @@ async def handle_message(update, context):
     except Exception as e:
         logger.error(f"Error in handle_message for user {update.effective_user.id}: {e}", exc_info=True)
         try:
-            await update.message.reply_text("❌ Có lỗi xảy ra khi xử lý tin nhắn. Vui lòng thử lại!")
+            await update.message.reply_text(f"❌ Có lỗi xảy ra khi xử lý tin nhắn. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in handle_message: {reply_error}")
