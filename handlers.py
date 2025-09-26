@@ -204,20 +204,22 @@ async def log_expense(update, context):
                     ))
                     
                     # Ensure all amounts are integers when updating
-                    for row in sorted_data:
-                        if len(row) >= 3 and row[2]:
-                            try:
-                                # Convert amount to integer to avoid formatting issues
-                                row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
-                            except (ValueError, TypeError):
-                                pass  # Keep original value if conversion fails
+                    # for row in sorted_data:
+                    #     if len(row) >= 3 and row[2]:
+                    #         try:
+                    #             # Convert amount to integer to avoid formatting issues
+                    #             row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
+                    #         except (ValueError, TypeError):
+                    #             pass  # Keep original value if conversion fails
                     
                     # Update the sorted data back to columns A-D using RAW input
                     sheet.update(f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option='RAW')
                     
                     # Find where our entry ended up after sorting
                     for i, row in enumerate(sorted_data, start=2):
-                        if (len(row) >= 4 and row[0] == entry_date and row[1] == entry_time and 
+                        if (len(row) >= 4 and
+                            row[0] == entry_date and 
+                            row[1] == entry_time and 
                             int(float(str(row[2]).replace(',', '').replace('₫', '').strip())) == int(amount) and row[3] == note):
                             position_msg = f"📍 Vị trí: Dòng {i}"
                             break
@@ -242,63 +244,6 @@ async def log_expense(update, context):
         logger.error(f"Error logging expense: {e}")
         await update.message.reply_text(f"❌ Có lỗi xảy ra. Vui lòng thử lại!\n\nLỗi: {e}")
 
-@safe_async_handler  
-async def handle_quick_expense(update, context):
-    """Handle quick expense selection from inline buttons"""
-    try:
-        query = update.callback_query
-        await query.answer()
-        
-        # Parse callback data: "log_amount_shortcut"
-        parts = query.data.split("_")
-        if len(parts) != 3 or parts[0] != "log":
-            return
-            
-        amount = int(parts[1])
-        shortcut = parts[2]
-        
-        # Get the note from shortcuts
-        shortcuts = {"s": "ăn sáng", "t": "ăn trưa", "t": "ăn tối", "x": "xăng xe", "g": "grab"}
-        note = shortcuts.get(shortcut, "")
-        
-        # Smart amount handling
-        amount = amount * 1000
-        
-        # Get current time
-        now = get_current_time()
-        entry_date = now.strftime("%d/%m")
-        entry_time = now.strftime("%H:%M")
-        target_month = now.strftime("%m/%Y")
-        
-        logger.info(f"Quick expense: {amount} VND - {note}")
-        
-        # Get or create the target month's sheet
-        sheet = get_or_create_monthly_sheet(target_month)
-        
-        # Add the new entry
-        try:
-            all_values = sheet.get_values("A:D")
-        except Exception:
-            all_values = []
-            
-        next_row = len(all_values) + 1
-        range_name = f"A{next_row}:D{next_row}"
-        sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
-        
-        # Edit the original message to show success
-        await query.edit_message_text(
-            f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n📅 {entry_date} {entry_time}\n📄 Sheet: {target_month}"
-        )
-        
-        logger.info(f"Quick expense logged: {amount} VND - {note}")
-        
-    except Exception as e:
-        logger.error(f"Error in handle_quick_expense: {e}", exc_info=True)
-        try:
-            await update.callback_query.edit_message_text(f"❌ Có lỗi xảy ra. Vui lòng thử lại!\n\nLỗi: {e}")
-        except:
-            pass
-
 @safe_async_handler
 async def delete_expense(update, context):
     """Delete expense entry from Google Sheet"""
@@ -308,11 +253,11 @@ async def delete_expense(update, context):
         logger.info(f"Delete expense requested by user {update.effective_user.id}: '{text}'")
         
         parts = text.split()
-        # Only "del hh:mm" -> assume today's date
+        # Only "del 00h11s00" -> assume today's date
         if len(parts) == 2:
             entry_date = get_current_time().strftime("%d/%m")
             entry_time = normalize_time(parts[1])
-        # Parse delete command: "del 14/10 00:11"
+        # Parse delete command: "del 14/10 00h11s00"
         elif len(parts) >= 3:
             entry_date = normalize_date(parts[1])
             entry_time = normalize_time(parts[2])
@@ -355,7 +300,6 @@ async def delete_expense(update, context):
             return
         
         found = False
-        
         for i, record in enumerate(all_records, start=2):  # Start from row 2 (after header)
             record_date = normalize_date(record.get('Date', '').strip())
             record_time = normalize_time(record.get('Time', '').strip())
