@@ -323,7 +323,7 @@ async def delete_expense(update, context):
         try:
             await update.message.reply_text(f"❌ Có lỗi xảy ra khi xóa! Vui lòng thử lại.\n\nLỗi: {e}")
         except Exception as reply_error:
-            logger.error(f"Failed to send error message in delete_expense: {reply_error}")
+            logger.error(f"Failed to send error message in delete_expense 12: {reply_error}")
 
 @safe_async_handler
 async def sort(update, context):
