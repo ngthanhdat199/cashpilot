@@ -187,7 +187,8 @@ async def log_expense(update, context):
         # Add the new entry to columns A-D
         range_name = f"A{next_row}:D{next_row}"
         # Ensure amount is stored as a plain number without formatting
-        sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
+        amount = int(float(str(amount).replace(',', '').replace('₫', '').strip()))
+        sheet.update(range_name, [[entry_date, entry_time, amount, note]], value_input_option='RAW')
         
         # Now sort only columns A-D by date and time to maintain order
         if len(all_values) > 1:  # Only sort if there's more than just the header
@@ -204,13 +205,13 @@ async def log_expense(update, context):
                     ))
                     
                     # Ensure all amounts are integers when updating
-                    for row in sorted_data:
-                        if len(row) >= 3 and row[2]:
-                            try:
-                                # Convert amount to integer to avoid formatting issues
-                                row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
-                            except (ValueError, TypeError):
-                                pass  # Keep original value if conversion fails
+                    # for row in sorted_data:
+                    #     if len(row) >= 3 and row[2]:
+                    #         try:
+                    #             # Convert amount to integer to avoid formatting issues
+                    #             row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
+                    #         except (ValueError, TypeError):
+                    #             pass  # Keep original value if conversion fails
                     
                     # Update the sorted data back to columns A-D using RAW input
                     sheet.update(f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option='RAW')
