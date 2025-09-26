@@ -204,13 +204,13 @@ async def log_expense(update, context):
                     ))
                     
                     # Ensure all amounts are integers when updating
-                    # for row in sorted_data:
-                    #     if len(row) >= 3 and row[2]:
-                    #         try:
-                    #             # Convert amount to integer to avoid formatting issues
-                    #             row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
-                    #         except (ValueError, TypeError):
-                    #             pass  # Keep original value if conversion fails
+                    for row in sorted_data:
+                        if len(row) >= 3 and row[2]:
+                            try:
+                                # Convert amount to integer to avoid formatting issues
+                                row[2] = int(float(str(row[2]).replace(',', '').replace('₫', '').strip()))
+                            except (ValueError, TypeError):
+                                pass  # Keep original value if conversion fails
                     
                     # Update the sorted data back to columns A-D using RAW input
                     sheet.update(f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option='RAW')
