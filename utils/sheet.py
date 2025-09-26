@@ -2,6 +2,7 @@ import os
 import unicodedata
 import re
 import gspread
+import time
 from utils.logger import logger
 from config import config
 from utils.timezone import get_current_time
@@ -539,3 +540,39 @@ def get_total_income(sheet):
     except Exception as e:
         logger.error(f"Error getting total income: {e}", exc_info=True)
         return 0, 0, 0
+    
+# Performance optimization: Cache for sheet data to reduce API calls
+_sheet_cache = {}
+_cache_timeout = 30  # Cache data for 30 seconds
+
+def get_cached_sheet_data(sheet_name, force_refresh=False):
+    """Get cached sheet data or fetch fresh if expired"""
+    current_time = time.time()
+    cache_key = sheet_name
+    
+    if not force_refresh and cache_key in _sheet_cache:
+        data, timestamp = _sheet_cache[cache_key]
+        if current_time - timestamp < _cache_timeout:
+            logger.debug(f"Using cached data for sheet {sheet_name}")
+            return data
+    
+    # Fetch fresh data
+    logger.debug(f"Fetching fresh data for sheet {sheet_name}")
+    try:
+        sheet = get_or_create_monthly_sheet(sheet_name)
+        # Use get_values instead of get_all_records for better performance
+        all_values = sheet.get_values("A:D")
+        _sheet_cache[cache_key] = (all_values, current_time)
+        return all_values
+    except Exception as e:
+        logger.error(f"Error fetching sheet data for {sheet_name}: {e}")
+        # Return cached data if available, even if expired
+        if cache_key in _sheet_cache:
+            return _sheet_cache[cache_key][0]
+        raise
+
+def invalidate_sheet_cache(sheet_name):
+    """Invalidate cache for a specific sheet"""
+    if sheet_name in _sheet_cache:
+        del _sheet_cache[sheet_name]
+        logger.debug(f"Invalidated cache for sheet {sheet_name}")
