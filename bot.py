@@ -25,7 +25,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["income", "inc"], income))
 
         # Callback handler for quick expense buttons
-        bot_app.add_handler(CallbackQueryHandler(handle_quick_expense))
+        # bot_app.add_handler(CallbackQueryHandler(handle_quick_expense))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -70,7 +70,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["salary", "sl"], salary))
         fresh_app.add_handler(CommandHandler(["income", "inc"], income))
 
-        fresh_app.add_handler(CallbackQueryHandler(handle_quick_expense))
+        # fresh_app.add_handler(CallbackQueryHandler(handle_quick_expense))
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
         # Add error handler to prevent "No error handlers are registered" warnings
