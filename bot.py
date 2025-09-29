@@ -23,7 +23,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
         bot_app.add_handler(CommandHandler(["salary", "sl"], salary))
         bot_app.add_handler(CommandHandler(["income", "inc"], income))
-        bot_app.add_handler(CommandHandler(["sort", "sort"], sort))
+        bot_app.add_handler(CommandHandler(["sort", "s"], sort))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -67,7 +67,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
         fresh_app.add_handler(CommandHandler(["salary", "sl"], salary))
         fresh_app.add_handler(CommandHandler(["income", "inc"], income))
-        fresh_app.add_handler(CommandHandler(["sort", "sort"], sort))
+        fresh_app.add_handler(CommandHandler(["sort", "s"], sort))
 
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
