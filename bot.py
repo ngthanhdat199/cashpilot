@@ -10,7 +10,7 @@ def setup_bot():
         bot_app = Application.builder().token(TOKEN).build()
         
         # Command handlers
-        # bot_app.add_handler(CommandHandler(["start", "s"], start))
+        bot_app.add_handler(CommandHandler(["start", "st"], start))
         bot_app.add_handler(CommandHandler(["help", "h"], help))
         bot_app.add_handler(CommandHandler(["today", "t"], today))
         bot_app.add_handler(CommandHandler(["week", "w"], week))
@@ -54,7 +54,7 @@ def create_fresh_bot():
         fresh_app = Application.builder().token(TOKEN).build()
         
         # Add all handlers
-        # fresh_app.add_handler(CommandHandler(["start", "s"], start))
+        fresh_app.add_handler(CommandHandler(["start", "st"], start))
         fresh_app.add_handler(CommandHandler(["help", "h"], help))
         fresh_app.add_handler(CommandHandler(["today", "t"], today))
         fresh_app.add_handler(CommandHandler(["week", "w"], week))
