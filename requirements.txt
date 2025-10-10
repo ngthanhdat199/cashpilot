@@ -4,5 +4,6 @@ google-auth
 google-auth-oauthlib
 google-auth-httplib2
 flask
+flask-cors
 pytz
 requests

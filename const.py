@@ -22,6 +22,11 @@ MONTH_NAMES = {
     "09": "tháng 9", "10": "tháng 10", "11": "tháng 11", "12": "tháng 12"
 }
 
+MONTH_NAMES_SHORT = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+]
+
 SHORTCUTS = {
     "a": "ăn",
     "s": "ăn sáng", 
@@ -121,4 +126,5 @@ RENT_KEYWORD = ["thuê nhà"]
 SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
 SALARY_CELL = "I2"
 FREELANCE_CELL = "J2"
+TOTAL_EXPENSE_CELL = "G2"
 EXPECTED_HEADERS = ["Date", "Time", "VND", "Note", "Total per day", "SALARY", "FREELANCE"]

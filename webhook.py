@@ -1,18 +1,31 @@
 import datetime
 import asyncio
 import threading
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from utils.logger import logger
 from telegram import Update
 from bot import setup_bot, create_fresh_bot
-from const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME, WSGI_FILE
+from const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME, WSGI_FILE, MONTH_NAMES_SHORT
+from utils.sheet import get_monthly_expense
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from flask_cors import CORS
 
 # Flask app for webhook
 app = Flask(__name__)
 
+# Configure CORS with explicit settings
+CORS(app, 
+    origins=['*'],  # Allow all origins for development
+    methods=['GET', 'POST', 'OPTIONS'],
+    allow_headers=['Content-Type', 'Authorization', 'Accept'],
+    supports_credentials=True
+)
+
 @app.route('/')
 def home():
-    return "Money Tracker Bot is running with webhooks!"
+    response = jsonify({"message": "Money Tracker Bot is running with webhooks!"})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 @app.route('/deploy', methods=['POST'])
 def deploy():
@@ -264,3 +277,53 @@ def webhook():
         webhook_failures += 1
         last_failure_time = datetime.datetime.now()
         return "Internal server error", 500
+
+@app.route('/expense/summary', methods=['GET', 'OPTIONS'])
+def expense_summary():
+    """Provide yearly expense summary by month"""
+    try:
+        # Get year parameter from query string, default to current year
+        year = request.args.get('year', type=int)
+        if not year:
+            current_time = datetime.datetime.now()
+            year = current_time.year
+        
+        logger.info(f"Yearly expense summary requested for year: {year}")
+
+        # use thread pool to fetch all sheets concurrently
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = {}
+            for month_num in range(1, 13):
+                month_name = MONTH_NAMES_SHORT[month_num - 1]
+                sheet_name = f"{month_num:02d}/{year}"  # Format as "mm/yyyy"
+                
+                futures[executor.submit(get_monthly_expense, sheet_name)] = month_name
+            
+            monthly_expenses = []
+            for future in as_completed(futures):
+                month_name = futures[future]
+                total = 0.0
+                try:
+                    total = future.result()
+                except Exception as fetch_error:
+                    logger.error(f"Error fetching expense for {month_name}: {fetch_error}")
+                
+                monthly_expenses.append({
+                    "month": month_name,
+                    "total": total
+                })
+
+
+        response_data = {
+            "year": year,
+            "currency": "VND",
+            "monthly_expenses": monthly_expenses
+        }
+        
+        logger.info(f"Yearly expense summary completed for {year}")
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        logger.error(f"Error generating yearly expense summary: {e}", exc_info=True)
+        return jsonify({"error": "Error generating summary"}), 500
+

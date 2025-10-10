@@ -9,7 +9,7 @@ from utils.timezone import get_current_time
 from config import config, BASE_DIR
 from google.oauth2.service_account import Credentials
 from utils.logger import logger
-from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS
+from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, TOTAL_EXPENSE_CELL
 
 # Google Sheets setup
 try:
@@ -147,7 +147,7 @@ def has_keyword(note: str, keywords: list[str]) -> bool:
         bool: True if any keyword is found in the note, False otherwise
         
     Note:
-        The function tokenizes the note using regex pattern r"[^\s]+" which splits
+        The function tokenizes the note using regex pattern r"[^\\s]+" which splits
         on whitespace. Single-word keywords must match complete tokens to avoid
         partial word matches (e.g., "cat" won't match "category").
     """
@@ -172,6 +172,28 @@ def safe_int(value):
     text = re.sub(r"[^\d]", "", text)
     return int(text) if text.isdigit() else 0
 
+
+def get_monthly_sheet_if_exists(target_month):
+    """Get month's sheet if it exists, return None if it doesn't exist"""
+    try:
+        sheet_name = target_month
+        logger.debug(f"Checking if sheet exists: {sheet_name}")
+        
+        # Try to get existing sheet
+        try:
+            current_sheet = spreadsheet.worksheet(sheet_name)
+            logger.debug(f"Found existing sheet: {sheet_name}")
+            return current_sheet
+        except gspread.WorksheetNotFound:
+            logger.debug(f"Sheet {sheet_name} not found")
+            return None
+        except Exception as worksheet_error:
+            logger.error(f"Error accessing worksheet {sheet_name}: {worksheet_error}", exc_info=True)
+            return None
+                
+    except Exception as e:
+        logger.error(f"Error in get_monthly_sheet_if_exists: {e}", exc_info=True)
+        return None
 
 def get_or_create_monthly_sheet(target_month=None):
     """Get month's sheet or create a new one for target month"""
@@ -576,3 +598,23 @@ def invalidate_sheet_cache(sheet_name):
     if sheet_name in _sheet_cache:
         del _sheet_cache[sheet_name]
         logger.debug(f"Invalidated cache for sheet {sheet_name}")
+
+def get_monthly_expense(sheet_name):
+    """Fetch total expense for a given month sheet"""
+    total = 0.0
+    try:
+        # Try to get the sheet for this month (don't create if it doesn't exist)
+        sheet = get_monthly_sheet_if_exists(sheet_name)
+        if sheet:
+            # Get value from cell G2 (total expenses cell)
+            try:
+                total_cell_value = sheet.acell(TOTAL_EXPENSE_CELL).value
+                if total_cell_value:
+                    # Parse the amount (remove currency symbols, commas, etc.)
+                    total = parse_amount(total_cell_value)
+            except Exception as cell_error:
+                logger.warning(f"Could not read G2 from sheet {sheet_name}: {cell_error}")
+    except Exception as sheet_error:
+        logger.error(f"Error accessing sheet {sheet_name}: {sheet_error}")
+    
+    return total
