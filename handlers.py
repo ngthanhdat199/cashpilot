@@ -487,7 +487,7 @@ async def week(update, context: CallbackContext):
             grouped[date_str].append(r)
 
         details_lines = []
-        for day, rows in sorted(grouped.items(), key=lambda d: datetime.datetime.strptime(d[0], "%d/%m")):
+        for day, rows in sorted(grouped.items(), key=lambda d: datetime.datetime.strptime(d[0], "%d/%m/%Y")):
             day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
             details_lines.append(f"\n📅 {day}: {day_total:,.0f} VND")
             details_lines.extend(format_expense(r, i) for i, r in enumerate(rows, start=1))
