@@ -428,10 +428,10 @@ async def week(update, context: CallbackContext):
         logger.info(f"Getting week expenses from {week_start:%d/%m} to {week_end:%d/%m}")
 
         # Collect all months the week spans
-        months_to_check = {
+        months_to_check = sorted({
             (week_start + datetime.timedelta(days=i)).strftime("%m/%Y")
             for i in range(7)
-        }
+        }, key=lambda s: datetime.datetime.strptime(s, "%m/%Y"))
 
         week_expenses = []
         total = 0.0
