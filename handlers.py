@@ -193,7 +193,7 @@ async def log_expense(update, context):
 
         await asyncio.to_thread(
             lambda: sheet.append_row(
-                [[entry_date, entry_time, int(amount), note]],
+                [entry_date, entry_time, int(amount), note],
                 value_input_option='RAW'
             )
         )
