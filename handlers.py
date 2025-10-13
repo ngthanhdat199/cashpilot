@@ -465,6 +465,7 @@ async def week(update, context: CallbackContext):
                             amount = parse_amount(raw_amount)
                             if amount == 0:
                                 continue
+                            r["expense_date"] = expense_date
                             week_expenses.append(r)
                             total += amount
                     except Exception as e:
@@ -482,7 +483,7 @@ async def week(update, context: CallbackContext):
         grouped = defaultdict(list)
         for r in week_expenses:
             # grouped[r.get("Date", "")].append(r)
-            date_str = r["_expense_date"].strftime("%d/%m/%Y")
+            date_str = r["expense_date"].strftime("%d/%m/%Y")
             grouped[date_str].append(r)
 
         details_lines = []
