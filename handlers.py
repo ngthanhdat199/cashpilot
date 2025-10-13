@@ -180,21 +180,29 @@ async def log_expense(update, context):
             logger.warning(f"Could not get values, using empty list: {get_error}")
             all_values = []
             
-        next_row = len(all_values) + 1
+        # next_row = len(all_values) + 1
         
-        # OPTIMIZATION: Simple append without immediate sorting - sorting is expensive and not always necessary
-        range_name = f"A{next_row}:D{next_row}"
+        # # OPTIMIZATION: Simple append without immediate sorting - sorting is expensive and not always necessary
+        # range_name = f"A{next_row}:D{next_row}"
+        # await asyncio.to_thread(
+        #     lambda: sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
+        # )
+        
+        # # OPTIMIZATION: Skip sorting for most entries - only indicate position
+        # position_msg = f"📍 Vị trí: Dòng {next_row}"
+
         await asyncio.to_thread(
-            lambda: sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
+            lambda: sheet.append_values(
+                [[entry_date, entry_time, int(amount), note]],
+                value_input_option='RAW'
+            )
         )
-        
-        # OPTIMIZATION: Skip sorting for most entries - only indicate position
-        position_msg = f"📍 Vị trí: Dòng {next_row}"
         
         # Invalidate cache since we've updated the sheet
         invalidate_sheet_cache(target_month)
 
-        response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n{position_msg}\n� Sheet: {target_month}"
+        # response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n{position_msg}\n� Sheet: {target_month}"
+        response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n� Sheet: {target_month}"
         await update.message.reply_text(response)
 
         logger.info(f"Logged expense: {amount} VND - {note} at {entry_date} {entry_time} in sheet {target_month}")
