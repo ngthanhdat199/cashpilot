@@ -192,7 +192,7 @@ async def log_expense(update, context):
         # position_msg = f"📍 Vị trí: Dòng {next_row}"
 
         await asyncio.to_thread(
-            lambda: sheet.append_values(
+            lambda: sheet.append_row(
                 [[entry_date, entry_time, int(amount), note]],
                 value_input_option='RAW'
             )
