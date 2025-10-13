@@ -605,7 +605,6 @@ async def month(update, context: CallbackContext):
             f"📝 {count} giao dịch\n\n"
 
             f"📌 Ngân sách dự kiến (% thu nhập):\n"
-            # f"🏠 Thiết yếu: {essential_budget:.0f}% = {essential_estimate:,.0f} VND\n"
             f"🏠 Thuê nhà: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
             f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
             f"👪 Hỗ trợ ba mẹ: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
@@ -623,11 +622,12 @@ async def month(update, context: CallbackContext):
             f"🚀 Đầu tư cơ hội: {opportunity_invest_total:,.0f} VND ({opportunity_invest_estimate - opportunity_invest_total:+,.0f})\n\n"
 
             f"📋 Chi tiết:\n"
+            f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
             f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
             f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
-            f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
-            f"🛍️ Khác: {other_total:,.0f} VND\n"
+            f"💖 Hẹn hò: {dating_total:,.0f} VND\n"
             f"💹 Đầu tư: {investment_total:,.0f} VND\n"
+            f"🛍️ Khác: {other_total:,.0f} VND\n"
         )
 
         await update.message.reply_text(response)
