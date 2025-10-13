@@ -613,7 +613,6 @@ async def month(update, context: CallbackContext):
             f"🚀 Đầu tư cơ hội: {opportunity_invest_budget:.0f}% = {opportunity_invest_estimate:,.0f} VND\n\n"
 
             f"💸 Chi tiêu thực tế:\n"
-            # f"🏠 Thiết yếu: {essential_total:,.0f} VND ({essential_estimate - essential_total:+,.0f})\n"
             f"🏠 Thuê nhà: {rent_total:,.0f} VND ({rent_estimate - rent_total:+,.0f})\n"
             f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
             f"👪 Hỗ trợ ba mẹ: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
