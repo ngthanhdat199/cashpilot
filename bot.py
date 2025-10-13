@@ -1,4 +1,4 @@
-from telegram.ext import Application, MessageHandler, CommandHandler, filters, CallbackQueryHandler
+from telegram.ext import Application, MessageHandler, CommandHandler, filters
 from const import TOKEN
 from utils.logger import logger
 from handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort

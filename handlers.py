@@ -1,12 +1,12 @@
 from dateutil.relativedelta import relativedelta
-from telegram import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ReplyKeyboardMarkup
 from telegram.ext import CallbackContext
 import datetime
 import asyncio
 from collections import defaultdict
 from const import MONTH_NAMES, HELP_MSG
 from utils.logger import logger
-from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_rent_total, get_other_total, get_long_investment_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, invalidate_sheet_cache
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, invalidate_sheet_cache
 from const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
 from config import config, save_config
 
@@ -53,11 +53,11 @@ async def start(update, context):
     try:
         logger.info(f"Start command requested by user {update.effective_user.id}")
         keyboard = [
-            ["/today", "/week", "/month", "/week -1", "/month -1"],
-            ["/gas", "/gas -1", "/food", "/food -1", "/other", "/other -1"],
-            ["/dating", "/dating -1"],
+            ["/today", "/week", "/month", "/month -1", "/sort"],
+            ["/gas", "/food", "/other", "/dating"],
             ["/investment", "/investment -1"],
-            ["/income", "/income -1", "/fl", "/sl"],
+            ["/income", "/income -1"],
+            ["/fl", "/sl"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -174,11 +174,11 @@ async def log_expense(update, context):
         sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
         # OPTIMIZATION: Use single API call to get current data size
-        try:
-            all_values = await asyncio.to_thread(lambda: sheet.get_values("A:D"))
-        except Exception as get_error:
-            logger.warning(f"Could not get values, using empty list: {get_error}")
-            all_values = []
+        # try:
+        #     all_values = await asyncio.to_thread(lambda: sheet.get_values("A:D"))
+        # except Exception as get_error:
+        #     logger.warning(f"Could not get values, using empty list: {get_error}")
+        #     all_values = []
             
         # next_row = len(all_values) + 1
         
@@ -202,7 +202,7 @@ async def log_expense(update, context):
         invalidate_sheet_cache(target_month)
 
         # response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n{position_msg}\n� Sheet: {target_month}"
-        response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n� Sheet: {target_month}"
+        response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n📅 {entry_date} {entry_time}\n📄 Sheet: {target_month}"
         await update.message.reply_text(response)
 
         logger.info(f"Logged expense: {amount} VND - {note} at {entry_date} {entry_time} in sheet {target_month}")
