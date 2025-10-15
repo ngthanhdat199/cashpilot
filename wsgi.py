@@ -1,20 +1,16 @@
 import sys
-import os
 
-# Absolute path to src folder
-PROJECT_HOME = '/home/thanhdat19/track-money/src'
+# Add your project directory to the Python path
+project_home = '/home/thanhdat19/track-money'
+if project_home not in sys.path:
+    sys.path = [project_home] + sys.path
 
-# Add src folder to sys.path
-if PROJECT_HOME not in sys.path:
-    sys.path.insert(0, PROJECT_HOME)
-
-# Import app from the package inside src (no 'src.' prefix)
+# Import your Flask app and bot components
+# from main import app
 from track_py.main import app
 
-# Required for PythonAnywhere
+# For PythonAnywhere, the WSGI application should be called 'application'
 application = app
 
-
-# For local testing purposes
-# if __name__ == "__main__":
-#     application.run()
+if __name__ == "__main__":
+    application.run()

@@ -12,8 +12,7 @@ MAX_FAILURES = 10
 FAILURE_RESET_TIME = 300  # 5 minutes
 TOKEN = config["telegram"]["bot_token"]
 WEBHOOK_URL = config["telegram"]["webhook_url"]
-# PROJECT_HOME = '/home/thanhdat19/track-money'
-PROJECT_HOME = '/home/thanhdat19/track-money/src'
+PROJECT_HOME = '/home/thanhdat19/track-money'
 WSGI_FILE = 'thanhdat19_pythonanywhere_com_wsgi.py'
 
 # Get month name in Vietnamese
