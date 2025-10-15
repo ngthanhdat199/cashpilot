@@ -447,10 +447,11 @@ async def week(update, context: CallbackContext):
         # Process each relevant sheet
         for target_month in months_to_check:
             try:
-                current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-                records = await asyncio.to_thread(
-                    lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-                )
+                # current_sheet = await asyncio.to_thread(get_cached_sheet_data, target_month)
+                # records = await asyncio.to_thread(
+                #     lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+                # )
+                records = await asyncio.to_thread(get_cached_sheet_data, target_month)
 
                 year = target_month.split("/")[1]
 
