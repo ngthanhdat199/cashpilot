@@ -451,14 +451,18 @@ async def week(update, context: CallbackContext):
                 # records = await asyncio.to_thread(
                 #     lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
                 # )
-                records = await asyncio.to_thread(get_cached_sheet_data, target_month)
+                all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
 
                 year = target_month.split("/")[1]
 
-                for r in records:
-                    raw_date = (r.get("Date") or "").strip()
-                    raw_amount = r.get("VND", 0)
+                for row in all_values[1:]:  # Skip header row
+                    if len(row) < 3:
+                        continue
 
+                    # raw_date = (row.get("Date") or "").strip()
+                    # raw_amount = row.get("VND", 0)
+                    raw_date = row[0].strip().lstrip("'") if row[0] else ""
+                    raw_amount = row[2] if len(row) > 2 else 0
                     if not raw_date or not raw_amount:
                         continue
 
@@ -474,8 +478,9 @@ async def week(update, context: CallbackContext):
                             amount = parse_amount(raw_amount)
                             if amount == 0:
                                 continue
-                            r["expense_date"] = expense_date
-                            week_expenses.append(r)
+
+                            row["expense_date"] = expense_date
+                            week_expenses.append(row)
                             total += amount
                     except Exception as e:
                         logger.debug(f"Skipping invalid date {raw_date} in {target_month}: {e}")
@@ -490,10 +495,9 @@ async def week(update, context: CallbackContext):
         logger.info(f"Found {count} expenses with total {total} VND")
 
         grouped = defaultdict(list)
-        for r in week_expenses:
-            # grouped[r.get("Date", "")].append(r)
-            date_str = r["expense_date"].strftime("%d/%m/%Y")
-            grouped[date_str].append(r)
+        for row in week_expenses:
+            date_str = row["expense_date"].strftime("%d/%m/%Y")
+            grouped[date_str].append(row)
 
         details_lines = []
         for day, rows in sorted(grouped.items(), key=lambda d: datetime.datetime.strptime(d[0], "%d/%m/%Y")):
