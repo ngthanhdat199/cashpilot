@@ -3,18 +3,19 @@ import unicodedata
 import re
 import gspread
 import time
-from utils.logger import logger
-from config import config
-from utils.timezone import get_current_time
-from config import config, BASE_DIR
+from src.track_py.utils.logger import logger
+from src.track_py.config import config
+from src.track_py.utils.timezone import get_current_time
+from src.track_py.config import config, BASE_DIR, PROJECT_ROOT
 from google.oauth2.service_account import Credentials
-from utils.logger import logger
-from const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, TOTAL_EXPENSE_CELL
+from src.track_py.utils.logger import logger
+from src.track_py.const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, TOTAL_EXPENSE_CELL
 
 # Google Sheets setup
 try:
     scope = config["google_sheets"]["scopes"]
-    credentials_path = os.path.join(BASE_DIR, config["google_sheets"]["credentials_file"])
+    # credentials_path = os.path.join(BASE_DIR, config["google_sheets"]["credentials_file"])
+    credentials_path = os.path.join(PROJECT_ROOT, config["google_sheets"]["credentials_file"])
     creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
     client = gspread.authorize(creds)
     # Open the specific Google Sheet by ID from the URL
@@ -23,7 +24,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to connect to Google Sheets: {e}")
     print("⚠️  Please make sure you have:")
-    print(f"1. Created {config['google_sheets']['credentials_file']} file in {BASE_DIR}")
+    print(f"1. Created {config['google_sheets']['credentials_file']} file in {PROJECT_ROOT}")
     print(f"2. Shared the Google Sheet (ID: {config['google_sheets']['spreadsheet_id']}) with your service account email")
     print("3. The sheet has the correct permissions")
     exit(1)

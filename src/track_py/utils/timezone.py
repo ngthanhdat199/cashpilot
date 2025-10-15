@@ -1,6 +1,6 @@
 import datetime
 import pytz
-from config import config
+from src.track_py.config import config
 
 # Timezone setup
 timezone = pytz.timezone(config["settings"]["timezone"])

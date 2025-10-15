@@ -1,9 +1,16 @@
 import os
 import json
+from pathlib import Path
+
 
 # Get the directory where this script is located
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent  # /src/track_py
+PROJECT_ROOT = BASE_DIR.parents[1]          # /track_py
+
+# CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
+
+CONFIG_PATH = PROJECT_ROOT / "config.json"
 config = {}  # global in memory
 
 # Load configuration immediately when module is imported

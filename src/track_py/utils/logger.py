@@ -1,5 +1,5 @@
 import logging
-from config import config
+from src.track_py.config import config
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=getattr(logging, config["settings"]["logging_level"]))

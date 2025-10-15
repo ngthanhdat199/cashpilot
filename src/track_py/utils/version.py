@@ -1,5 +1,5 @@
 import os
-from config import BASE_DIR
+from src.track_py.config import BASE_DIR
 
 def get_version():
     try:

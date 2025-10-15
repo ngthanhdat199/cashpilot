@@ -1,9 +1,9 @@
 import os
-from utils.version import get_version
-from const import bot_app, WEBHOOK_URL
-from utils.logger import logger
-from webhook import app
-from bot import setup_bot
+from src.track_py.utils.version import get_version
+from src.track_py.const import bot_app, WEBHOOK_URL
+from src.track_py.utils.logger import logger
+from src.track_py.webhook.webhook import app
+from src.track_py.webhook.bot import setup_bot
 
 def main():
     """Main function to run the bot with webhook"""

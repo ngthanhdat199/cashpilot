@@ -1,5 +1,5 @@
-from config import config
-from utils.version import get_version
+from src.track_py.config import config
+from src.track_py.utils.version import get_version
 
 # Global variable to store bot application - initialize it immediately
 bot_app = None
