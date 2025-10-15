@@ -4,11 +4,11 @@ from telegram.ext import CallbackContext
 import datetime
 import asyncio
 from collections import defaultdict
-from src.track_py.const import MONTH_NAMES, HELP_MSG
-from src.track_py.utils.logger import logger
-from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, invalidate_sheet_cache
-from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
-from src.track_py.config import config, save_config
+from track_py.const import MONTH_NAMES, HELP_MSG
+from utils.logger import logger
+from utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache
+from track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
+from track_py.config import config, save_config
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -447,22 +447,17 @@ async def week(update, context: CallbackContext):
         # Process each relevant sheet
         for target_month in months_to_check:
             try:
-                # current_sheet = await asyncio.to_thread(get_cached_sheet_data, target_month)
-                # records = await asyncio.to_thread(
-                #     lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-                # )
-                all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+                current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+                records = await asyncio.to_thread(
+                    lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+                )
 
                 year = target_month.split("/")[1]
 
-                for row in all_values[1:]:  # Skip header row
-                    if len(row) < 3:
-                        continue
+                for r in records:
+                    raw_date = (r.get("Date") or "").strip()
+                    raw_amount = r.get("VND", 0)
 
-                    # raw_date = (row.get("Date") or "").strip()
-                    # raw_amount = row.get("VND", 0)
-                    raw_date = row[0].strip().lstrip("'") if row[0] else ""
-                    raw_amount = row[2] if len(row) > 2 else 0
                     if not raw_date or not raw_amount:
                         continue
 
@@ -478,9 +473,8 @@ async def week(update, context: CallbackContext):
                             amount = parse_amount(raw_amount)
                             if amount == 0:
                                 continue
-
-                            row["expense_date"] = expense_date
-                            week_expenses.append(row)
+                            r["expense_date"] = expense_date
+                            week_expenses.append(r)
                             total += amount
                     except Exception as e:
                         logger.debug(f"Skipping invalid date {raw_date} in {target_month}: {e}")
@@ -495,9 +489,10 @@ async def week(update, context: CallbackContext):
         logger.info(f"Found {count} expenses with total {total} VND")
 
         grouped = defaultdict(list)
-        for row in week_expenses:
-            date_str = row["expense_date"].strftime("%d/%m/%Y")
-            grouped[date_str].append(row)
+        for r in week_expenses:
+            # grouped[r.get("Date", "")].append(r)
+            date_str = r["expense_date"].strftime("%d/%m/%Y")
+            grouped[date_str].append(r)
 
         details_lines = []
         for day, rows in sorted(grouped.items(), key=lambda d: datetime.datetime.strptime(d[0], "%d/%m/%Y")):
@@ -541,7 +536,7 @@ async def month(update, context: CallbackContext):
         logger.info(f"Getting month expenses for sheet {target_month}")
         
         try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)

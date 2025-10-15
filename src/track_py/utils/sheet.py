@@ -173,6 +173,22 @@ def safe_int(value):
     text = re.sub(r"[^\d]", "", text)
     return int(text) if text.isdigit() else 0
 
+def convert_values_to_records(all_values):
+    """Convert raw sheet values to record format (list of dicts)"""
+    if not all_values or len(all_values) < 2:  # Need at least header + 1 data row
+        return []
+    
+    records = []
+    for row in all_values[1:]:  # Skip header
+        if len(row) >= 4:  # Ensure we have all columns
+            records.append({
+                "Date": row[0] if len(row) > 0 else "",
+                "Time": row[1] if len(row) > 1 else "",
+                "VND": row[2] if len(row) > 2 else 0,
+                "Note": row[3] if len(row) > 3 else ""
+            })
+    return records
+
 
 def get_monthly_sheet_if_exists(target_month):
     """Get month's sheet if it exists, return None if it doesn't exist"""
@@ -291,11 +307,13 @@ def get_or_create_monthly_sheet(target_month=None):
 def get_gas_total(month):
     """Helper to get total gas expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
         
         gas_expenses = []
         total = 0
+        
         for r in records:
             note = r.get("Note", "").lower()
             if has_keyword(note, TRANSPORT_KEYWORDS):
@@ -313,11 +331,13 @@ def get_gas_total(month):
 def get_food_total(month):
     """Helper to get total food expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+        
         food_expenses = []
         total = 0
+        
         for r in records:
             note = r.get("Note", "").lower()
             if has_keyword(note, FOOD_KEYWORDS):
@@ -335,18 +355,27 @@ def get_food_total(month):
 def get_dating_total(month):
     """Helper to get total date expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        
+        # Skip header row and convert to records-like format
         date_expenses = []
         total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if has_keyword(note, DATING_KEYWORDS):
-                amount = r.get("VND", 0)
-                if amount:
-                    date_expenses.append(r)
-                    total += parse_amount(amount)
+        
+        for row in all_values[1:]:  # Skip header
+            if len(row) >= 4:  # Ensure we have all columns
+                r = {
+                    "Date": row[0] if len(row) > 0 else "",
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": row[2] if len(row) > 2 else 0,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                note = r.get("Note", "").lower()
+                if has_keyword(note, DATING_KEYWORDS):
+                    amount = r.get("VND", 0)
+                    if amount:
+                        date_expenses.append(r)
+                        total += parse_amount(amount)
         
         return date_expenses, total
     except Exception as e:
@@ -357,18 +386,27 @@ def get_dating_total(month):
 def get_rent_total(month):
     """Helper to get total rent expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        
+        # Skip header row and convert to records-like format
         rent_expenses = []
         total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if RENT_KEYWORD in note:
-                amount = r.get("VND", 0)
-                if amount:
-                    rent_expenses.append(r)
-                    total += parse_amount(amount)
+        
+        for row in all_values[1:]:  # Skip header
+            if len(row) >= 4:  # Ensure we have all columns
+                r = {
+                    "Date": row[0] if len(row) > 0 else "",
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": row[2] if len(row) > 2 else 0,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                note = r.get("Note", "").lower()
+                if RENT_KEYWORD in note:
+                    amount = r.get("VND", 0)
+                    if amount:
+                        rent_expenses.append(r)
+                        total += parse_amount(amount)
         
         return rent_expenses, total
     except Exception as e:
@@ -379,26 +417,35 @@ def get_rent_total(month):
 def get_other_total(month):
     """Helper to get total other expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        
+        # Skip header row and convert to records-like format
         other_expenses = []
         total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if not (
-                has_keyword(note, FOOD_KEYWORDS) or 
-                has_keyword(note, DATING_KEYWORDS) or
-                has_keyword(note, TRANSPORT_KEYWORDS) or
-                has_keyword(note, LONG_INVEST_KEYWORDS) or 
-                has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or
-                has_keyword(note, SUPPORT_PARENT_KEYWORDS)  or
-                has_keyword(note, RENT_KEYWORD)
-            ):
-                amount = r.get("VND", 0)
-                if amount:
-                    other_expenses.append(r)
-                    total += parse_amount(amount)
+        
+        for row in all_values[1:]:  # Skip header
+            if len(row) >= 4:  # Ensure we have all columns
+                r = {
+                    "Date": row[0] if len(row) > 0 else "",
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": row[2] if len(row) > 2 else 0,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                note = r.get("Note", "").lower()
+                if not (
+                    has_keyword(note, FOOD_KEYWORDS) or 
+                    has_keyword(note, DATING_KEYWORDS) or
+                    has_keyword(note, TRANSPORT_KEYWORDS) or
+                    has_keyword(note, LONG_INVEST_KEYWORDS) or 
+                    has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or
+                    has_keyword(note, SUPPORT_PARENT_KEYWORDS)  or
+                    has_keyword(note, RENT_KEYWORD)
+                ):
+                    amount = r.get("VND", 0)
+                    if amount:
+                        other_expenses.append(r)
+                        total += parse_amount(amount)
         
         return other_expenses, total
     except Exception as e:
@@ -409,18 +456,27 @@ def get_other_total(month):
 def get_long_investment_total(month):
     """Helper to get total investment expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        
+        # Skip header row and convert to records-like format
         invest_expenses = []
         total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if has_keyword(note, LONG_INVEST_KEYWORDS):
-                amount = r.get("VND", 0)
-                if amount:
-                    invest_expenses.append(r)
-                    total += parse_amount(amount)
+        
+        for row in all_values[1:]:  # Skip header
+            if len(row) >= 4:  # Ensure we have all columns
+                r = {
+                    "Date": row[0] if len(row) > 0 else "",
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": row[2] if len(row) > 2 else 0,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                note = r.get("Note", "").lower()
+                if has_keyword(note, LONG_INVEST_KEYWORDS):
+                    amount = r.get("VND", 0)
+                    if amount:
+                        invest_expenses.append(r)
+                        total += parse_amount(amount)
         
         return invest_expenses, total
     except Exception as e:
@@ -430,18 +486,27 @@ def get_long_investment_total(month):
 def get_opportunity_investment_total(month):
     """Helper to get total opportunity investment expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        
+        # Skip header row and convert to records-like format
         invest_expenses = []
         total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
-                amount = r.get("VND", 0)
-                if amount:
-                    invest_expenses.append(r)
-                    total += parse_amount(amount)
+        
+        for row in all_values[1:]:  # Skip header
+            if len(row) >= 4:  # Ensure we have all columns
+                r = {
+                    "Date": row[0] if len(row) > 0 else "",
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": row[2] if len(row) > 2 else 0,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                note = r.get("Note", "").lower()
+                if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
+                    amount = r.get("VND", 0)
+                    if amount:
+                        invest_expenses.append(r)
+                        total += parse_amount(amount)
         
         return invest_expenses, total
     except Exception as e:
@@ -451,17 +516,27 @@ def get_opportunity_investment_total(month):
 def get_investment_total(month):
     """Helper to get total investment expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        
+        # Skip header row and convert to records-like format
         invest_expenses = []
         total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or has_keyword(note, LONG_INVEST_KEYWORDS):
-                amount = r.get("VND", 0)
-                if amount:
-                    invest_expenses.append(r)
-                    total += parse_amount(amount)
+        
+        for row in all_values[1:]:  # Skip header
+            if len(row) >= 4:  # Ensure we have all columns
+                r = {
+                    "Date": row[0] if len(row) > 0 else "",
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": row[2] if len(row) > 2 else 0,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                note = r.get("Note", "").lower()
+                if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or has_keyword(note, LONG_INVEST_KEYWORDS):
+                    amount = r.get("VND", 0)
+                    if amount:
+                        invest_expenses.append(r)
+                        total += parse_amount(amount)
         
         return invest_expenses, total
     except Exception as e:
@@ -473,18 +548,27 @@ def get_investment_total(month):
 def get_support_parent_total(month):
     """Helper to get total support parent expenses for a given month"""
     try:
-        sheet = get_or_create_monthly_sheet(month)
-        records = sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        
+        # Skip header row and convert to records-like format
         support_parent_expenses = []
         total = 0
-        for r in records:
-            note = r.get("Note", "").lower()
-            if has_keyword(note, SUPPORT_PARENT_KEYWORDS):
-                amount = r.get("VND", 0)
-                if amount:
-                    support_parent_expenses.append(r)
-                    total += parse_amount(amount)
+        
+        for row in all_values[1:]:  # Skip header
+            if len(row) >= 4:  # Ensure we have all columns
+                r = {
+                    "Date": row[0] if len(row) > 0 else "",
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": row[2] if len(row) > 2 else 0,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                note = r.get("Note", "").lower()
+                if has_keyword(note, SUPPORT_PARENT_KEYWORDS):
+                    amount = r.get("VND", 0)
+                    if amount:
+                        support_parent_expenses.append(r)
+                        total += parse_amount(amount)
         
         return support_parent_expenses, total
     except Exception as e:
@@ -566,12 +650,37 @@ def get_total_income(sheet):
     
 # Performance optimization: Cache for sheet data to reduce API calls
 _sheet_cache = {}
+_worksheet_cache = {}
 _cache_timeout = 30  # Cache data for 30 seconds
+
+def get_cached_worksheet(sheet_name, force_refresh=False):
+    """Get cached worksheet object or fetch fresh if expired"""
+    current_time = time.time()
+    cache_key = f"worksheet_{sheet_name}"
+    
+    if not force_refresh and cache_key in _worksheet_cache:
+        worksheet, timestamp = _worksheet_cache[cache_key]
+        if current_time - timestamp < _cache_timeout:
+            logger.debug(f"Using cached worksheet for {sheet_name}")
+            return worksheet
+    
+    # Fetch fresh worksheet
+    logger.debug(f"Fetching fresh worksheet for {sheet_name}")
+    try:
+        worksheet = get_or_create_monthly_sheet(sheet_name)
+        _worksheet_cache[cache_key] = (worksheet, current_time)
+        return worksheet
+    except Exception as e:
+        logger.error(f"Error fetching worksheet for {sheet_name}: {e}")
+        # Return cached worksheet if available, even if expired
+        if cache_key in _worksheet_cache:
+            return _worksheet_cache[cache_key][0]
+        raise
 
 def get_cached_sheet_data(sheet_name, force_refresh=False):
     """Get cached sheet data or fetch fresh if expired"""
     current_time = time.time()
-    cache_key = sheet_name
+    cache_key = f"data_{sheet_name}"
     
     if not force_refresh and cache_key in _sheet_cache:
         data, timestamp = _sheet_cache[cache_key]
@@ -582,7 +691,7 @@ def get_cached_sheet_data(sheet_name, force_refresh=False):
     # Fetch fresh data
     logger.debug(f"Fetching fresh data for sheet {sheet_name}")
     try:
-        sheet = get_or_create_monthly_sheet(sheet_name)
+        sheet = get_cached_worksheet(sheet_name)
         # Use get_values instead of get_all_records for better performance
         all_values = sheet.get_values("A:D")
         _sheet_cache[cache_key] = (all_values, current_time)
@@ -596,9 +705,16 @@ def get_cached_sheet_data(sheet_name, force_refresh=False):
 
 def invalidate_sheet_cache(sheet_name):
     """Invalidate cache for a specific sheet"""
-    if sheet_name in _sheet_cache:
-        del _sheet_cache[sheet_name]
-        logger.debug(f"Invalidated cache for sheet {sheet_name}")
+    data_key = f"data_{sheet_name}"
+    worksheet_key = f"worksheet_{sheet_name}"
+    
+    if data_key in _sheet_cache:
+        del _sheet_cache[data_key]
+        logger.debug(f"Invalidated data cache for sheet {sheet_name}")
+    
+    if worksheet_key in _worksheet_cache:
+        del _worksheet_cache[worksheet_key]
+        logger.debug(f"Invalidated worksheet cache for sheet {sheet_name}")
 
 def get_monthly_expense(sheet_name):
     """Fetch total expense for a given month sheet"""
