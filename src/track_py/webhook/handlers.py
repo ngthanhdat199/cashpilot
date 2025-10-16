@@ -1284,13 +1284,11 @@ async def income(update, context):
 
         if not prev_freelance_income or prev_freelance_income.strip() == "":
             logger.info("Previous freelance income cell is empty, using config fallback")
-            await update.message.reply_text("⚠️ Thu nhập freelance tháng trước chưa được ghi nhận. Vui lòng sử dụng lệnh /fl 1 để cập nhật.")
-            return
+            prev_freelance_income = 0
         
         if not prev_salary_income or prev_salary_income.strip() == "":    
             logger.info("Previous salary income cell is empty, using config fallback")
-            await update.message.reply_text("⚠️ Thu nhập lương tháng trước chưa được ghi nhận. Vui lòng sử dụng lệnh /sl 1 để cập nhật.")
-            return
+            prev_salary_income = 0
 
         prev_freelance_income = safe_int(prev_freelance_income)
         prev_salary_income = safe_int(prev_salary_income)
