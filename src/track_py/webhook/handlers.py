@@ -58,7 +58,7 @@ async def start(update, context):
             ["/gas", "/food", "/other", "/dating"],
             ["/investment", "/investment -1"],
             ["/income", "/income -1"],
-            ["/fl", "/sl"],
+            ["/fl", "/sl", "/ai"],
             ["/help"]
         ]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)

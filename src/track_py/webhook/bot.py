@@ -1,7 +1,7 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 from src.track_py.const import TELEGRAM_TOKEN
 from src.track_py.utils.logger import logger
-from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort
+from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort, ai_analyze
 
 # Initialize bot application immediately
 def setup_bot():
@@ -24,6 +24,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["salary", "sl"], salary))
         bot_app.add_handler(CommandHandler(["income", "inc"], income))
         bot_app.add_handler(CommandHandler(["sort", "s"], sort))
+        bot_app.add_handler(CommandHandler(["ai", "a"], ai_analyze))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -68,6 +69,7 @@ def create_fresh_bot():
         fresh_app.add_handler(CommandHandler(["salary", "sl"], salary))
         fresh_app.add_handler(CommandHandler(["income", "inc"], income))
         fresh_app.add_handler(CommandHandler(["sort", "s"], sort))
+        fresh_app.add_handler(CommandHandler(["ai", "a"], ai_analyze))
 
         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         

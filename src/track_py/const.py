@@ -67,6 +67,7 @@ HELP_MSG = f"""
 • /dating → Hẹn hò/giải trí (/d) 🎉  
 • /other → Khác (/o) 🛒  
 • /investment → Đầu tư (/i) 📈  
+• /ai → Phân tích chi tiêu (/a) 🤖
 
 💰 Thu nhập:
 • /salary [số tiền] → Ghi nhận lương (/sl) 🏢  
