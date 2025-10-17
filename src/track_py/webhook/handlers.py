@@ -809,7 +809,7 @@ async def ai_analyze(update, context: CallbackContext):
             f"{markdown_response}"
         )
 
-        await update.message.reply_text(telegram_response)
+        await update.message.reply_text(telegram_response, parse_mode='HTML')
         logger.info(f"Month summary sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
