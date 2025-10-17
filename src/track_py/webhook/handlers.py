@@ -768,7 +768,7 @@ async def ai_analyze(update, context: CallbackContext):
 
         client = InferenceClient(token=HUGGING_FACE_TOKEN)
         # model = "mistralai/Mistral-7B-Instruct-v0.2"
-        model = "Llama-3.1-8B/70B-Instruct"
+        model = "meta-llama/Llama-3.1-8B-Instruct"
 
         # Use chat_completion for instruction/chat models
         ai_response = client.chat_completion(
