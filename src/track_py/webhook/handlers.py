@@ -786,11 +786,11 @@ async def ai_analyze(update, context: CallbackContext):
                     "content": f"{raw_data}"
                 }
             ],
-            max_tokens=300,
+            max_tokens=1000,
         )
 
         telegram_response = (
-            f"🤖 Phân tích chi tiêu tháng {month_display}:"
+            f"🤖 Phân tích chi tiêu {month_display}:\n"
             f"{ai_response['choices'][0]['message']['content'].strip()}"
         )
 
