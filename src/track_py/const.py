@@ -10,9 +10,10 @@ use_fresh_bots = True  # Flag to enable/disable fresh bot instances
 # Simple circuit breaker for webhook failures
 MAX_FAILURES = 10
 FAILURE_RESET_TIME = 300  # 5 minutes
-TOKEN = config["telegram"]["bot_token"]
+TELEGRAM_TOKEN = config["telegram"]["bot_token"]
 WEBHOOK_URL = config["telegram"]["webhook_url"]
 WSGI_FILE = 'thanhdat19_pythonanywhere_com_wsgi.py'
+HUGGING_FACE_TOKEN = config["hugging_face"]["token"]
 
 # Get month name in Vietnamese
 MONTH_NAMES = {

@@ -4,10 +4,11 @@ from telegram.ext import CallbackContext
 import datetime
 import asyncio
 from collections import defaultdict
+from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
 from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache
-from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS
+from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN
 from src.track_py.config import config, save_config
 
 def safe_async_handler(handler_func):
@@ -646,6 +647,163 @@ async def month(update, context: CallbackContext):
             await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in month command: {reply_error}")
+
+@safe_async_handler
+async def ai_analyze(update, context: CallbackContext):
+    args = context.args
+    offset = 0
+    if args:
+        try:
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    """Get this month's total expenses with AI analysis"""
+    try:
+        logger.info(f"Month command requested by user {update.effective_user.id}")
+        
+        now = get_current_time() + relativedelta(months=offset)
+        target_month = now.strftime("%m/%Y")
+        
+        logger.info(f"Getting month expenses for sheet {target_month}")
+        
+        try:
+            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+            logger.info(f"Successfully obtained sheet for {target_month}")
+        except Exception as sheet_error:
+            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
+            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
+            return
+        
+        try:
+            records = await asyncio.to_thread(
+                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
+            )
+            logger.info(f"Retrieved {len(records)} records from sheet")
+        except Exception as records_error:
+            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
+            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
+            return
+        
+        summary = get_month_summary(records)
+        month_expenses = summary["expenses"]
+        total = summary["total"]
+        food_total = summary["food"]
+        dating_total = summary["dating"]
+        gas_total = summary["gas"]
+        rent_total = summary["rent"]
+        other_total = summary["other"]
+        long_invest_total = summary["long_investment"]
+        opportunity_invest_total = summary["opportunity_investment"]
+        investment_total = summary["investment"]
+        support_parent_total = summary["support_parent"]
+
+        # Get income from sheet
+        salary = current_sheet.acell(SALARY_CELL).value
+        freelance = current_sheet.acell(FREELANCE_CELL).value
+
+        # fallback from config if empty/invalid
+        if not salary or not str(salary).strip().isdigit():
+            salary = config["income"].get("salary", 0)
+        if not freelance or not str(freelance).strip().isdigit():
+            freelance = config["income"].get("freelance", 0)
+
+        # convert safely to int
+        salary = safe_int(salary)
+        freelance = safe_int(freelance)
+
+        total_income = salary + freelance
+
+        food_and_travel_total = food_total + gas_total + other_total
+        food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
+        rent_budget = config["budgets"].get("rent", 0)
+        long_invest_budget = config["budgets"].get("long_investment", 0)
+        opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
+        support_parent_budget = config["budgets"].get("support_parent", 0)
+        dating_budget = config["budgets"].get("dating", 0)
+
+        count = len(month_expenses)
+        current_month = now.strftime("%m")
+        current_year = now.strftime("%Y")
+        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
+
+        # Calculate estimated amounts based on percentages and income
+        food_and_travel_estimate = total_income * (food_and_travel_budget / 100) if total_income > 0 else 0
+        rent_estimate = total_income * (rent_budget / 100) if total_income > 0 else 0
+        long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
+        opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
+        support_parent_estimate = total_income * (support_parent_budget / 100) if total_income > 0 else 0
+        dating_estimate = total_income * (dating_budget / 100) if total_income > 0 else 0
+
+        raw_data = (
+            f"📊 Tổng kết {month_display}:\n"
+            f"💰 Chi tiêu: {total:,.0f} VND\n"
+            f"💵 Thu nhập: {total_income:,.0f} VND\n"
+            f"📝 {count} giao dịch\n\n"
+
+            f"📌 Ngân sách dự kiến (% thu nhập):\n"
+            f"🏠 Thuê nhà: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
+            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
+            f"👪 Hỗ trợ ba mẹ: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
+            f"💖 Hẹn hò: {dating_budget:.0f}% = {dating_estimate:,.0f} VND\n"
+            f"📈 Đầu tư dài hạn: {long_invest_budget:.0f}% = {long_invest_estimate:,.0f} VND\n"
+            f"🚀 Đầu tư cơ hội: {opportunity_invest_budget:.0f}% = {opportunity_invest_estimate:,.0f} VND\n\n"
+
+            f"💸 Chi tiêu thực tế:\n"
+            f"🏠 Thuê nhà: {rent_total:,.0f} VND ({rent_estimate - rent_total:+,.0f})\n"
+            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
+            f"👪 Hỗ trợ ba mẹ: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
+            f"💖 Hẹn hò: {dating_total:,.0f} VND ({dating_estimate - dating_total:+,.0f})\n"
+            f"📈 Đầu tư dài hạn: {long_invest_total:,.0f} VND ({long_invest_estimate - long_invest_total:+,.0f})\n"
+            f"🚀 Đầu tư cơ hội: {opportunity_invest_total:,.0f} VND ({opportunity_invest_estimate - opportunity_invest_total:+,.0f})\n\n"
+
+            f"📋 Chi tiết:\n"
+            f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
+            f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
+            f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
+            f"💖 Hẹn hò: {dating_total:,.0f} VND\n"
+            f"💹 Đầu tư: {investment_total:,.0f} VND\n"
+            f"🛍️ Khác: {other_total:,.0f} VND\n"
+        )
+
+        client = InferenceClient(token=HUGGING_FACE_TOKEN)
+        model = "mistralai/Mistral-7B-Instruct-v0.2"
+
+        # Use chat_completion for instruction/chat models
+        ai_response = client.chat_completion(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a personal finance assistant that analyzes user expenses. "
+                        "Given a monthly spending breakdown, identify overspending areas, "
+                        "detect trends, and suggest 2–3 actionable improvements."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"{raw_data}"
+                }
+            ],
+            max_tokens=300,
+        )
+
+        telegram_response = (
+            f"🤖 Phân tích chi tiêu tháng {month_display}:"
+            f"{ai_response['choices'][0]['message']['content'].strip()}"
+        )
+
+        await update.message.reply_text(telegram_response)
+        logger.info(f"Month summary sent successfully to user {update.effective_user.id}")
+        
+    except Exception as e:
+        logger.error(f"Error in month command for user {update.effective_user.id}: {e}", exc_info=True)
+        try:
+            await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
+        except Exception as reply_error:
+            logger.error(f"Failed to send error message in month command: {reply_error}")
+
 
 @safe_async_handler
 async def gas(update, context):

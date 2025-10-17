@@ -1,5 +1,5 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
-from src.track_py.const import TOKEN
+from src.track_py.const import TELEGRAM_TOKEN
 from src.track_py.utils.logger import logger
 from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort
 
@@ -7,7 +7,7 @@ from src.track_py.webhook.handlers import start, help, today, week, month, gas, 
 def setup_bot():
     """Setup the bot application"""
     try:
-        bot_app = Application.builder().token(TOKEN).build()
+        bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
         
         # Command handlers
         bot_app.add_handler(CommandHandler(["start", "st"], start))
@@ -51,7 +51,7 @@ def create_fresh_bot():
     """Create a completely fresh bot instance for isolated processing"""
     try:
         logger.info("Creating fresh bot instance")
-        fresh_app = Application.builder().token(TOKEN).build()
+        fresh_app = Application.builder().token(TELEGRAM_TOKEN).build()
         
         # Add all handlers
         fresh_app.add_handler(CommandHandler(["start", "st"], start))
