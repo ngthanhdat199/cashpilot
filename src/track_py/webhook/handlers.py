@@ -778,26 +778,27 @@ async def ai_analyze(update, context: CallbackContext):
                 "role": "system",
                 "content": 
                 (
-                    "Bạn là một trợ lý tài chính cá nhân thông minh."
-                    "Dựa trên bản tóm tắt chi tiêu hàng tháng (bao gồm thu nhập, ngân sách, và chi tiêu thực tế), hãy thực hiện phân tích tài chính chi tiết với các mục tiêu sau:\n\n"
-                    "1️⃣ Xác định **các hạng mục chi tiêu vượt ngân sách hoặc tiết kiệm hơn dự kiến**, kèm giá trị chênh lệch.\n"
-                    "2️⃣ Phát hiện **2–3 xu hướng chi tiêu** (ví dụ: thay đổi thói quen, tăng giảm đầu tư, rủi ro mất cân đối).\n"
-                    "3️⃣ Đưa ra **2–3 gợi ý hành động cụ thể và cá nhân hóa** để cải thiện cân bằng tài chính hoặc tối ưu chi tiêu.\n"
-                    "4️⃣ Nếu tổng chi tiêu vượt quá thu nhập, hãy nêu rõ mức thâm hụt và đề xuất cách khắc phục.\n"
-                    "5️⃣ Nếu chi tiêu thấp hơn ngân sách, hãy gợi ý cách tận dụng khoản dư để tiết kiệm hoặc đầu tư thêm.\n\n"
-                    "**Định dạng đầu ra:**\n"
-                    "🧾 **Tóm tắt:** Một đoạn ngắn mô tả tình hình tài chính tháng.\n"
-                    "📊 **Phân tích chi tiêu vượt ngân sách:** Nêu rõ các mục chi vượt, lý do hoặc nguyên nhân tiềm ẩn.\n"
-                    "📈 **Xu hướng chi tiêu:** 2–3 xu hướng nổi bật trong hành vi chi tiêu.\n"
-                    "💡 **Khuyến nghị:** 2–3 gợi ý cụ thể, dễ hiểu, mang tính thực tế.\n\n"
-                    "💬 **Yêu cầu đặc biệt:**\n"
-                    "- Phản hồi **hoàn toàn bằng tiếng Việt**, giọng văn thân thiện, đồng cảm, nhưng vẫn thực tế và chuyên nghiệp.\n"
-                    "- Sử dụng emoji phù hợp (🧾📊📈💡💰✨...) để tăng tính dễ đọc."
+                    "Bạn là một trợ lý tài chính cá nhân thông minh, phản hồi hoàn toàn bằng tiếng Việt. "
+                    "Phân tích dữ liệu chi tiêu hàng tháng (bao gồm thu nhập, ngân sách và chi tiêu thực tế) để đưa ra phân tích và khuyến nghị.\n\n"
                     "⚙️ Quy ước dữ liệu:\n"
-                    "- Số trong ngoặc đơn (ví dụ: (+1,000,000) hoặc (-500,000)) thể hiện chênh lệch giữa chi tiêu thực tế và ngân sách.\n"
-                    "- Dấu (+) nghĩa là **chi tiêu ít hơn ngân sách** (tiết kiệm).\n"
-                    "- Dấu (-) nghĩa là **chi tiêu vượt ngân sách** (vượt chi hoặc thâm hụt ngân sách).\n"
-                    "- Ví dụ: (−200,000) → vượt ngân sách 200,000 VND, (+500,000) → tiết kiệm 500,000 VND.\n\n"
+                    "- Mỗi dòng chi tiêu có dạng: <Tên hạng mục>: <Chi tiêu thực tế> VND (<Chênh lệch>)\n"
+                    "- Giá trị trong ngoặc thể hiện CHÊNH LỆCH giữa chi tiêu thực tế và ngân sách:\n"
+                    "    • Dấu (+) nghĩa là chi tiêu ÍT HƠN ngân sách (TIẾT KIỆM)\n"
+                    "    • Dấu (-) nghĩa là chi tiêu NHIỀU HƠN ngân sách (VƯỢT CHI)\n"
+                    "- Ví dụ: (+1,000,000) = tiết kiệm 1 triệu. (-500,000) = vượt ngân sách 500 nghìn.\n\n"
+                    "⚙️ Phân tích yêu cầu:\n"
+                    "1️⃣ Xác định các hạng mục chi vượt ngân sách (dấu -) và hạng mục tiết kiệm (dấu +), nêu rõ số tiền chênh lệch.\n"
+                    "2️⃣ So sánh tổng chi tiêu và thu nhập để xác định thặng dư hoặc thâm hụt.\n"
+                    "3️⃣ Phát hiện 2–3 xu hướng nổi bật trong chi tiêu.\n"
+                    "4️⃣ Đưa ra 2–3 khuyến nghị cụ thể giúp cải thiện cân bằng tài chính.\n\n"
+                    "📋 Định dạng đầu ra (HTML-friendly cho Telegram):\n"
+                    "🧾 <b>Tóm tắt:</b> Một đoạn ngắn mô tả tình hình tài chính tháng.\n"
+                    "📊 <b>Phân tích chi tiêu vượt ngân sách:</b> Liệt kê rõ từng mục vượt và tiết kiệm.\n"
+                    "📈 <b>Xu hướng chi tiêu:</b> 2–3 xu hướng nổi bật.\n"
+                    "💡 <b>Khuyến nghị:</b> 2–3 gợi ý cụ thể.\n\n"
+                    "💬 <b>Yêu cầu:</b>\n"
+                    "- Giọng văn thân thiện, chuyên nghiệp, có cảm xúc.\n"
+                    "- Sử dụng emoji phù hợp (🧾📊📈💡💰✨...) để tăng tính dễ đọc.\n"
                 )
             },
             {
@@ -809,12 +810,7 @@ async def ai_analyze(update, context: CallbackContext):
         )
 
         markdown_response = markdown_to_html(ai_response['choices'][0]['message']['content'].strip())
-        telegram_response = (
-            f"🤖 Phân tích chi tiêu {month_display}:\n"
-            f"{markdown_response}"
-        )
-
-        await update.message.reply_text(telegram_response, parse_mode='HTML')
+        await update.message.reply_text(markdown_response, parse_mode='HTML')
         logger.info(f"Month summary sent successfully to user {update.effective_user.id}")
         
     except Exception as e:
