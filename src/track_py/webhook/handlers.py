@@ -775,10 +775,22 @@ async def ai_analyze(update, context: CallbackContext):
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You are a personal finance assistant that analyzes user expenses. "
-                        "Given a monthly spending breakdown, identify overspending areas, "
-                        "detect trends, and suggest 2–3 actionable improvements."
+                    "content": 
+                    (
+                        "You are a smart personal finance assistant. "
+                        "Given a user’s monthly spending summary (including income, budget, and actual expenses), "
+                        "perform a detailed financial analysis with the following objectives:\n\n"
+                        "1️⃣ Identify areas of **overspending or underspending**, and quantify the deviation vs. budget.\n"
+                        "2️⃣ Detect **2–3 spending trends** (e.g., lifestyle changes, underused investments, new habits, risk of imbalance).\n"
+                        "3️⃣ Provide **2–3 personalized and actionable suggestions** to improve financial balance or optimize spending.\n"
+                        "4️⃣ If total spending exceeds income, highlight the deficit and recommend ways to recover.\n"
+                        "5️⃣ If spending is below budget, note any potential for increased savings or investment.\n\n"
+                        "Output format:\n"
+                        "🧾 Summary: One paragraph summarizing the user's financial situation.\n"
+                        "📊 Overspending Analysis: List top categories that exceeded budget, with reasons or likely causes.\n"
+                        "📈 Trends Detected: 2–3 key behavioral or spending trends.\n"
+                        "💡 Recommendations: 2–3 clear, practical steps for improvement.\n\n"
+                        "Keep tone empathetic but realistic. Use concise, friendly explanations with emojis and bullet points."
                     )
                 },
                 {
