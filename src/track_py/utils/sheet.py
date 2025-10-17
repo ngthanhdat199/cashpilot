@@ -3,6 +3,7 @@ import unicodedata
 import re
 import gspread
 import time
+import re
 from google.oauth2.service_account import Credentials
 from src.track_py.utils.logger import logger
 from src.track_py.config import config
@@ -735,3 +736,9 @@ def get_monthly_expense(sheet_name):
         logger.error(f"Error accessing sheet {sheet_name}: {sheet_error}")
     
     return total
+
+# Convert markdown → HTML
+def markdown_to_html(text: str) -> str:
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"\*(.+?)\*", r"<i>\1</i>", text)
+    return text

@@ -7,7 +7,7 @@ from collections import defaultdict
 from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
-from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache
+from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, markdown_to_html
 from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN
 from src.track_py.config import config, save_config
 
@@ -778,7 +778,7 @@ async def ai_analyze(update, context: CallbackContext):
                 "role": "system",
                 "content": 
                 (
-                    "Bạn là một trợ lý tài chính cá nhân thông minh, luôn phản hồi bằng tiếng Việt. "
+                    "Bạn là một trợ lý tài chính cá nhân thông minh."
                     "Dựa trên bản tóm tắt chi tiêu hàng tháng (bao gồm thu nhập, ngân sách, và chi tiêu thực tế), hãy thực hiện phân tích tài chính chi tiết với các mục tiêu sau:\n\n"
                     "1️⃣ Xác định **các hạng mục chi tiêu vượt ngân sách hoặc tiết kiệm hơn dự kiến**, kèm giá trị chênh lệch.\n"
                     "2️⃣ Phát hiện **2–3 xu hướng chi tiêu** (ví dụ: thay đổi thói quen, tăng giảm đầu tư, rủi ro mất cân đối).\n"
@@ -803,9 +803,10 @@ async def ai_analyze(update, context: CallbackContext):
             max_tokens=1000,
         )
 
+        markdown_response = markdown_to_html(ai_response['choices'][0]['message']['content'].strip())
         telegram_response = (
             f"🤖 Phân tích chi tiêu {month_display}:\n"
-            f"{ai_response['choices'][0]['message']['content'].strip()}"
+            f"{markdown_response}"
         )
 
         await update.message.reply_text(telegram_response)
