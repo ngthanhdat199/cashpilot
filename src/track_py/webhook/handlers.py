@@ -793,6 +793,11 @@ async def ai_analyze(update, context: CallbackContext):
                     "💬 **Yêu cầu đặc biệt:**\n"
                     "- Phản hồi **hoàn toàn bằng tiếng Việt**, giọng văn thân thiện, đồng cảm, nhưng vẫn thực tế và chuyên nghiệp.\n"
                     "- Sử dụng emoji phù hợp (🧾📊📈💡💰✨...) để tăng tính dễ đọc."
+                    "⚙️ Quy ước dữ liệu:\n"
+                    "- Số trong ngoặc đơn (ví dụ: (+1,000,000) hoặc (-500,000)) thể hiện chênh lệch giữa chi tiêu thực tế và ngân sách.\n"
+                    "- Dấu (+) nghĩa là **chi tiêu ít hơn ngân sách** (tiết kiệm).\n"
+                    "- Dấu (-) nghĩa là **chi tiêu vượt ngân sách** (vượt chi hoặc thâm hụt ngân sách).\n"
+                    "- Ví dụ: (−200,000) → vượt ngân sách 200,000 VND, (+500,000) → tiết kiệm 500,000 VND.\n\n"
                 )
             },
             {
