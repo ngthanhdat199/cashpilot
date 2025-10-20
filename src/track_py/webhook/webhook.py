@@ -4,7 +4,7 @@ import threading
 from flask import Flask, request, jsonify
 from src.track_py.utils.logger import logger
 from telegram import Update
-from src.track_py.webhook.bot import setup_bot, setup_bot
+from src.track_py.webhook.bot import setup_bot, setup_bot_commands
 from src.track_py.const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME, WSGI_FILE, MONTH_NAMES_SHORT
 from src.track_py.utils.sheet import get_monthly_expense
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -152,6 +152,8 @@ def webhook():
                         
                         # Initialize the fresh bot instance
                         await fresh_bot_app.initialize()
+                        # Set up commands for fresh bot instance
+                        await setup_bot_commands(fresh_bot_app)
                         logger.info("Fresh bot instance initialized successfully")
                         
                         # Verify bot is properly initialized by checking if it has a username
@@ -191,6 +193,8 @@ def webhook():
                 if not bot_app.running:
                     logger.info("Initializing global bot application")
                     await bot_app.initialize()
+                    # Set up commands for global bot instance
+                    await setup_bot_commands(bot_app)
                     logger.info("Global bot application initialized successfully")
                 
                 # Process the update with global instance (using original update object)

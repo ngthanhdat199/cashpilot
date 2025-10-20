@@ -5,8 +5,8 @@ from src.track_py.utils.logger import logger
 from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort, ai_analyze
 
 # Initialize bot application immediately
-async def setup_bot():
-    """Setup the bot application"""
+def setup_bot():
+    """Setup the bot application (synchronous part only)"""
     try:
         bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
         
@@ -42,14 +42,6 @@ async def setup_bot():
         
         bot_app.add_error_handler(error_handler)
 
-        # Set custom menu button
-        commands = [
-            BotCommand("start", "Start the bot"),
-            BotCommand("help", "Show help info"),
-        ]
-        await bot_app.bot.set_my_commands(commands)
-        await bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-
         logger.info("Bot application setup completed!")
         return bot_app
         
@@ -57,8 +49,27 @@ async def setup_bot():
         logger.error(f"Error setting up bot: {e}")
         raise
 
+async def setup_bot_commands(bot_app):
+    """Setup bot commands and menu (async part)"""
+    try:
+        # Set custom menu button
+        commands = [
+            BotCommand("start", "Start the bot"),
+            BotCommand("help", "Show help info"),
+        ]
+        await bot_app.bot.set_my_commands(commands)
+        await bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+        
+        logger.info("Bot commands and menu setup completed!")
+        
+    except Exception as e:
+        logger.error(f"Error setting up bot commands: {e}")
+        raise
+
 async def initialize_bot(bot_app):
     """Initialize the bot application asynchronously"""
     if not bot_app.running:
         await bot_app.initialize()
+        # Set up commands after initialization
+        await setup_bot_commands(bot_app)
     return bot_app
