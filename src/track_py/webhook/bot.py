@@ -1,5 +1,5 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
-from telegram import MenuButtonCommands
+from telegram import MenuButtonCommands, BotCommand
 from src.track_py.const import TELEGRAM_TOKEN
 from src.track_py.utils.logger import logger
 from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort, ai_analyze
@@ -43,26 +43,12 @@ def setup_bot():
         bot_app.add_error_handler(error_handler)
 
         # Set custom menu button
-        bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands(
-            text="Commands",
-            command_list=[
-                "/start - Bắt đầu sử dụng bot",
-                "/help - Xem hướng dẫn sử dụng",
-                "/today - Xem chi tiêu hôm nay",
-                "/week - Xem chi tiêu tuần này",
-                "/month - Xem chi tiêu tháng này",
-                "/gas - Thêm chi tiêu xăng xe",
-                "/food - Thêm chi tiêu ăn uống",
-                "/dating - Thêm chi tiêu hẹn hò",
-                "/other - Thêm chi tiêu khác",
-                "/investment - Thêm thu nhập đầu tư",
-                "/freelance - Thêm thu nhập freelance",
-                "/salary - Thêm thu nhập lương",
-                "/income - Xem tổng thu nhập",
-                "/sort - Sắp xếp chi tiêu",
-                "/ai - Phân tích chi tiêu bằng AI"
-            ]
-        ))
+        commands = [
+            BotCommand("start", "Start the bot"),
+            BotCommand("help", "Show help info"),
+        ]
+        bot_app.bot.set_my_commands(commands)
+        bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
         
         logger.info("Bot application setup completed!")
         return bot_app
