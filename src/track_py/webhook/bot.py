@@ -5,7 +5,7 @@ from src.track_py.utils.logger import logger
 from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort, ai_analyze
 
 # Initialize bot application immediately
-def setup_bot():
+async def setup_bot():
     """Setup the bot application"""
     try:
         bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -47,9 +47,9 @@ def setup_bot():
             BotCommand("start", "Start the bot"),
             BotCommand("help", "Show help info"),
         ]
-        bot_app.bot.set_my_commands(commands)
-        bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
-        
+        await bot_app.bot.set_my_commands(commands)
+        await bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+
         logger.info("Bot application setup completed!")
         return bot_app
         
