@@ -4,7 +4,7 @@ import threading
 from flask import Flask, request, jsonify
 from src.track_py.utils.logger import logger
 from telegram import Update
-from src.track_py.webhook.bot import setup_bot, create_fresh_bot
+from src.track_py.webhook.bot import setup_bot, setup_bot
 from src.track_py.const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME, WSGI_FILE, MONTH_NAMES_SHORT
 from src.track_py.utils.sheet import get_monthly_expense
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -148,7 +148,7 @@ def webhook():
                 if use_fresh_bots:
                     fresh_bot_app = None
                     try:
-                        fresh_bot_app = create_fresh_bot()
+                        fresh_bot_app = setup_bot()
                         
                         # Initialize the fresh bot instance
                         await fresh_bot_app.initialize()
