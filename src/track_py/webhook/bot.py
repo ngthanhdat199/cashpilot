@@ -1,4 +1,5 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
+from telegram import MenuButtonCommands
 from src.track_py.const import TELEGRAM_TOKEN
 from src.track_py.utils.logger import logger
 from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort, ai_analyze
@@ -40,6 +41,28 @@ def setup_bot():
                     logger.error(f"Failed to send error message: {reply_error}")
         
         bot_app.add_error_handler(error_handler)
+
+        # Set custom menu button
+        bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands(
+            text="Commands",
+            command_list=[
+                "/start - Bắt đầu sử dụng bot",
+                "/help - Xem hướng dẫn sử dụng",
+                "/today - Xem chi tiêu hôm nay",
+                "/week - Xem chi tiêu tuần này",
+                "/month - Xem chi tiêu tháng này",
+                "/gas - Thêm chi tiêu xăng xe",
+                "/food - Thêm chi tiêu ăn uống",
+                "/dating - Thêm chi tiêu hẹn hò",
+                "/other - Thêm chi tiêu khác",
+                "/investment - Thêm thu nhập đầu tư",
+                "/freelance - Thêm thu nhập freelance",
+                "/salary - Thêm thu nhập lương",
+                "/income - Xem tổng thu nhập",
+                "/sort - Sắp xếp chi tiêu",
+                "/ai - Phân tích chi tiêu bằng AI"
+            ]
+        ))
         
         logger.info("Bot application setup completed!")
         return bot_app
@@ -47,50 +70,6 @@ def setup_bot():
     except Exception as e:
         logger.error(f"Error setting up bot: {e}")
         raise
-
-# def create_fresh_bot():
-#     """Create a completely fresh bot instance for isolated processing"""
-#     try:
-#         logger.info("Creating fresh bot instance")
-#         fresh_app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-#         # Add all handlers
-#         fresh_app.add_handler(CommandHandler(["start", "st"], start))
-#         fresh_app.add_handler(CommandHandler(["help", "h"], help))
-#         fresh_app.add_handler(CommandHandler(["today", "t"], today))
-#         fresh_app.add_handler(CommandHandler(["week", "w"], week))
-#         fresh_app.add_handler(CommandHandler(["month", "m"], month))
-#         fresh_app.add_handler(CommandHandler(["gas", "g"], gas))
-#         fresh_app.add_handler(CommandHandler(["food", "f"], food))
-#         fresh_app.add_handler(CommandHandler(["dating", "d"], dating))
-#         fresh_app.add_handler(CommandHandler(["other", "o"], other))
-#         fresh_app.add_handler(CommandHandler(["investment", "i"], investment))
-#         fresh_app.add_handler(CommandHandler(["freelance", "fl"], freelance))
-#         fresh_app.add_handler(CommandHandler(["salary", "sl"], salary))
-#         fresh_app.add_handler(CommandHandler(["income", "inc"], income))
-#         fresh_app.add_handler(CommandHandler(["sort", "s"], sort))
-#         fresh_app.add_handler(CommandHandler(["ai", "a"], ai_analyze))
-
-#         fresh_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        
-#         # Add error handler to prevent "No error handlers are registered" warnings
-#         async def error_handler(update, context):
-#             """Global error handler for fresh bot instance"""
-#             logger.error(f"Error in fresh bot instance: {context.error}", exc_info=context.error)
-#             if update and update.effective_message:
-#                 try:
-#                     await update.effective_message.reply_text("❌ Có lỗi xảy ra. Vui lòng thử lại!")
-#                 except Exception as reply_error:
-#                     logger.error(f"Failed to send error message: {reply_error}")
-        
-#         fresh_app.add_error_handler(error_handler)
-        
-#         logger.info("Fresh bot instance created successfully")
-#         return fresh_app
-        
-#     except Exception as e:
-#         logger.error(f"Error creating fresh bot: {e}", exc_info=True)
-#         raise
 
 async def initialize_bot(bot_app):
     """Initialize the bot application asynchronously"""
