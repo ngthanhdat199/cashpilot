@@ -54,21 +54,21 @@ async def setup_bot_commands(bot_app):
     try:
         # Set custom menu button
         commands = [
-            BotCommand("start", "Start the bot"),
-            BotCommand("help", "Show help info"),
-            BotCommand("today", "Log today's expense"),
-            BotCommand("week", "Show this week's expenses"),
-            BotCommand("month", "Show this month's expenses"),
-            BotCommand("gas", "Log gas expense"),
-            BotCommand("food", "Log food expense"),
-            BotCommand("dating", "Log dating expense"),
-            BotCommand("other", "Log other expense"),
-            BotCommand("investment", "Log investment expense"),
-            BotCommand("freelance", "Log freelance income"),
-            BotCommand("salary", "Log salary income"),
-            BotCommand("income", "Log other income"),
-            BotCommand("sort", "Sort expenses"),
-            BotCommand("ai", "Analyze expenses with AI"),
+            BotCommand("start", "🚀 Start the bot"),
+            BotCommand("help", "❓ Show help info"),
+            BotCommand("today", "🗓️ Log today's expense"),
+            BotCommand("week", "📅 Show this week's expenses"),
+            BotCommand("month", "🧾 Show this month's expenses"),
+            BotCommand("gas", "⛽ Log gas expense"),
+            BotCommand("food", "🍔 Log food expense"),
+            BotCommand("dating", "💘 Log dating expense"),
+            BotCommand("other", "🛍️ Log other expense"),
+            BotCommand("investment", "📈 Log investment expense"),
+            BotCommand("freelance", "💻 Log freelance income"),
+            BotCommand("salary", "💰 Log salary income"),
+            BotCommand("income", "💵 Log other income"),
+            BotCommand("sort", "🧹 Sort expenses"),
+            BotCommand("ai", "🤖 Analyze expenses with AI"),
         ]
         await bot_app.bot.set_my_commands(commands)
         await bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())
