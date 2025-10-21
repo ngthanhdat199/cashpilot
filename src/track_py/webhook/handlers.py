@@ -1313,7 +1313,6 @@ async def income(update, context):
             f"{category_display['freelance']}: {freelance_income:,.0f} VND\n"
             f"{category_display['total']}: {total_income:,.0f} VND\n"
             f"{category_display['compare']} {previous_month}: {total_income - prev_total_income:+,.0f} VND {percentage_text}\n"
-
         )
         
         await update.message.reply_text(response)
