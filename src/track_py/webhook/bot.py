@@ -1,8 +1,9 @@
 from telegram.ext import Application, MessageHandler, CommandHandler, filters
 from telegram import MenuButtonCommands, BotCommand
-from src.track_py.const import TELEGRAM_TOKEN
+from src.track_py.const import TELEGRAM_TOKEN, CATEGORY_ICONS
 from src.track_py.utils.logger import logger
-from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort, ai_analyze
+from src.track_py.webhook.handlers import start, help, today, week, month, gas, food, dating, other, investment, handle_message, freelance, income, salary, sort, ai_analyze, stats, categories
+
 
 # Initialize bot application immediately
 def setup_bot():
@@ -26,6 +27,8 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["income", "inc"], income))
         bot_app.add_handler(CommandHandler(["sort", "s"], sort))
         bot_app.add_handler(CommandHandler(["ai", "a"], ai_analyze))
+        bot_app.add_handler(CommandHandler(["stats", "stat"], stats))
+        bot_app.add_handler(CommandHandler(["categories", "cat"], categories))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -54,21 +57,23 @@ async def setup_bot_commands(bot_app):
     try:
         # Set custom menu button
         commands = [
-            BotCommand("start", "🚀 Start the bot"),
-            BotCommand("help", "❓ Show help info"),
-            BotCommand("today", "🗓️ Log today's expense"),
-            BotCommand("week", "📅 Show this week's expenses"),
-            BotCommand("month", "🧾 Show this month's expenses"),
-            BotCommand("gas", "⛽ Log gas expense"),
-            BotCommand("food", "🍔 Log food expense"),
-            BotCommand("dating", "💘 Log dating expense"),
-            BotCommand("other", "🛍️ Log other expense"),
-            BotCommand("investment", "📈 Log investment expense"),
-            BotCommand("freelance", "💻 Log freelance income"),
-            BotCommand("salary", "💰 Log salary income"),
-            BotCommand("income", "💵 Log other income"),
-            BotCommand("sort", "🧹 Sort expenses"),
-            BotCommand("ai", "🤖 Analyze expenses with AI"),
+            BotCommand("start", f"{CATEGORY_ICONS['start']} Start the bot"),
+            BotCommand("help", f"{CATEGORY_ICONS['help']} Show help info"),
+            BotCommand("today", f"{CATEGORY_ICONS['today']} Log today's expense"),
+            BotCommand("week", f"{CATEGORY_ICONS['week']} Show this week's expenses"),
+            BotCommand("month", f"{CATEGORY_ICONS['month']} Show this month's expenses"),
+            BotCommand("gas", f"{CATEGORY_ICONS['gas']} Log gas expense"),
+            BotCommand("food", f"{CATEGORY_ICONS['food']} Log food expense"),
+            BotCommand("dating", f"{CATEGORY_ICONS['dating']} Log dating expense"),
+            BotCommand("other", f"{CATEGORY_ICONS['other']} Log other expense"),
+            BotCommand("investment", f"{CATEGORY_ICONS['investment']} Log investment expense"),
+            BotCommand("freelance", f"{CATEGORY_ICONS['freelance']} Log freelance income"),
+            BotCommand("salary", f"{CATEGORY_ICONS['salary']} Log salary income"),
+            BotCommand("income", f"{CATEGORY_ICONS['income']} Log other income"),
+            BotCommand("sort", f"{CATEGORY_ICONS['sort']} Sort expenses"),
+            BotCommand("ai", f"{CATEGORY_ICONS['ai']} Analyze expenses with AI"),
+            BotCommand("stats", f"{CATEGORY_ICONS['stats']} Show expense statistics"),
+            BotCommand("categories", f"{CATEGORY_ICONS['categories']} Show expense categories")
         ]
         await bot_app.bot.set_my_commands(commands)
         await bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())

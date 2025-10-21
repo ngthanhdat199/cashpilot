@@ -1,5 +1,5 @@
 from dateutil.relativedelta import relativedelta
-from telegram import ReplyKeyboardMarkup
+from telegram import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import CallbackContext
 import datetime
 import asyncio
@@ -7,9 +7,11 @@ from collections import defaultdict
 from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
-from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, markdown_to_html
-from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN
+from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, get_month_response
+from src.track_py.utils.util import markdown_to_html
+from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES
 from src.track_py.config import config, save_config
+from src.track_py.utils.category import category_display
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -174,24 +176,6 @@ async def log_expense(update, context):
         # OPTIMIZATION: Get or create the target month's sheet
         sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
 
-        # OPTIMIZATION: Use single API call to get current data size
-        # try:
-        #     all_values = await asyncio.to_thread(lambda: sheet.get_values("A:D"))
-        # except Exception as get_error:
-        #     logger.warning(f"Could not get values, using empty list: {get_error}")
-        #     all_values = []
-            
-        # next_row = len(all_values) + 1
-        
-        # # OPTIMIZATION: Simple append without immediate sorting - sorting is expensive and not always necessary
-        # range_name = f"A{next_row}:D{next_row}"
-        # await asyncio.to_thread(
-        #     lambda: sheet.update(range_name, [[entry_date, entry_time, int(amount), note]], value_input_option='RAW')
-        # )
-        
-        # # OPTIMIZATION: Skip sorting for most entries - only indicate position
-        # position_msg = f"📍 Vị trí: Dòng {next_row}"
-
         await asyncio.to_thread(
             lambda: sheet.append_row(
                 [entry_date, entry_time, int(amount), note],
@@ -314,7 +298,6 @@ async def sort(update, context):
         all_values = await asyncio.to_thread(lambda: sheet.get_values("A:D"))
         
         if len(all_values) > 2:  # More than header + 1 row
-            headers = all_values[0]
             data_rows = all_values[1:]
             
             # Sort by date and time
@@ -398,7 +381,11 @@ async def today(update, context):
         logger.info(f"Found {count} expenses for today with total {total} VND")
         logger.info(f"Today date string: '{today_str}', Rows processed: {len(all_values)}")  # Debug info
         
-        response = f"📊 Tổng kết hôm nay ({today_str}):\n💰 {total:,.0f} VND\n📝 {count} giao dịch\n📄 Sheet: {target_month}"
+        response = (
+            f"{category_display['summarized']} hôm nay ({today_str}):\n"
+            f"{category_display['spend']}: {total:,.0f} VND\n"
+            f"{category_display['transaction']}: {count}\n"
+        )
         
         if today_expenses:
             details = "\n".join(
@@ -502,10 +489,11 @@ async def week(update, context: CallbackContext):
             details_lines.extend(format_expense(r, i) for i, r in enumerate(rows, start=1))
 
         response_parts = [
-            f"📊 Tổng kết tuần này ({week_start:%d/%m} - {week_end:%d/%m}):",
-            f"💰 {total:,.0f} VND",
-            f"📝 {count} giao dịch",
+            f"{category_display['summarized']} tuần này ({week_start:%d/%m} - {week_end:%d/%m}):",
+            f"{category_display['spend']}: {total:,.0f} VND\n"
+            f"{category_display['transaction']}: {count}\n"
         ]
+
         if details_lines:
             response_parts.append("\n📝 Chi tiết:")
             response_parts.extend(details_lines)
@@ -553,91 +541,8 @@ async def month(update, context: CallbackContext):
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
             await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
-        
-        summary = get_month_summary(records)
-        month_expenses = summary["expenses"]
-        total = summary["total"]
-        food_total = summary["food"]
-        dating_total = summary["dating"]
-        gas_total = summary["gas"]
-        rent_total = summary["rent"]
-        other_total = summary["other"]
-        essential_total = summary["essential"]
-        long_invest_total = summary["long_investment"]
-        opportunity_invest_total = summary["opportunity_investment"]
-        investment_total = summary["investment"]
-        support_parent_total = summary["support_parent"]
 
-        # Get income from sheet
-        salary = current_sheet.acell(SALARY_CELL).value
-        freelance = current_sheet.acell(FREELANCE_CELL).value
-
-        # fallback from config if empty/invalid
-        if not salary or not str(salary).strip().isdigit():
-            salary = config["income"].get("salary", 0)
-        if not freelance or not str(freelance).strip().isdigit():
-            freelance = config["income"].get("freelance", 0)
-
-        # convert safely to int
-        salary = safe_int(salary)
-        freelance = safe_int(freelance)
-
-        total_income = salary + freelance
-
-        food_and_travel_total = food_total + gas_total + other_total
-        food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
-        rent_budget = config["budgets"].get("rent", 0)
-        essential_budget = food_and_travel_budget + rent_budget
-        long_invest_budget = config["budgets"].get("long_investment", 0)
-        opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
-        support_parent_budget = config["budgets"].get("support_parent", 0)
-        dating_budget = config["budgets"].get("dating", 0)
-
-        count = len(month_expenses)
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-
-        # Calculate estimated amounts based on percentages and income
-        # essential_estimate = total_income * (essential_budget / 100) if total_income > 0 else 0
-        food_and_travel_estimate = total_income * (food_and_travel_budget / 100) if total_income > 0 else 0
-        rent_estimate = total_income * (rent_budget / 100) if total_income > 0 else 0
-        long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
-        opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
-        support_parent_estimate = total_income * (support_parent_budget / 100) if total_income > 0 else 0
-        dating_estimate = total_income * (dating_budget / 100) if total_income > 0 else 0
-
-        response = (
-            f"📊 Tổng kết {month_display}:\n"
-            f"💰 Chi tiêu: {total:,.0f} VND\n"
-            f"💵 Thu nhập: {total_income:,.0f} VND\n"
-            f"📝 {count} giao dịch\n\n"
-
-            f"📌 Ngân sách dự kiến (% thu nhập):\n"
-            f"🏠 Thuê nhà: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
-            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
-            f"👪 Hỗ trợ ba mẹ: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
-            f"💖 Hẹn hò: {dating_budget:.0f}% = {dating_estimate:,.0f} VND\n"
-            f"📈 Đầu tư dài hạn: {long_invest_budget:.0f}% = {long_invest_estimate:,.0f} VND\n"
-            f"🚀 Đầu tư cơ hội: {opportunity_invest_budget:.0f}% = {opportunity_invest_estimate:,.0f} VND\n\n"
-
-            f"💸 Chi tiêu thực tế:\n"
-            f"🏠 Thuê nhà: {rent_total:,.0f} VND ({rent_estimate - rent_total:+,.0f})\n"
-            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
-            f"👪 Hỗ trợ ba mẹ: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
-            f"💖 Hẹn hò: {dating_total:,.0f} VND ({dating_estimate - dating_total:+,.0f})\n"
-            f"📈 Đầu tư dài hạn: {long_invest_total:,.0f} VND ({long_invest_estimate - long_invest_total:+,.0f})\n"
-            f"🚀 Đầu tư cơ hội: {opportunity_invest_total:,.0f} VND ({opportunity_invest_estimate - opportunity_invest_total:+,.0f})\n\n"
-
-            f"📋 Chi tiết:\n"
-            f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
-            f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
-            f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
-            f"💖 Hẹn hò: {dating_total:,.0f} VND\n"
-            f"💹 Đầu tư: {investment_total:,.0f} VND\n"
-            f"🛍️ Khác: {other_total:,.0f} VND\n"
-        )
-
+        response = get_month_response(records, current_sheet, now)
         await update.message.reply_text(response)
         logger.info(f"Month summary sent successfully to user {update.effective_user.id}")
         
@@ -685,89 +590,9 @@ async def ai_analyze(update, context: CallbackContext):
             await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
         
-        summary = get_month_summary(records)
-        month_expenses = summary["expenses"]
-        total = summary["total"]
-        food_total = summary["food"]
-        dating_total = summary["dating"]
-        gas_total = summary["gas"]
-        rent_total = summary["rent"]
-        other_total = summary["other"]
-        long_invest_total = summary["long_investment"]
-        opportunity_invest_total = summary["opportunity_investment"]
-        investment_total = summary["investment"]
-        support_parent_total = summary["support_parent"]
-
-        # Get income from sheet
-        salary = current_sheet.acell(SALARY_CELL).value
-        freelance = current_sheet.acell(FREELANCE_CELL).value
-
-        # fallback from config if empty/invalid
-        if not salary or not str(salary).strip().isdigit():
-            salary = config["income"].get("salary", 0)
-        if not freelance or not str(freelance).strip().isdigit():
-            freelance = config["income"].get("freelance", 0)
-
-        # convert safely to int
-        salary = safe_int(salary)
-        freelance = safe_int(freelance)
-
-        total_income = salary + freelance
-
-        food_and_travel_total = food_total + gas_total + other_total
-        food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
-        rent_budget = config["budgets"].get("rent", 0)
-        long_invest_budget = config["budgets"].get("long_investment", 0)
-        opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
-        support_parent_budget = config["budgets"].get("support_parent", 0)
-        dating_budget = config["budgets"].get("dating", 0)
-
-        count = len(month_expenses)
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-
-        # Calculate estimated amounts based on percentages and income
-        food_and_travel_estimate = total_income * (food_and_travel_budget / 100) if total_income > 0 else 0
-        rent_estimate = total_income * (rent_budget / 100) if total_income > 0 else 0
-        long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
-        opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
-        support_parent_estimate = total_income * (support_parent_budget / 100) if total_income > 0 else 0
-        dating_estimate = total_income * (dating_budget / 100) if total_income > 0 else 0
-
-        raw_data = (
-            f"📊 Tổng kết {month_display}:\n"
-            f"💰 Chi tiêu: {total:,.0f} VND\n"
-            f"💵 Thu nhập: {total_income:,.0f} VND\n"
-            f"📝 {count} giao dịch\n\n"
-
-            f"📌 Ngân sách dự kiến (% thu nhập):\n"
-            f"🏠 Thuê nhà: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
-            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
-            f"👪 Hỗ trợ ba mẹ: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
-            f"💖 Hẹn hò: {dating_budget:.0f}% = {dating_estimate:,.0f} VND\n"
-            f"📈 Đầu tư dài hạn: {long_invest_budget:.0f}% = {long_invest_estimate:,.0f} VND\n"
-            f"🚀 Đầu tư cơ hội: {opportunity_invest_budget:.0f}% = {opportunity_invest_estimate:,.0f} VND\n\n"
-
-            f"💸 Chi tiêu thực tế:\n"
-            f"🏠 Thuê nhà: {rent_total:,.0f} VND ({rent_estimate - rent_total:+,.0f})\n"
-            f"🍽️ Ăn uống & 🚗 Đi lại: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
-            f"👪 Hỗ trợ ba mẹ: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
-            f"💖 Hẹn hò: {dating_total:,.0f} VND ({dating_estimate - dating_total:+,.0f})\n"
-            f"📈 Đầu tư dài hạn: {long_invest_total:,.0f} VND ({long_invest_estimate - long_invest_total:+,.0f})\n"
-            f"🚀 Đầu tư cơ hội: {opportunity_invest_total:,.0f} VND ({opportunity_invest_estimate - opportunity_invest_total:+,.0f})\n\n"
-
-            f"📋 Chi tiết:\n"
-            f"🏠 Thuê nhà: {rent_total:,.0f} VND\n"
-            f"🍽️ Ăn uống: {food_total:,.0f} VND\n"
-            f"⛽ Xăng / Đi lại: {gas_total:,.0f} VND\n"
-            f"💖 Hẹn hò: {dating_total:,.0f} VND\n"
-            f"💹 Đầu tư: {investment_total:,.0f} VND\n"
-            f"🛍️ Khác: {other_total:,.0f} VND\n"
-        )
+        raw_data = get_month_response(records, current_sheet, now)
 
         client = InferenceClient(token=HUGGING_FACE_TOKEN)
-        # model = "mistralai/Mistral-7B-Instruct-v0.2"
         model = "meta-llama/Llama-3.1-8B-Instruct"
 
         # Use chat_completion for instruction/chat models
@@ -889,10 +714,10 @@ async def gas(update, context):
             percentage_text = ""
 
         response = (
-            f"⛽ Tổng kết đổ xăng / đi lại {month_display}:\n"
-            f"💰 Tổng chi: {total:,.0f} VND\n"
-            f"📝 Giao dịch: {count}\n"
-            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+            f"{category_display['gas']} {month_display}:\n" 
+            f"{category_display['spend']}: {total:,.0f} VND\n"
+            f"{category_display['transaction']}: {count}\n"
+            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
         )
         
         if details:
@@ -976,10 +801,10 @@ async def food(update, context):
             percentage_text = ""
 
         response = (
-            f"🍽️ Tổng kết chi tiêu ăn uống {month_display}:\n"
-            f"💰 Tổng chi: {total:,.0f} VND\n"
-            f"📝 Giao dịch: {count}\n"
-            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+            f"{category_display['food']} {month_display}:\n" 
+            f"{category_display['spend']}: {total:,.0f} VND\n"
+            f"{category_display['transaction']}: {count}\n"
+            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
         )
         
         if details:
@@ -1063,10 +888,10 @@ async def dating(update, context):
             percentage_text = ""
 
         response = (
-            f"🎉 Tổng kết chi tiêu hẹn hò / giải trí {month_display}:\n"
-            f"💰 Tổng chi: {total:,.0f} VND\n"
-            f"📝 Giao dịch: {count}\n"
-            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+            f"{category_display['dating']} {month_display}:\n" 
+            f"{category_display['spend']}: {total:,.0f} VND\n"
+            f"{category_display['transaction']}: {count}\n"
+            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
         )
         
         if details:
@@ -1150,10 +975,10 @@ async def other(update, context):
             percentage_text = ""
 
         response = (
-            f"🛍️ Tổng kết chi tiêu khác {month_display}:\n"
-            f"💰 Tổng chi: {total:,.0f} VND\n"
-            f"📝 Giao dịch: {count}\n"
-            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+            f"{category_display['other']} {month_display}:\n" 
+            f"{category_display['spend']}: {total:,.0f} VND\n"
+            f"{category_display['transaction']}: {count}\n"
+            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
         )
         
         if details:
@@ -1245,10 +1070,10 @@ async def investment(update, context):
         opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
 
         response = (
-            f"📈 Tổng kết chi tiêu đầu tư {month_display}\n"
-            f"💰 Tổng chi: {total:,.0f} VND\n"
-            f"📝 Giao dịch: {count}\n"
-            f"📊 So với {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n\n"
+            f"{category_display['investment']} {month_display}:\n" 
+            f"{category_display['spend']}: {total:,.0f} VND\n"
+            f"{category_display['transaction']}: {count}\n"
+            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n\n"
 
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 Phân bổ danh mục\n"
@@ -1483,11 +1308,12 @@ async def income(update, context):
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         response = (
-            f"💼 Tổng thu nhập {month_display}:\n"
-            f"💰 Lương: {salary_income:,.0f} VND\n"
-            f"💰 Freelance: {freelance_income:,.0f} VND\n"
-            f"💵 Tổng cộng: {total_income:,.0f} VND\n"
-            f"📊 So với {previous_month}: {total_income - prev_total_income:+,.0f} VND {percentage_text}\n"
+            f"{category_display['incom']} {month_display}:\n"
+            f"{category_display['salary']}: {salary_income:,.0f} VND\n"
+            f"{category_display['freelance']}: {freelance_income:,.0f} VND\n"
+            f"{category_display['total']}: {total_income:,.0f} VND\n"
+            f"{category_display['compare']} {previous_month}: {total_income - prev_total_income:+,.0f} VND {percentage_text}\n"
+
         )
         
         await update.message.reply_text(response)
@@ -1521,3 +1347,25 @@ async def handle_message(update, context):
             await update.message.reply_text(f"❌ Có lỗi xảy ra khi xử lý tin nhắn. Vui lòng thử lại!\n\nLỗi: {e}")
         except Exception as reply_error:
             logger.error(f"Failed to send error message in handle_message: {reply_error}")
+
+@safe_async_handler
+async def stats(update, context):
+    """Show dashboard link"""
+    dashboard_webapp = WebAppInfo(url="https://track-money-ui.vercel.app/")
+    keyboard = [[InlineKeyboardButton("📊 Mở Dashboard", web_app=dashboard_webapp)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "Biểu đồ thu nhập 🚀",
+        reply_markup=reply_markup
+    )
+
+@safe_async_handler
+async def categories(update, context):
+    """Show expense categories"""
+
+    message = f"{category_display['categories']} chi tiêu hiện có:\n\n"
+    for category, icon in CATEGORY_ICONS.items():
+        message += f"• {icon} {CATEGORY_NAMES[category]}\n"
+
+    await update.message.reply_text(message)

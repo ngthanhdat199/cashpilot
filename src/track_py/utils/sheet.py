@@ -1,6 +1,5 @@
 import os
 import unicodedata
-import re
 import gspread
 import time
 import re
@@ -8,17 +7,19 @@ from google.oauth2.service_account import Credentials
 from src.track_py.utils.logger import logger
 from src.track_py.config import config
 from src.track_py.utils.timezone import get_current_time
-from src.track_py.config import config, BASE_DIR, PROJECT_ROOT
+from src.track_py.config import config, PROJECT_ROOT
 from src.track_py.utils.logger import logger
-from src.track_py.const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, TOTAL_EXPENSE_CELL
+from src.track_py.const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, TOTAL_EXPENSE_CELL, MONTH_NAMES
+from src.track_py.utils.util import get_month_display
+from src.track_py.utils.category import category_display
 
 # Google Sheets setup
 try:
     scope = config["google_sheets"]["scopes"]
-    # credentials_path = os.path.join(BASE_DIR, config["google_sheets"]["credentials_file"])
     credentials_path = os.path.join(PROJECT_ROOT, config["google_sheets"]["credentials_file"])
     creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
     client = gspread.authorize(creds)
+
     # Open the specific Google Sheet by ID from the URL
     spreadsheet = client.open_by_key(config["google_sheets"]["spreadsheet_id"])
     logger.info(f"Google Sheets connected successfully using credentials from {credentials_path}")
@@ -737,8 +738,87 @@ def get_monthly_expense(sheet_name):
     
     return total
 
-# Convert markdown → HTML
-def markdown_to_html(text: str) -> str:
-    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"\*(.+?)\*", r"<i>\1</i>", text)
-    return text
+# helper for month response
+def get_month_response(sheet, records, time_with_offset):
+    summary = get_month_summary(records)
+    month_expenses = summary["expenses"]
+    total = summary["total"]
+    food_total = summary["food"]
+    dating_total = summary["dating"]
+    gas_total = summary["gas"]
+    rent_total = summary["rent"]
+    other_total = summary["other"]
+    long_invest_total = summary["long_investment"]
+    opportunity_invest_total = summary["opportunity_investment"]
+    investment_total = summary["investment"]
+    support_parent_total = summary["support_parent"]
+
+    # Get income from sheet
+    salary = sheet.acell(SALARY_CELL).value
+    freelance = sheet.acell(FREELANCE_CELL).value
+
+    # fallback from config if empty/invalid
+    if not salary or not str(salary).strip().isdigit():
+        salary = config["income"].get("salary", 0)
+    if not freelance or not str(freelance).strip().isdigit():
+        freelance = config["income"].get("freelance", 0)
+
+    # convert safely to int
+    salary = safe_int(salary)
+    freelance = safe_int(freelance)
+
+    total_income = salary + freelance
+
+    food_and_travel_total = food_total + gas_total + other_total
+    food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
+    rent_budget = config["budgets"].get("rent", 0)
+    long_invest_budget = config["budgets"].get("long_investment", 0)
+    opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
+    support_parent_budget = config["budgets"].get("support_parent", 0)
+    dating_budget = config["budgets"].get("dating", 0)
+
+    count = len(month_expenses)
+    month = time_with_offset.strftime("%m")
+    year = time_with_offset.strftime("%Y")
+    month_display = get_month_display(month, year)
+
+    # Calculate estimated amounts based on percentages and income
+    food_and_travel_estimate = total_income * (food_and_travel_budget / 100) if total_income > 0 else 0
+    rent_estimate = total_income * (rent_budget / 100) if total_income > 0 else 0
+    long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
+    opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
+    support_parent_estimate = total_income * (support_parent_budget / 100) if total_income > 0 else 0
+    dating_estimate = total_income * (dating_budget / 100) if total_income > 0 else 0
+
+    response = (
+        f"{category_display['summarized']} {month_display}:\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['income']}: {total_income:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n\n"
+
+        f"{category_display['estimate_budget']}:\n"
+        f"{category_display['rent']}: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
+        f"{category_display['food_travel']}: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
+        f"{category_display['support_parent']}: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
+        f"{category_display['dating']}: {dating_budget:.0f}% = {dating_estimate:,.0f} VND\n"
+        f"{category_display['long_investment']}: {long_invest_budget:.0f}% = {long_invest_estimate:,.0f} VND\n"
+        f"{category_display['opportunity_investment']}: {opportunity_invest_budget:.0f}% = {opportunity_invest_estimate:,.0f} VND\n\n"
+
+        f"{category_display['actual_spend']}:\n"
+        f"{category_display['rent']}: {rent_total:,.0f} VND ({rent_estimate - rent_total:+,.0f})\n"
+        f"{category_display['food_travel']}: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
+        f"{category_display['support_parent']}: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
+        f"{category_display['dating']}: {dating_total:,.0f} VND ({dating_estimate - dating_total:+,.0f})\n"
+        f"{category_display['long_investment']}: {long_invest_total:,.0f} VND ({long_invest_estimate - long_invest_total:+,.0f})\n"
+        f"{category_display['opportunity_investment']}: {opportunity_invest_total:,.0f} VND ({opportunity_invest_estimate - opportunity_invest_total:+,.0f})\n\n"
+
+        f"{category_display['detail']}:\n"
+        f"{category_display['rent']}: {rent_total:,.0f} VND\n"
+        f"{category_display['food']}: {food_total:,.0f} VND\n"
+        f"{category_display['gas']}: {gas_total:,.0f} VND\n"
+        f"{category_display['dating']}: {dating_total:,.0f} VND\n"
+        f"{category_display['investment']}: {investment_total:,.0f} VND\n"
+        f"{category_display['other']}: {other_total:,.0f} VND\n"
+    )
+
+    return response
