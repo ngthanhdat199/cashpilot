@@ -1308,7 +1308,7 @@ async def income(update, context):
         month_display = f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
 
         response = (
-            f"{category_display['incom']} {month_display}:\n"
+            f"{category_display['income']} {month_display}:\n"
             f"{category_display['salary']}: {salary_income:,.0f} VND\n"
             f"{category_display['freelance']}: {freelance_income:,.0f} VND\n"
             f"{category_display['total']}: {total_income:,.0f} VND\n"
