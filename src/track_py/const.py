@@ -46,7 +46,7 @@ def format_shortcuts():
     return "\n".join(lines)
 
 HELP_MSG = f"""
-📖 Hướng dẫn sử dụng Money Tracker Bot
+📖 Hướng dẫn sử dụng CashPilot
 
 ⚡ Danh sách shortcut:
 {format_shortcuts()}

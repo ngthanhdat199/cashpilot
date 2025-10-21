@@ -23,7 +23,7 @@ CORS(app,
 
 @app.route('/')
 def home():
-    response = jsonify({"message": "Money Tracker Bot is running with webhooks!"})
+    response = jsonify({"message": "CashPilot is running with webhooks!"})
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response
 

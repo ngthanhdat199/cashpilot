@@ -1,4 +1,4 @@
-# 💰 Money Tracker Bot
+# 💰 CashPilot
 
 A Vietnamese Telegram bot for tracking personal expenses and income with Google Sheets integration. This bot helps you log daily expenses, categorize spending, and analyze your financial habits through an intuitive Telegram interface.
 

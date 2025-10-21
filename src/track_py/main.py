@@ -15,7 +15,7 @@ def main():
             bot_app = setup_bot()
         
         logger.info("Bot started successfully with webhook support!")
-        print("🚀 Money Tracker Bot is running with webhooks...")
+        print("🚀 CashPilot is running with webhooks...")
         print("📊 Connected to Google Sheets")
         print(f"🔗 Webhook URL: {WEBHOOK_URL}")
         print("💬 Listening for webhook requests...")
