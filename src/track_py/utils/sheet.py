@@ -739,7 +739,7 @@ def get_monthly_expense(sheet_name):
     return total
 
 # helper for month response
-def get_month_response(sheet, records, time_with_offset):
+def get_month_response(records, sheet, time_with_offset):
     summary = get_month_summary(records)
     month_expenses = summary["expenses"]
     total = summary["total"]
