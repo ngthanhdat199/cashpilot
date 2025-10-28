@@ -131,6 +131,13 @@ TOTAL_EXPENSE_CELL = "G2"
 EXPECTED_HEADERS = ["Date", "Time", "VND", "Note", "Total per day", "SALARY", "FREELANCE"]
 
 # Category mappings with icons
+FOOD_TRAVEL = "food_and_travel"
+LONG_INVEST = "long_investment"
+RENT = "rent"
+OPPORTUNITY_INVEST = "opportunity_investment"
+SUPPORT_PARENT = "support_parent"
+DATING = "dating"
+
 CATEGORY_ICONS = {
     "food": "🍔",
     "gas": "⛽", 
@@ -192,10 +199,19 @@ CATEGORY_NAMES = {
 }
 
 CATEGORY_COLORS = {
-    "food_and_travel": "#F59E0B",        # Warm orange
-    "rent": "#10B981",                   # Teal green
-    "long_investment": "#2563EB",        # Deep blue
-    "opportunity_investment": "#8B5CF6", # Violet / Indigo
-    "support_parent": "#F9A8D4",         # Soft pink
-    "dating": "#EC4899",                 # Bright pink / coral
+    FOOD_TRAVEL: "#F59E0B",        # Warm orange
+    RENT: "#10B981",                   # Teal green
+    LONG_INVEST: "#2563EB",        # Deep blue
+    OPPORTUNITY_INVEST: "#8B5CF6", # Violet / Indigo
+    SUPPORT_PARENT: "#F9A8D4",         # Soft pink
+    DATING: "#EC4899",                 # Bright pink / coral
+}
+
+CATEGORY_CELLS = {
+    FOOD_TRAVEL: "L2",
+    RENT: "M2",
+    LONG_INVEST: "N2",
+    OPPORTUNITY_INVEST: "O2",
+    SUPPORT_PARENT: "P2",
+    DATING: "Q2",
 }

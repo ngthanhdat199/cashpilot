@@ -10,7 +10,7 @@ from src.track_py.utils.logger import logger
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.config import config, PROJECT_ROOT
 from src.track_py.utils.logger import logger
-from src.track_py.const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, TOTAL_EXPENSE_CELL, MONTH_NAMES
+from src.track_py.const import FOOD_KEYWORDS, DATING_KEYWORDS, TRANSPORT_KEYWORDS, RENT_KEYWORD, LONG_INVEST_KEYWORDS, SUPPORT_PARENT_KEYWORDS, OPPORTUNITY_INVEST_KEYWORDS, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, TOTAL_EXPENSE_CELL, CATEGORY_CELLS, FOOD_TRAVEL, LONG_INVEST, RENT, OPPORTUNITY_INVEST, SUPPORT_PARENT, DATING
 from src.track_py.utils.util import get_month_display
 from src.track_py.utils.category import category_display
 
@@ -246,20 +246,8 @@ def get_or_create_monthly_sheet(target_month=None):
                     # Create new sheet by duplicating the template
                     new_sheet = template_sheet.duplicate(new_sheet_name=sheet_name)
                     logger.info(f"Duplicated template sheet to create: {sheet_name}")
-                    
-                    # Clear only the data rows, keep headers and formatting
-                    # Get all values to identify where data starts (after headers)
-                    # try:
-                    #     all_values = new_sheet.get_all_values()
-                        
-                    #     if len(all_values) > 1:  # If there's more than just headers
-                    #         # Clear data from row 2 onwards (keep row 1 as headers)
-                    #         range_to_clear = f"A2:Z{len(all_values)}"
-                    #         new_sheet.batch_clear([range_to_clear])
-                    #         logger.info(f"Cleared data rows from new sheet: {range_to_clear}")
-                    # except Exception as clear_error:
-                    #     logger.warning(f"Could not clear template data: {clear_error}")
 
+                    # write salary and freelance income from config
                     salary_income = new_sheet.acell(SALARY_CELL).value
                     if not salary_income or salary_income.strip() == "":
                         salary_income = config["income"]["salary"]
@@ -269,6 +257,17 @@ def get_or_create_monthly_sheet(target_month=None):
                     if not freelance_income or freelance_income.strip() == "":
                         freelance_income = config["income"]["freelance"]
                         new_sheet.update_acell(FREELANCE_CELL, freelance_income)
+
+                    # write category percentages from config
+                    for category in config["budgets"]:
+                        if category not in CATEGORY_CELLS:
+                            continue
+
+                        cell = CATEGORY_CELLS[category]
+                        raw_value = new_sheet.acell(cell).value
+                        if not raw_value or raw_value.strip() == "":
+                            percent = config["budgets"][category]
+                            new_sheet.update_acell(cell, percent)
 
                     logger.info(f"Created new sheet from template: {sheet_name}")
                     return new_sheet
@@ -757,30 +756,17 @@ def get_month_response(records, sheet, time_with_offset):
     opportunity_invest_total = summary["opportunity_investment"]
     investment_total = summary["investment"]
     support_parent_total = summary["support_parent"]
-
-    # Get income from sheet
-    salary = sheet.acell(SALARY_CELL).value
-    freelance = sheet.acell(FREELANCE_CELL).value
-
-    # fallback from config if empty/invalid
-    if not salary or not str(salary).strip().isdigit():
-        salary = config["income"].get("salary", 0)
-    if not freelance or not str(freelance).strip().isdigit():
-        freelance = config["income"].get("freelance", 0)
-
-    # convert safely to int
-    salary = safe_int(salary)
-    freelance = safe_int(freelance)
-
-    total_income = salary + freelance
-
     food_and_travel_total = food_total + gas_total + other_total
-    food_and_travel_budget = config["budgets"].get("food_and_travel", 0)
-    rent_budget = config["budgets"].get("rent", 0)
-    long_invest_budget = config["budgets"].get("long_investment", 0)
-    opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
-    support_parent_budget = config["budgets"].get("support_parent", 0)
-    dating_budget = config["budgets"].get("dating", 0)
+
+    total_income = get_month_budget_by_sheet(sheet)
+
+    category_budget = get_category_percentages_by_sheet(sheet)
+    food_and_travel_budget = category_budget[FOOD_TRAVEL]
+    rent_budget = category_budget[RENT]
+    long_invest_budget = category_budget[LONG_INVEST]
+    opportunity_invest_budget = category_budget[OPPORTUNITY_INVEST]
+    support_parent_budget = category_budget[SUPPORT_PARENT]
+    dating_budget = category_budget[DATING]
 
     count = len(month_expenses)
     month = time_with_offset.strftime("%m")
@@ -974,3 +960,74 @@ async def get_month_budget(month):
     month_budget = salary + freelance
 
     return month_budget
+
+# helper for month budget by sheet
+def get_month_budget_by_sheet(current_sheet):
+    # Get income from sheet
+    result = current_sheet.batch_get([SALARY_CELL, FREELANCE_CELL])
+    salary = result[0][0][0] if result and len(result) > 0 and len(result[0]) > 0 else config["income"].get("salary", 0)
+    freelance = result[1][0][0] if result and len(result) > 1 and len(result[1]) > 0 else config["income"].get("freelance", 0)
+
+    # convert safely to int
+    salary = safe_int(salary)
+    freelance = safe_int(freelance)
+
+    return salary + freelance
+
+# helper for month budget percentages
+async def get_category_percentages_by_month(month):
+    current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
+
+    # Read budget percentages from relevant cells
+    percentages = {}
+    for category, cell in CATEGORY_CELLS.items():
+        raw_value = current_sheet.acell(cell).value
+
+        if not raw_value or not str(raw_value).strip().isdigit():
+            # Fallback to config if cell is empty/invalid
+            percentage = config["budgets"].get(category, 0)
+
+            # convert safely to int
+            percentages[category] = percentage
+
+    return percentages
+
+def get_category_percentages_by_sheet(current_sheet):
+    """
+    Reads all category percentages from a single row (L2:Q2) efficiently.
+    Falls back to config defaults if cells are empty or invalid.
+    """
+
+    try:
+        cell_range = "L2:Q2"
+        result = current_sheet.get(cell_range)  
+        row = result[0] if result else []
+        categories = list(CATEGORY_CELLS.keys())
+        percentages = {}
+
+        for i, category in enumerate(categories):
+            raw_value = row[i] if i < len(row) else None
+            if not raw_value or not str(raw_value).strip().isdigit():
+                percentages[category] = config["budgets"].get(category, 0)
+            else:
+                percentages[category] = int(raw_value)
+
+        return percentages
+
+    except Exception as e:
+        logger.error(f"Error fetching category percentages: {e}")
+        # 4️⃣ Fail-safe fallback to config defaults
+        return {cat: config["budgets"].get(cat, 0) for cat in CATEGORY_CELLS}
+
+
+# helper for get percentage spend for a category
+def get_category_percentage(current_sheet, category):
+    # current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
+    cell = CATEGORY_CELLS.get(category)
+    raw_value = current_sheet.acell(cell).value
+
+    if not raw_value or not str(raw_value).strip().isdigit():
+        percentage = config["budgets"].get(category, 0)
+
+    return percentage
+

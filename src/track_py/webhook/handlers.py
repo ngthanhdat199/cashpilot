@@ -3,13 +3,14 @@ from telegram import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMa
 from telegram.ext import CallbackContext
 import datetime
 import asyncio
+import time
 from collections import defaultdict
 from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
-from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, get_month_response, get_week_process_data, get_daily_process_data
+from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, get_month_response, get_week_process_data, get_daily_process_data, get_category_percentage, convert_values_to_records
 from src.track_py.utils.util import markdown_to_html
-from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES
+from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES, LONG_INVEST, OPPORTUNITY_INVEST
 from src.track_py.config import config, save_config
 from src.track_py.utils.category import category_display
 
@@ -445,14 +446,14 @@ async def month(update, context: CallbackContext):
             return
         
         try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
+            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+            logger.info(f"Retrieved {len(all_values)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
             await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
+
+        records = convert_values_to_records(all_values)
 
         response = get_month_response(records, current_sheet, now)
         await update.message.reply_text(response)
@@ -493,15 +494,14 @@ async def ai_analyze(update, context: CallbackContext):
             return
         
         try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
+            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+            logger.info(f"Retrieved {len(all_values)} records from sheet")
         except Exception as records_error:
             logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
             await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
         
+        records = convert_values_to_records(all_values)
         raw_data = get_month_response(records, current_sheet, now)
 
         client = InferenceClient(token=HUGGING_FACE_TOKEN)
@@ -578,24 +578,6 @@ async def gas(update, context):
 
         logger.info(f"Getting gas expenses for sheet {target_month}")
 
-        try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
-            return
-    
-        try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
-        except Exception as records_error:
-            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
-            return
-
         gas_expenses, total = get_gas_total(target_month)
         count = len(gas_expenses)
         logger.info(f"Found {count} gas expenses for this month with total {total} VND")
@@ -664,24 +646,6 @@ async def food(update, context):
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting food expenses for sheet {target_month}")
-
-        try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
-            return
-    
-        try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
-        except Exception as records_error:
-            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
-            return
 
         food_expenses, total = get_food_total(target_month)
         count = len(food_expenses)
@@ -752,24 +716,6 @@ async def dating(update, context):
 
         logger.info(f"Getting dating expenses for sheet {target_month}")
 
-        try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
-            return
-    
-        try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
-        except Exception as records_error:
-            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
-            return
-
         dating_expenses, total = get_dating_total(target_month)
         count = len(dating_expenses)
         logger.info(f"Found {count} dating expenses for this month with total {total} VND")
@@ -838,24 +784,6 @@ async def other(update, context):
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting other expenses for sheet {target_month}")
-
-        try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
-            return
-    
-        try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
-        except Exception as records_error:
-            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
-            return
 
         other_expenses, total = get_other_total(target_month)
         count = len(other_expenses)
@@ -927,21 +855,11 @@ async def investment(update, context):
         logger.info(f"Getting investment expenses for sheet {target_month}")
 
         try:
-            current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(f"Error getting/creating sheet {target_month}: {sheet_error}", exc_info=True)
             await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
-            return
-    
-        try:
-            records = await asyncio.to_thread(
-                lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-            )
-            logger.info(f"Retrieved {len(records)} records from sheet")
-        except Exception as records_error:
-            logger.error(f"Error retrieving records from sheet: {records_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}")
             return
 
         investment_expenses, total = get_investment_total(target_month)
@@ -976,8 +894,8 @@ async def investment(update, context):
 
         # Get income from sheet
         total_income = get_total_income(current_sheet)
-        long_invest_budget = config["budgets"].get("long_investment", 0)
-        opportunity_invest_budget = config["budgets"].get("opportunity_investment", 0)
+        long_invest_budget = get_category_percentage(current_sheet, LONG_INVEST)
+        opportunity_invest_budget = get_category_percentage(current_sheet, OPPORTUNITY_INVEST)
         long_invest_estimate = total_income * (long_invest_budget / 100) if total_income > 0 else 0
         opportunity_invest_estimate = total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
 

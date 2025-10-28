@@ -7,7 +7,7 @@ from src.track_py.utils.logger import logger
 from telegram import Update
 from src.track_py.webhook.bot import setup_bot, setup_bot_commands
 from src.track_py.const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME, WSGI_FILE, MONTH_NAMES_SHORT, CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_NAMES
-from src.track_py.utils.sheet import get_monthly_expense, get_records_summary_by_cat, get_current_time, get_week_process_data, get_daily_process_data, get_month_budget, get_cached_sheet_data, convert_values_to_records
+from src.track_py.utils.sheet import get_monthly_expense, get_records_summary_by_cat, get_current_time, get_week_process_data, get_daily_process_data, get_month_budget, get_cached_sheet_data, convert_values_to_records, get_category_percentages_by_month
 from src.track_py.config import config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask_cors import CORS
@@ -343,22 +343,16 @@ async def expense_dashboard():
         now = get_current_time()
         target_month = now.strftime("%m/%Y")
 
-        start = time.perf_counter()
         month_value = await asyncio.to_thread(get_cached_sheet_data, target_month)
-        end = time.perf_counter()
-        logger.info(f"Fetched month records for '{target_month}' in {end - start:.2f} seconds")
 
         # Get week and daily data concurrently
         week_data_task = get_week_process_data(now)
         daily_data_task = get_daily_process_data(now)
         month_budget_task = get_month_budget(target_month)
 
-        start = time.perf_counter()
         week_data, daily_data, month_budget = await asyncio.gather(
             week_data_task, daily_data_task, month_budget_task
         )
-        end = time.perf_counter()
-        logger.info(f"Fetched week and daily data in {end - start:.2f} seconds")
 
         # Get the worksheet for the target week
         week_expenses = week_data["week_expenses"]
@@ -396,15 +390,15 @@ async def expense_dashboard():
         week_categories = []  
         day_categories = []
 
-        config_budgets = config["budgets"]
+        category_percent = await get_category_percentages_by_month(target_month)
         cat_meta = {
             cat: {
                 "color": CATEGORY_COLORS.get(cat, "#000000"),
                 "icon": CATEGORY_ICONS.get(cat, "🌟"),
                 "name": CATEGORY_NAMES.get(cat, "Unknown"),
-                "percent": config_budgets.get(cat, 0)
+                "percent": category_percent[cat]
             }
-            for cat in config_budgets
+            for cat in category_percent
         }
 
         # for cat in budgets:
