@@ -977,19 +977,7 @@ def get_month_budget_by_sheet(current_sheet):
 # helper for month budget percentages
 async def get_category_percentages_by_month(month):
     current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
-
-    # Read budget percentages from relevant cells
-    percentages = {}
-    for category, cell in CATEGORY_CELLS.items():
-        raw_value = current_sheet.acell(cell).value
-
-        if not raw_value or not str(raw_value).strip().isdigit():
-            # Fallback to config if cell is empty/invalid
-            percentage = config["budgets"].get(category, 0)
-
-            # convert safely to int
-            percentages[category] = percentage
-
+    percentages = get_category_percentages_by_sheet(current_sheet)
     return percentages
 
 def get_category_percentages_by_sheet(current_sheet):
