@@ -10,9 +10,10 @@ from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
 from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, get_month_response, get_week_process_data, get_daily_process_data, get_category_percentage, convert_values_to_records
 from src.track_py.utils.util import markdown_to_html
-from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES, LONG_INVEST, OPPORTUNITY_INVEST
+from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES, LONG_INVEST, OPPORTUNITY_INVEST, TELEGRAM_TOKEN
 from src.track_py.config import config, save_config
 from src.track_py.utils.category import category_display
+from src.track_py.utils.bot import _background_tasks, _background_log_expense
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -93,7 +94,15 @@ async def help(update, context):
 
 @safe_async_handler
 async def log_expense(update, context):
-    """Log expense to Google Sheet with smart date/time parsing"""
+    """Log expense to Google Sheet with smart date/time parsing - Enhanced UX with Progressive Loading
+    
+    Features:
+    - Instant acknowledgment with estimated time
+    - Queue position tracking for multiple requests  
+    - Progress updates for batch operations
+    - Real-time completion feedback with timing
+    - Enhanced error messages with retry guidance
+    """
     text = update.message.text.strip()
     parts = text.split()
 
@@ -174,29 +183,44 @@ async def log_expense(update, context):
 
         logger.info(f"Parsed expense: {amount} VND on {entry_date} {entry_time} - {note} (sheet: {target_month})")
 
-        # OPTIMIZATION: Get or create the target month's sheet
-        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-
-        await asyncio.to_thread(
-            lambda: sheet.append_row(
-                [entry_date, entry_time, int(amount), note],
-                value_input_option='RAW'
-            )
+        # ENHANCED PRELOADING: Send immediate response with better loading UX
+        response = (
+            f"⚡ *Đã ghi nhận chi tiêu!*\n\n"
+            f"💰 {amount:,} VND\n"
+            f"📝 {note}\n"
+            f"📅 {entry_date} • {entry_time}\n\n"
+            f"🔄 *Đang đồng bộ với Google Sheets...*\n"
+            f"⏱️ _Ước tính: 2-3 giây_"
         )
+        sent_message = await update.message.reply_text(response, parse_mode='Markdown')
         
-        # Invalidate cache since we've updated the sheet
-        invalidate_sheet_cache(target_month)
-
-        # response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n� {entry_date} {entry_time}\n{position_msg}\n� Sheet: {target_month}"
-        response = f"✅ Đã ghi nhận:\n💰 {amount:,} VND\n📝 {note}\n📅 {entry_date} {entry_time}\n📄 Sheet: {target_month}"
-        await update.message.reply_text(response)
-
-        logger.info(f"Logged expense: {amount} VND - {note} at {entry_date} {entry_time} in sheet {target_month}")
+        # Start background task to actually log to Google Sheets
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        message_id = sent_message.message_id  # Store message ID for editing later
+        
+        # Get bot token reliably
+        try:
+            bot_token = context.bot.token
+        except Exception:
+            # Fallback to config token
+            bot_token = TELEGRAM_TOKEN
+        
+        # Create background task (fire and forget) but ensure it can complete
+        task = asyncio.create_task(_background_log_expense(
+            entry_date, entry_time, amount, note, target_month, user_id, chat_id, bot_token, message_id
+        ))
+        
+        # Add task to background tasks set for tracking
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+        
+        logger.info(f"Background logging task created for expense: {amount} VND - {note} at {entry_date} {entry_time}")
 
     except ValueError as ve:
         await update.message.reply_text("❌ Lỗi định dạng số tiền!\n\n📝 Các định dạng hỗ trợ:\n• 1000 ăn trưa\n• 02/09 5000 cafe\n• 02/09 08:30 15000 breakfast")
     except Exception as e:
-        logger.error(f"Error logging expense: {e}")
+        logger.error(f"Error in log_expense parsing: {e}")
         await update.message.reply_text(f"❌ Có lỗi xảy ra. Vui lòng thử lại!\n\nLỗi: {e}")
 
 @safe_async_handler
@@ -416,7 +440,6 @@ async def week(update, context: CallbackContext):
     except Exception as e:
         logger.error(f"Error in week command: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Không thể lấy dữ liệu. Vui lòng thử lại!\n\nLỗi: {e}")
-
 
 @safe_async_handler
 async def month(update, context: CallbackContext):
