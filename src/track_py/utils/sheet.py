@@ -3,9 +3,10 @@ import unicodedata
 import gspread
 import time
 import re
+import asyncio
+import datetime
 from google.oauth2.service_account import Credentials
 from src.track_py.utils.logger import logger
-from src.track_py.config import config
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.config import config, PROJECT_ROOT
 from src.track_py.utils.logger import logger
@@ -578,7 +579,7 @@ def get_support_parent_total(month):
         return [], 0
     
 # helper for totals summary
-def get_month_summary(records):
+def get_records_summary_by_cat(records):
     """Helper to get total expenses summary for a given month"""
     totals = {
         "expenses": [],
@@ -593,6 +594,7 @@ def get_month_summary(records):
         "essential": 0, # total of food + gas + rent + other
         "investment": 0,  # total of long_investment + opportunity_investment
         "support_parent": 0,
+        "food_and_travel": 0,
     }
 
     for r in records:
@@ -628,6 +630,9 @@ def get_month_summary(records):
             totals["other"] += amount
             totals["essential"] += amount
 
+    # Calculate food_and_travel total
+    totals["food_and_travel"] = totals["food"] + totals["gas"]
+
     return totals
 
 # helper for get total income
@@ -653,7 +658,7 @@ def get_total_income(sheet):
 # Performance optimization: Cache for sheet data to reduce API calls
 _sheet_cache = {}
 _worksheet_cache = {}
-_cache_timeout = 30  # Cache data for 30 seconds
+_cache_timeout = 300 # Cache timeout in seconds (5 minutes)
 
 def get_cached_worksheet(sheet_name, force_refresh=False):
     """Get cached worksheet object or fetch fresh if expired"""
@@ -740,7 +745,7 @@ def get_monthly_expense(sheet_name):
 
 # helper for month response
 def get_month_response(records, sheet, time_with_offset):
-    summary = get_month_summary(records)
+    summary = get_records_summary_by_cat(records)
     month_expenses = summary["expenses"]
     total = summary["total"]
     food_total = summary["food"]
@@ -798,7 +803,7 @@ def get_month_response(records, sheet, time_with_offset):
 
         f"{category_display['estimate_budget']}:\n"
         f"{category_display['rent']}: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
-        f"{category_display['food_travel']}: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
+        f"{category_display['food_and_travel']}: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
         f"{category_display['support_parent']}: {support_parent_budget:.0f}% = {support_parent_estimate:,.0f} VND\n"
         f"{category_display['dating']}: {dating_budget:.0f}% = {dating_estimate:,.0f} VND\n"
         f"{category_display['long_investment']}: {long_invest_budget:.0f}% = {long_invest_estimate:,.0f} VND\n"
@@ -806,7 +811,7 @@ def get_month_response(records, sheet, time_with_offset):
 
         f"{category_display['actual_spend']}:\n"
         f"{category_display['rent']}: {rent_total:,.0f} VND ({rent_estimate - rent_total:+,.0f})\n"
-        f"{category_display['food_travel']}: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
+        f"{category_display['food_and_travel']}: {food_and_travel_total:,.0f} VND ({food_and_travel_estimate - food_and_travel_total:+,.0f})\n"
         f"{category_display['support_parent']}: {support_parent_total:,.0f} VND ({support_parent_estimate - support_parent_total:+,.0f})\n"
         f"{category_display['dating']}: {dating_total:,.0f} VND ({dating_estimate - dating_total:+,.0f})\n"
         f"{category_display['long_investment']}: {long_invest_total:,.0f} VND ({long_invest_estimate - long_invest_total:+,.0f})\n"
@@ -822,3 +827,150 @@ def get_month_response(records, sheet, time_with_offset):
     )
 
     return response
+
+# Helper to get week's expenses from relevant month sheets
+async def get_week_process_data(time_with_offset):
+    now = time_with_offset
+    # Calculate week boundaries
+    week_start = now - datetime.timedelta(days=now.weekday())  # Monday
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = week_start + datetime.timedelta(days=6, hours=23, minutes=59, seconds=59)
+
+    logger.info(f"Getting week expenses from {week_start:%d/%m} to {week_end:%d/%m}")
+
+    # Collect all months the week spans
+    months_to_check = sorted({
+        (week_start + datetime.timedelta(days=i)).strftime("%m/%Y")
+        for i in range(7)
+    }, key=lambda s: datetime.datetime.strptime(s, "%m/%Y"))
+
+    week_expenses = []
+    total = 0.0
+    week_records = []
+
+    tasks = [
+        asyncio.to_thread(get_cached_sheet_data, month)
+        for month in months_to_check
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Process each relevant sheet
+    for target_month, all_values in zip(months_to_check, results):
+        try:
+            records = convert_values_to_records(all_values)
+            year = target_month.split("/")[1]
+            for r in records:
+                raw_date = (r.get("Date") or "").strip()
+                raw_amount = r.get("VND", 0)
+
+                if not raw_date or not raw_amount:
+                    continue
+
+                try:
+                    # Parse dd/mm with inferred year
+                    if "/" not in raw_date:
+                        continue
+                    day, month = raw_date.split("/")[:2]
+                    date_obj = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y")
+                    expense_date = date_obj.replace(tzinfo=week_start.tzinfo)
+
+                    if week_start <= expense_date <= week_end:
+                        amount = parse_amount(raw_amount)
+                        if amount == 0:
+                            continue
+                        r["expense_date"] = expense_date
+                        week_expenses.append(r)
+                        total += amount
+                        week_records.append(r)
+                except Exception as e:
+                    logger.debug(f"Skipping invalid date {raw_date} in {target_month}: {e}")
+                    continue
+
+        except Exception as sheet_error:
+            logger.warning(f"Could not access sheet {target_month}: {sheet_error}")
+            continue
+
+    # Prepare grouped details
+    count = len(week_expenses)
+    logger.info(f"Found {count} expenses with total {total} VND")
+
+    return {
+        "total": total,
+        "week_expenses": week_expenses,
+        "week_start": week_start,
+        "week_end": week_end,
+        "records": week_records,
+    }
+
+# Helper to get today's expenses from relevant month sheet
+async def get_daily_process_data(time_with_offset):
+    now = time_with_offset
+    today_str = now.strftime("%d/%m")
+    target_month = now.strftime("%m/%Y")
+    
+    logger.info(f"Getting today's expenses for {today_str} in sheet {target_month}")
+    
+    # OPTIMIZATION: Use cached data for better performance
+    try:
+        all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+        if not all_values or len(all_values) < 2:
+            return
+        logger.info(f"Retrieved {len(all_values)} rows from sheet (cached)")
+    except Exception as sheet_error:
+        logger.error(f"Error getting sheet data for {target_month}: {sheet_error}", exc_info=True)
+        return
+    
+    # OPTIMIZATION: Process data directly from values array
+    today_expenses = []
+    total = 0
+    today_records = []
+    
+    # Skip header row (index 0)
+    for row in all_values[1:]:
+        if len(row) >= 3:  # Need at least date, time, amount
+            record_date = row[0].strip().lstrip("'") if row[0] else ""
+            record_amount = row[2] if len(row) > 2 else 0
+            
+            if record_date == today_str and record_amount:
+                # Convert row to record format for compatibility
+                record = {
+                    "Date": record_date,
+                    "Time": row[1] if len(row) > 1 else "",
+                    "VND": record_amount,
+                    "Note": row[3] if len(row) > 3 else ""
+                }
+                today_expenses.append(record)
+                total += parse_amount(record_amount)
+                today_records.append(record)
+    
+    count = len(today_expenses)
+    logger.info(f"Found {count} expenses for today with total {total} VND")
+    logger.info(f"Today date string: '{today_str}', Rows processed: {len(all_values)}")  # Debug info
+
+    return {
+        "total": total,
+        "today_expenses": today_expenses,
+        "date_str": today_str,
+        "records": today_records,
+    }
+
+# helper for month budget
+async def get_month_budget(month):
+    current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
+
+    # Get income from sheet
+    salary = current_sheet.acell(SALARY_CELL).value
+    freelance = current_sheet.acell(FREELANCE_CELL).value
+
+    # fallback from config if empty/invalid
+    if not salary or not str(salary).strip().isdigit():
+        salary = config["income"].get("salary", 0)
+    if not freelance or not str(freelance).strip().isdigit():
+        freelance = config["income"].get("freelance", 0)
+
+    # convert safely to int
+    salary = safe_int(salary)
+    freelance = safe_int(freelance)
+    month_budget = salary + freelance
+
+    return month_budget

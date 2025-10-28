@@ -7,3 +7,4 @@ __pycache__/
 venv/
 src/track_py/__pycache__/
 test.py
+wsgi.py

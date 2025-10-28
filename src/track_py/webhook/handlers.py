@@ -7,7 +7,7 @@ from collections import defaultdict
 from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
-from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, get_month_summary, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, get_month_response
+from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, get_month_response, get_week_process_data, get_daily_process_data
 from src.track_py.utils.util import markdown_to_html
 from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES
 from src.track_py.config import config, save_config
@@ -339,48 +339,13 @@ async def today(update, context):
         
         now = get_current_time()
         # now = get_current_time() + datetime.timedelta(days=63)
-        today_str = now.strftime("%d/%m")
-        target_month = now.strftime("%m/%Y")
-        
-        logger.info(f"Getting today's expenses for {today_str} in sheet {target_month}")
-        
-        # OPTIMIZATION: Use cached data for better performance
-        try:
-            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
-            if not all_values or len(all_values) < 2:
-                await update.message.reply_text(f"📊 Hôm nay chưa có giao dịch nào ({today_str})")
-                return
-            logger.info(f"Retrieved {len(all_values)} rows from sheet (cached)")
-        except Exception as sheet_error:
-            logger.error(f"Error getting sheet data for {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
-            return
-        
-        # OPTIMIZATION: Process data directly from values array
-        today_expenses = []
-        total = 0
-        
-        # Skip header row (index 0)
-        for row in all_values[1:]:
-            if len(row) >= 3:  # Need at least date, time, amount
-                record_date = row[0].strip().lstrip("'") if row[0] else ""
-                record_amount = row[2] if len(row) > 2 else 0
-                
-                if record_date == today_str and record_amount:
-                    # Convert row to record format for compatibility
-                    record = {
-                        "Date": record_date,
-                        "Time": row[1] if len(row) > 1 else "",
-                        "VND": record_amount,
-                        "Note": row[3] if len(row) > 3 else ""
-                    }
-                    today_expenses.append(record)
-                    total += parse_amount(record_amount)
-        
+
+        today_data = await get_daily_process_data(now)
+        total = today_data["total"]
+        today_expenses = today_data["today_expenses"]
         count = len(today_expenses)
-        logger.info(f"Found {count} expenses for today with total {total} VND")
-        logger.info(f"Today date string: '{today_str}', Rows processed: {len(all_values)}")  # Debug info
-        
+        today_str = today_data["date_str"]
+
         response = (
             f"{category_display['summarized']} hôm nay ({today_str}):\n"
             f"{category_display['spend']}: {total:,.0f} VND\n"
@@ -416,65 +381,12 @@ async def week(update, context: CallbackContext):
     try:
         now = get_current_time() + datetime.timedelta(weeks=offset)
 
-        # Calculate week boundaries
-        week_start = now - datetime.timedelta(days=now.weekday())  # Monday
-        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
-        week_end = week_start + datetime.timedelta(days=6, hours=23, minutes=59, seconds=59)
-
-        logger.info(f"Getting week expenses from {week_start:%d/%m} to {week_end:%d/%m}")
-
-        # Collect all months the week spans
-        months_to_check = sorted({
-            (week_start + datetime.timedelta(days=i)).strftime("%m/%Y")
-            for i in range(7)
-        }, key=lambda s: datetime.datetime.strptime(s, "%m/%Y"))
-
-        week_expenses = []
-        total = 0.0
-
-        # Process each relevant sheet
-        for target_month in months_to_check:
-            try:
-                current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-                records = await asyncio.to_thread(
-                    lambda: current_sheet.get_all_records(expected_headers=EXPECTED_HEADERS)
-                )
-
-                year = target_month.split("/")[1]
-
-                for r in records:
-                    raw_date = (r.get("Date") or "").strip()
-                    raw_amount = r.get("VND", 0)
-
-                    if not raw_date or not raw_amount:
-                        continue
-
-                    try:
-                        # Parse dd/mm with inferred year
-                        if "/" not in raw_date:
-                            continue
-                        day, month = raw_date.split("/")[:2]
-                        date_obj = datetime.datetime.strptime(f"{day}/{month}/{year}", "%d/%m/%Y")
-                        expense_date = date_obj.replace(tzinfo=week_start.tzinfo)
-
-                        if week_start <= expense_date <= week_end:
-                            amount = parse_amount(raw_amount)
-                            if amount == 0:
-                                continue
-                            r["expense_date"] = expense_date
-                            week_expenses.append(r)
-                            total += amount
-                    except Exception as e:
-                        logger.debug(f"Skipping invalid date {raw_date} in {target_month}: {e}")
-                        continue
-
-            except Exception as sheet_error:
-                logger.warning(f"Could not access sheet {target_month}: {sheet_error}")
-                continue
-
-        # Prepare grouped details
+        week_data = await get_week_process_data(now)
+        total = week_data["total"]
+        week_expenses = week_data["week_expenses"]
         count = len(week_expenses)
-        logger.info(f"Found {count} expenses with total {total} VND")
+        week_start = week_data["week_start"]
+        week_end = week_data["week_end"]
 
         grouped = defaultdict(list)
         for r in week_expenses:

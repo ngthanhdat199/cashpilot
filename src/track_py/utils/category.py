@@ -13,7 +13,7 @@ def get_categories_display():
     food_display = f"{CATEGORY_ICONS.get('food')} {CATEGORY_NAMES.get('food')}"
     gas_display = f"{CATEGORY_ICONS.get('gas')} {CATEGORY_NAMES.get('gas')}"
     investment_display = f"{CATEGORY_ICONS.get('investment')} {CATEGORY_NAMES.get('investment')}"
-    food_travel_display = food_display + "/" + gas_display
+    food_and_travel_display = f"{CATEGORY_ICONS.get('food_and_travel')} {CATEGORY_NAMES.get('food_and_travel')}"
     summarized_display = f"{CATEGORY_ICONS.get('summarized')} {CATEGORY_NAMES.get('summarized')}"
     spend_display = f"{CATEGORY_ICONS.get('spend')} {CATEGORY_NAMES.get('spend')}"
     income_display = f"{CATEGORY_ICONS.get('income')} {CATEGORY_NAMES.get('income')}"
@@ -28,7 +28,7 @@ def get_categories_display():
 
     category_display = {
         "rent": rent_display,
-        "food_travel": food_travel_display,
+        "food_and_travel": food_and_travel_display,
         "support_parent": support_parent_display,
         "dating": dating_display,
         "long_investment": long_investment_display,

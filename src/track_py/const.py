@@ -134,6 +134,7 @@ EXPECTED_HEADERS = ["Date", "Time", "VND", "Note", "Total per day", "SALARY", "F
 CATEGORY_ICONS = {
     "food": "🍔",
     "gas": "⛽", 
+    "food_and_travel": "🍔/⛽",
     "dating": "💖",
     "long_investment": "📈",
     "opportunity_investment": "🚀",
@@ -167,6 +168,7 @@ CATEGORY_ICONS = {
 CATEGORY_NAMES = {
     "food": "Ăn uống",
     "gas": "Xăng / Đi lại", 
+    "food_and_travel": "Ăn uống & Đi lại",
     "dating": "Hẹn hò/Giải trí",
     "long_investment": "Đầu tư dài hạn",
     "opportunity_investment": "Đầu tư cơ hội",
@@ -187,4 +189,13 @@ CATEGORY_NAMES = {
     "freelance": "Làm thêm",
     "categories": "Danh mục",
     "total": "Tổng cộng",
+}
+
+CATEGORY_COLORS = {
+    "food_and_travel": "#F59E0B",        # Warm orange
+    "rent": "#10B981",                   # Teal green
+    "long_investment": "#2563EB",        # Deep blue
+    "opportunity_investment": "#8B5CF6", # Violet / Indigo
+    "support_parent": "#F9A8D4",         # Soft pink
+    "dating": "#EC4899",                 # Bright pink / coral
 }
