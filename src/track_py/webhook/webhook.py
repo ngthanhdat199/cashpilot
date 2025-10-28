@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify
 from src.track_py.utils.logger import logger
 from telegram import Update
 from src.track_py.webhook.bot import setup_bot, setup_bot_commands
-from src.track_py.webhook.handlers import wait_for_background_tasks, get_background_task_status
+from src.track_py.utils.bot import wait_for_background_tasks
 from src.track_py.const import bot_app, webhook_failures, last_failure_time, use_fresh_bots, MAX_FAILURES, FAILURE_RESET_TIME, WSGI_FILE, MONTH_NAMES_SHORT, CATEGORY_ICONS, CATEGORY_COLORS, CATEGORY_NAMES
 from src.track_py.utils.sheet import get_monthly_expense, get_records_summary_by_cat, get_current_time, get_week_process_data, get_daily_process_data, get_month_budget, get_cached_sheet_data, convert_values_to_records, get_category_percentages_by_month
 from src.track_py.config import config
