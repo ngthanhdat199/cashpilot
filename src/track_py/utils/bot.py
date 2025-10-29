@@ -1,5 +1,6 @@
 import asyncio
 import time
+from telegram import Bot
 from collections import defaultdict, deque
 from src.track_py.utils.logger import logger
 from src.track_py.utils.sheet import (
@@ -315,8 +316,6 @@ async def send_success_notification(expense_data, action):
         # Edit the original message to show success
         bot_token = expense_data.get("bot_token")
         if bot_token and expense_data.get("message_id"):
-            from telegram import Bot
-
             notification_bot = Bot(token=bot_token)
 
             success_message = (
@@ -345,7 +344,6 @@ async def send_success_notification(expense_data, action):
         # Fallback: send new message if editing fails
         try:
             if expense_data.get("bot_token"):
-                from telegram import Bot
 
                 fallback_bot = Bot(token=expense_data["bot_token"])
                 await fallback_bot.send_message(
@@ -365,8 +363,6 @@ async def send_error_notification(expense_data, error, action):
         # Edit the original message to show error
         bot_token = expense_data.get("bot_token")
         if bot_token and expense_data.get("message_id"):
-            from telegram import Bot
-
             notification_bot = Bot(token=bot_token)
 
             error_message = (
@@ -392,8 +388,6 @@ async def send_error_notification(expense_data, error, action):
             )
             # Fallback: send new message if editing fails
             if expense_data.get("bot_token"):
-                from telegram import Bot
-
                 fallback_bot = Bot(token=expense_data["bot_token"])
                 await fallback_bot.send_message(
                     chat_id=expense_data["chat_id"],
@@ -409,10 +403,7 @@ async def send_progress_update(expense_data, progress_message):
     try:
         bot_token = expense_data.get("bot_token")
         if bot_token and expense_data.get("message_id"):
-            from telegram import Bot
-
             notification_bot = Bot(token=bot_token)
-
             await notification_bot.edit_message_text(
                 chat_id=expense_data["chat_id"],
                 message_id=expense_data["message_id"],
@@ -469,8 +460,6 @@ async def background_log_expense(
                 f"⏳ _Ước tính: {queue_position * 2}-{queue_position * 3} giây_"
             )
             try:
-                from telegram import Bot
-
                 queue_bot = Bot(token=bot_token)
                 await queue_bot.edit_message_text(
                     chat_id=chat_id,
@@ -545,8 +534,6 @@ async def background_delete_expense(
                 f"⏳ _Ước tính: {queue_position * 2}-{queue_position * 3} giây_"
             )
             try:
-                from telegram import Bot
-
                 queue_bot = Bot(token=bot_token)
                 await queue_bot.edit_message_text(
                     chat_id=chat_id,
