@@ -215,3 +215,6 @@ CATEGORY_CELLS = {
     SUPPORT_PARENT: "P2",
     DATING: "Q2",
 }
+
+LOG_ACTION = "lưu chi tiêu"
+DELETE_ACTION = "xoá chi tiêu"

@@ -13,7 +13,7 @@ from src.track_py.utils.util import markdown_to_html
 from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES, LONG_INVEST, OPPORTUNITY_INVEST, TELEGRAM_TOKEN
 from src.track_py.config import config, save_config
 from src.track_py.utils.category import category_display
-from src.track_py.utils.bot import _background_tasks, _background_log_expense
+from src.track_py.utils.bot import _background_tasks, background_log_expense, background_delete_expense
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
@@ -185,12 +185,11 @@ async def log_expense(update, context):
 
         # ENHANCED PRELOADING: Send immediate response with better loading UX
         response = (
-            f"⚡ *Đã ghi nhận chi tiêu!*\n\n"
+            f"⚡ *Đã ghi nhận chi tiêu!*\n"
             f"💰 {amount:,} VND\n"
             f"📝 {note}\n"
             f"📅 {entry_date} • {entry_time}\n\n"
             f"🔄 *Đang đồng bộ với Google Sheets...*\n"
-            f"⏱️ _Ước tính: 2-3 giây_"
         )
         sent_message = await update.message.reply_text(response, parse_mode='Markdown')
         
@@ -207,7 +206,7 @@ async def log_expense(update, context):
             bot_token = TELEGRAM_TOKEN
         
         # Create background task (fire and forget) but ensure it can complete
-        task = asyncio.create_task(_background_log_expense(
+        task = asyncio.create_task(background_log_expense(
             entry_date, entry_time, amount, note, target_month, user_id, chat_id, bot_token, message_id
         ))
         
@@ -257,47 +256,33 @@ async def delete_expense(update, context):
                 target_month = f"{month}/{now.year}"
         
         logger.info(f"Target sheet: {target_month}")
-        
-        # OPTIMIZATION: Use cached data or fetch efficiently
+
+        response = (
+            f"🔄 *Đã ghi nhận xoá chi tiêu*\n"
+            f"📅 {entry_date} • {entry_time}\n\n"
+            f"📊 *Đang đồng bộ với Google Sheets...*\n"
+        )
+        sent_message = await update.message.reply_text(response, parse_mode='Markdown')
+
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        message_id = sent_message.message_id  # Store message ID for editing later
+
+        # Get bot token reliably
         try:
-            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
-            if not all_values or len(all_values) < 2:
-                await update.message.reply_text("❌ Không có dữ liệu trong sheet này.")
-                return
-            logger.info(f"Retrieved {len(all_values)} rows from sheet (cached)")
-        except Exception as sheet_error:
-            logger.error(f"Error getting sheet data for {target_month}: {sheet_error}", exc_info=True)
-            await update.message.reply_text(f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}")
-            return
+            bot_token = context.bot.token
+        except Exception:
+            # Fallback to config token
+            bot_token = TELEGRAM_TOKEN
         
-        # OPTIMIZATION: Search through values array instead of records (faster)
-        found_row = None
-        for i, row in enumerate(all_values[1:], start=2):  # Skip header row
-            if len(row) >= 2:
-                row_date = normalize_date(row[0].strip()) if row[0] else ""
-                row_time = normalize_time(row[1].strip()) if row[1] else ""
-                
-                if row_date == entry_date and row_time == entry_time:
-                    found_row = i
-                    break
-        
-        if found_row:
-            try:
-                current_sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
-                await asyncio.to_thread(lambda: current_sheet.delete_rows(found_row))
-                
-                # Invalidate cache since we've modified the sheet
-                invalidate_sheet_cache(target_month)
-                
-                logger.info(f"Successfully deleted expense: {entry_date} {entry_time} from row {found_row}")
-                await update.message.reply_text(f"✅ Đã xóa giao dịch: {entry_date} {entry_time}")
-                
-            except Exception as delete_error:
-                logger.error(f"Error deleting row {found_row}: {delete_error}", exc_info=True)
-                await update.message.reply_text(f"❌ Có lỗi xảy ra khi xóa giao dịch. Vui lòng thử lại!\n\nLỗi: {delete_error}")
-        else:
-            logger.warning(f"Expense not found: {entry_date} {entry_time}")
-            await update.message.reply_text(f"❌ Không tìm thấy giao dịch: {entry_date} {entry_time}")
+        # Create background task (fire and forget) but ensure it can complete
+        task = asyncio.create_task(background_delete_expense(
+            entry_date, entry_time, target_month, user_id, chat_id, bot_token, message_id
+        ))
+
+        # Add task to background tasks set for tracking
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
             
     except Exception as e:
         logger.error(f"Error in delete_expense for user {update.effective_user.id}: {e}", exc_info=True)
