@@ -12,24 +12,43 @@ MAX_FAILURES = 10
 FAILURE_RESET_TIME = 300  # 5 minutes
 TELEGRAM_TOKEN = config["telegram"]["bot_token"]
 WEBHOOK_URL = config["telegram"]["webhook_url"]
-WSGI_FILE = 'thanhdat19_pythonanywhere_com_wsgi.py'
+WSGI_FILE = "thanhdat19_pythonanywhere_com_wsgi.py"
 HUGGING_FACE_TOKEN = config["hugging_face"]["token"]
 
 # Get month name in Vietnamese
 MONTH_NAMES = {
-    "01": "tháng 1", "02": "tháng 2", "03": "tháng 3", "04": "tháng 4",
-    "05": "tháng 5", "06": "tháng 6", "07": "tháng 7", "08": "tháng 8", 
-    "09": "tháng 9", "10": "tháng 10", "11": "tháng 11", "12": "tháng 12"
+    "01": "tháng 1",
+    "02": "tháng 2",
+    "03": "tháng 3",
+    "04": "tháng 4",
+    "05": "tháng 5",
+    "06": "tháng 6",
+    "07": "tháng 7",
+    "08": "tháng 8",
+    "09": "tháng 9",
+    "10": "tháng 10",
+    "11": "tháng 11",
+    "12": "tháng 12",
 }
 
 MONTH_NAMES_SHORT = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
 ]
 
 SHORTCUTS = {
     "a": "ăn",
-    "s": "ăn sáng", 
+    "s": "ăn sáng",
     "t": "ăn trưa",
     "o": "ăn tối",
     "c": "cafe",
@@ -39,11 +58,13 @@ SHORTCUTS = {
     "n": "thuê nhà",
 }
 
+
 def format_shortcuts():
     lines = []
     for k, v in SHORTCUTS.items():
         lines.append(f"• {k} → {v}")
     return "\n".join(lines)
+
 
 HELP_MSG = f"""
 📖 Hướng dẫn sử dụng CashPilot
@@ -113,22 +134,61 @@ DELETE_EXPENSE_MSG = """
 """
 
 FOOD_KEYWORDS = ["ăn", "cơm", "hủ tiếu", "bánh cuốn", "uống", "nước"]
-DATING_KEYWORDS = ["hanuri", "matcha", "lẩu", "cá", "ốc", "bingsu", "kem", "phở", "hải sản", "mì cay", "gà rán", "dimsum", "cafe", "xem phim", "cơm gà", "pizza", "hẹn hò", "date"]
+DATING_KEYWORDS = [
+    "hanuri",
+    "matcha",
+    "lẩu",
+    "cá",
+    "ốc",
+    "bingsu",
+    "kem",
+    "phở",
+    "hải sản",
+    "mì cay",
+    "gà rán",
+    "dimsum",
+    "cafe",
+    "xem phim",
+    "cơm gà",
+    "pizza",
+    "hẹn hò",
+    "date",
+]
 TRANSPORT_KEYWORDS = ["grab", "giao hàng", "taxi", "bus", "gửi xe", "xăng"]
 LONG_INVEST_KEYWORDS = [
-    "chứng khoán", "cổ phiếu", "etf",
-    "bitcoin", "btc", "ethereum", "eth"
+    "chứng khoán",
+    "cổ phiếu",
+    "etf",
+    "bitcoin",
+    "btc",
+    "ethereum",
+    "eth",
 ]
 OPPORTUNITY_INVEST_KEYWORDS = [
-    "crypto", "altcoin", "sol", "avax", "link",
-    "growth stock", "small-cap", "thematic etf", "cổ phiếu tăng trưởng"
+    "crypto",
+    "altcoin",
+    "sol",
+    "avax",
+    "link",
+    "growth stock",
+    "small-cap",
+    "thematic etf",
+    "cổ phiếu tăng trưởng",
 ]
 RENT_KEYWORD = ["thuê nhà"]
 SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
 SALARY_CELL = "I2"
 FREELANCE_CELL = "J2"
 TOTAL_EXPENSE_CELL = "G2"
-EXPECTED_HEADERS = ["Date", "Time", "VND", "Note", "Total per day", "SALARY", "FREELANCE"]
+EXPECTED_HEADERS = [
+    "Date",
+    "Time",
+    "VND",
+    "Note",
+    "Total per day",
+    "SALARY",
+    "FREELANCE",
+]
 
 # Category mappings with icons
 FOOD_TRAVEL = "food_and_travel"
@@ -140,7 +200,7 @@ DATING = "dating"
 
 CATEGORY_ICONS = {
     "food": "🍔",
-    "gas": "⛽", 
+    "gas": "⛽",
     "food_and_travel": "🍔/⛽",
     "dating": "💖",
     "long_investment": "📈",
@@ -174,7 +234,7 @@ CATEGORY_ICONS = {
 
 CATEGORY_NAMES = {
     "food": "Ăn uống",
-    "gas": "Xăng / Đi lại", 
+    "gas": "Xăng / Đi lại",
     "food_and_travel": "Ăn uống & Đi lại",
     "dating": "Hẹn hò/Giải trí",
     "long_investment": "Đầu tư dài hạn",
@@ -199,12 +259,12 @@ CATEGORY_NAMES = {
 }
 
 CATEGORY_COLORS = {
-    FOOD_TRAVEL: "#F59E0B",        # Warm orange
-    RENT: "#10B981",                   # Teal green
-    LONG_INVEST: "#2563EB",        # Deep blue
-    OPPORTUNITY_INVEST: "#8B5CF6", # Violet / Indigo
-    SUPPORT_PARENT: "#F9A8D4",         # Soft pink
-    DATING: "#EC4899",                 # Bright pink / coral
+    FOOD_TRAVEL: "#F59E0B",  # Warm orange
+    RENT: "#10B981",  # Teal green
+    LONG_INVEST: "#2563EB",  # Deep blue
+    OPPORTUNITY_INVEST: "#8B5CF6",  # Violet / Indigo
+    SUPPORT_PARENT: "#F9A8D4",  # Soft pink
+    DATING: "#EC4899",  # Bright pink / coral
 }
 
 CATEGORY_CELLS = {
