@@ -366,7 +366,7 @@ async def today(update, context):
             details = "\n".join(
                 format_expense(r, i+1) for i, r in enumerate(today_expenses)
             )
-            response += f"\n\n📝 Chi tiết:\n{details}"
+            response += f"\n📝 Chi tiết:\n{details}"
 
         await update.message.reply_text(response)
         logger.info(f"Today summary sent successfully to user {update.effective_user.id}")
