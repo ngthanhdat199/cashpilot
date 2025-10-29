@@ -10,7 +10,7 @@ from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
 from src.track_py.utils.sheet import get_current_time, normalize_date, normalize_time, get_or_create_monthly_sheet, parse_amount, format_expense, get_gas_total, get_food_total, get_dating_total, get_other_total, safe_int, get_investment_total, get_total_income, get_cached_sheet_data, get_cached_worksheet, invalidate_sheet_cache, get_month_response, get_week_process_data, get_daily_process_data, get_category_percentage, convert_values_to_records
 from src.track_py.utils.util import markdown_to_html
-from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES, LONG_INVEST, OPPORTUNITY_INVEST, TELEGRAM_TOKEN
+from src.track_py.const import LOG_EXPENSE_MSG, DELETE_EXPENSE_MSG, FREELANCE_CELL, SALARY_CELL, EXPECTED_HEADERS, SHORTCUTS, HUGGING_FACE_TOKEN, CATEGORY_ICONS, CATEGORY_NAMES, LONG_INVEST, OPPORTUNITY_INVEST, TELEGRAM_TOKEN, LOG_ACTION, DELETE_ACTION
 from src.track_py.config import config, save_config
 from src.track_py.utils.category import category_display
 from src.track_py.utils.bot import _background_tasks, background_log_expense, background_delete_expense
@@ -185,7 +185,7 @@ async def log_expense(update, context):
 
         # ENHANCED PRELOADING: Send immediate response with better loading UX
         response = (
-            f"⚡ *Đã ghi nhận chi tiêu!*\n"
+            f"⚡ *Đã ghi nhận {LOG_ACTION}!*\n"
             f"💰 {amount:,} VND\n"
             f"📝 {note}\n"
             f"📅 {entry_date} • {entry_time}\n\n"
@@ -258,7 +258,7 @@ async def delete_expense(update, context):
         logger.info(f"Target sheet: {target_month}")
 
         response = (
-            f"🔄 *Đã ghi nhận xoá chi tiêu*\n"
+            f"🔄 *Đã ghi nhận {DELETE_ACTION}*\n"
             f"📅 {entry_date} • {entry_time}\n\n"
             f"📊 *Đang đồng bộ với Google Sheets...*\n"
         )

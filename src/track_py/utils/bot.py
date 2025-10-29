@@ -139,7 +139,7 @@ async def process_log_month_expenses(target_month, expenses):
         # Send progress update if processing takes longer than expected
         for expense_data in expenses:
             progress_message = (
-                f"⚡ *Đã ghi nhận chi tiêu!*\n"
+                f"⚡ *Đã ghi nhận {LOG_ACTION}!*\n"
                 f"💰 {expense_data['amount']:,} VND\n"
                 f"📝 {expense_data['note']}\n"
                 f"📅 {expense_data['entry_date']} • {expense_data['entry_time']}\n\n"
@@ -201,7 +201,7 @@ async def process_delete_month_expenses(target_month, expenses):
         # Send progress update if processing takes longer than expected
         for expense_data in expenses:
             progress_message = (
-                f"⚡ *Đã ghi nhận xoá chi tiêu!*\n"
+                f"⚡ *Đã ghi nhận {DELETE_ACTION}!*\n"
                 f"📅 {expense_data['entry_date']} • {expense_data['entry_time']}\n\n"
                 f"📊 *Đang xử lý batch ({len(expenses)} giao dịch)...*\n"
                 f"⏳ _Kết nối Google Sheets thành công_"
@@ -281,7 +281,7 @@ async def send_success_notification(expense_data, action):
             notification_bot = Bot(token=bot_token)
             
             success_message = (
-                f"✅ *Đã {action} thành công!*\n\n"
+                f"✅ *Đã {action} thành công!*\n"
                 f"💰 {expense_data['amount']:,} VND\n"
                 f"📝 {expense_data['note']}\n"
                 f"📅 {expense_data['entry_date']} • {expense_data['entry_time']}\n\n"
@@ -326,7 +326,7 @@ async def send_error_notification(expense_data, error, action):
             notification_bot = Bot(token=bot_token)
             
             error_message = (
-                f"❌ *Lỗi khi {action}*\n\n"
+                f"❌ *Lỗi khi {action}*\n"
                 f"💰 {expense_data['amount']:,} VND\n"
                 f"📝 {expense_data['note']}\n"
                 f"📅 {expense_data['entry_date']} • {expense_data['entry_time']}\n\n"
@@ -399,7 +399,7 @@ async def background_log_expense(entry_date, entry_time, amount, note, target_mo
         # Send queue position update if there are multiple items waiting
         if queue_position > 1:
             queue_update_message = (
-                f"⚡ *Đã ghi nhận chi tiêu!*\n"
+                f"⚡ *Đã ghi nhận {LOG_ACTION}!*\n"
                 f"💰 {amount:,} VND\n"
                 f"📝 {note}\n"
                 f"📅 {entry_date} • {entry_time}\n\n"
@@ -462,7 +462,7 @@ async def background_delete_expense(entry_date, entry_time, target_month, user_i
         # Send queue position update if there are multiple items waiting
         if queue_position > 1:
             queue_update_message = (
-                f"⚡ *Đã ghi nhận xoá chi tiêu!*\n"
+                f"⚡ *Đã ghi nhận {DELETE_ACTION}!*\n"
                 f"📅 {entry_date} • {entry_time}\n\n"
                 f"📋 *Vị trí trong hàng đợi: #{queue_position}*\n"
                 f"⏳ _Ước tính: {queue_position * 2}-{queue_position * 3} giây_"
