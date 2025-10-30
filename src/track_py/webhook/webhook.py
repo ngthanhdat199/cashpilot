@@ -169,40 +169,39 @@ def deploy():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Handle incoming webhook requests from Telegram"""
-    global bot_app, webhook_failures, last_failure_time
 
     try:
         logger.info("Webhook request received")
 
         # Check circuit breaker
         current_time = datetime.datetime.now()
-        if webhook_failures >= const.MAX_FAILURES:
+        if const.webhook_failures >= const.MAX_FAILURES:
             if (
-                last_failure_time
-                and (current_time - last_failure_time).seconds
+                const.last_failure_time
+                and (current_time - const.last_failure_time).seconds
                 < const.FAILURE_RESET_TIME
             ):
                 logger.warning(
-                    f"Circuit breaker open: {webhook_failures} failures, rejecting request"
+                    f"Circuit breaker open: {const.webhook_failures} failures, rejecting request"
                 )
                 return "Service temporarily unavailable", 503
             else:
                 # Reset the circuit breaker
                 logger.info("Resetting circuit breaker")
-                webhook_failures = 0
-                last_failure_time = None
+                const.webhook_failures = 0
+                const.last_failure_time = None
 
         # Ensure bot is initialized
-        if bot_app is None:
+        if const.bot_app is None:
             logger.info("Initializing bot application")
             try:
-                bot_app = setup_bot()
+                const.bot_app = setup_bot()
             except Exception as setup_error:
                 logger.error(
                     f"Failed to setup bot application: {setup_error}", exc_info=True
                 )
-                webhook_failures += 1
-                last_failure_time = current_time
+                const.webhook_failures += 1
+                const.last_failure_time = current_time
                 return "Bot setup failed", 500
 
         # Get the update from Telegram
@@ -299,15 +298,15 @@ def webhook():
                 logger.info("Using global bot instance")
 
                 # Initialize global bot if not already done
-                if not bot_app.running:
+                if not const.bot_app.running:
                     logger.info("Initializing global bot application")
-                    await bot_app.initialize()
+                    await const.bot_app.initialize()
                     # Set up commands for global bot instance
-                    await setup_bot_commands(bot_app)
+                    await setup_bot_commands(const.bot_app)
                     logger.info("Global bot application initialized successfully")
 
                 # Process the update with global instance (using original update object)
-                await bot_app.process_update(update)
+                await const.bot_app.process_update(update)
                 logger.info("Update processed successfully with global bot instance")
 
             except Exception as process_error:
@@ -387,10 +386,12 @@ def webhook():
             logger.info(f"Update processing thread started: {thread.name}")
 
             # Reset failure count on successful processing start
-            if webhook_failures > 0:
-                logger.info(f"Resetting failure count from {webhook_failures} to 0")
-                webhook_failures = 0
-                last_failure_time = None
+            if const.webhook_failures > 0:
+                logger.info(
+                    f"Resetting failure count from {const.webhook_failures} to 0"
+                )
+                const.webhook_failures = 0
+                const.last_failure_time = None
 
             # Don't wait for the thread to complete, return immediately
             return "OK", 200
@@ -399,14 +400,14 @@ def webhook():
             logger.error(
                 f"Error starting processing thread: {thread_error}", exc_info=True
             )
-            webhook_failures += 1
-            last_failure_time = datetime.datetime.now()
+            const.webhook_failures += 1
+            const.last_failure_time = datetime.datetime.now()
             return "Error starting processing thread", 500
 
     except Exception as e:
         logger.error(f"Unexpected error in webhook: {e}", exc_info=True)
-        webhook_failures += 1
-        last_failure_time = datetime.datetime.now()
+        const.webhook_failures += 1
+        const.last_failure_time = datetime.datetime.now()
         return "Internal server error", 500
 
 

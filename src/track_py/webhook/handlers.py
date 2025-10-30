@@ -171,7 +171,7 @@ async def log_expense(update, context):
                 expanded_parts.append(shortcuts.get(part.lower(), part))
             note = " ".join(expanded_parts)
 
-            now = sheet.get_current_time()
+            # now = sheet.get_current_time()
             # now = get_current_time() + datetime.timedelta(days=63)
             entry_date = sheet.get_current_time().strftime("%d/%m")
             entry_time = sheet.get_current_time().strftime("%H:%M:%S")
@@ -384,7 +384,9 @@ async def sort(update, context):
         if context.args and len(context.args) > 0:
             target_month = context.args[0]
 
-        sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
+        current_sheet = await asyncio.to_thread(
+            sheet.get_cached_worksheet, target_month
+        )
 
         # Get all data
         all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, target_month)
@@ -413,7 +415,7 @@ async def sort(update, context):
 
             # Update the sorted data
             await asyncio.to_thread(
-                lambda: sheet.update(
+                lambda: current_sheet.update(
                     f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
                 )
             )
@@ -1215,7 +1217,7 @@ async def freelance(update, context):
                 offset = int(args[0])
             except ValueError:
                 offset = 0
-            amount = sheet.safe_int(args[1])
+            amount = current_sheet.safe_int(args[1])
     else:
         await update.message.reply_text(
             "❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'"
@@ -1235,10 +1237,12 @@ async def freelance(update, context):
         month_display = (
             f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         )
-        sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
+        current_sheet = await asyncio.to_thread(
+            sheet.get_cached_worksheet, target_month
+        )
 
         amount = amount * 1000
-        sheet.update_acell(const.FREELANCE_CELL, amount)
+        current_sheet.update_acell(const.FREELANCE_CELL, amount)
 
         # Update config
         if offset == 0:
@@ -1311,10 +1315,10 @@ async def salary(update, context):
         month_display = (
             f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         )
-        sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
+        current_sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
 
         amount = amount * 1000
-        sheet.update_acell(const.SALARY_CELL, amount)
+        current_sheet.update_acell(const.SALARY_CELL, amount)
 
         if offset == 0:
             # Update config
