@@ -11,6 +11,7 @@ use_fresh_bots = True  # Flag to enable/disable fresh bot instances
 MAX_FAILURES = 10
 FAILURE_RESET_TIME = 300  # 5 minutes
 TELEGRAM_TOKEN = config["telegram"]["bot_token"]
+CHAT_ID = config["telegram"]["chat_id"]
 WEBHOOK_URL = config["telegram"]["webhook_url"]
 WSGI_FILE = "thanhdat19_pythonanywhere_com_wsgi.py"
 HUGGING_FACE_TOKEN = config["hugging_face"]["token"]

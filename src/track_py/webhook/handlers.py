@@ -16,7 +16,6 @@ from src.track_py.utils.sheet import (
     get_current_time,
     normalize_date,
     normalize_time,
-    get_or_create_monthly_sheet,
     parse_amount,
     format_expense,
     get_gas_total,
@@ -424,10 +423,10 @@ async def sort(update, context):
         if context.args and len(context.args) > 0:
             target_month = context.args[0]
 
-        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
 
         # Get all data
-        all_values = await asyncio.to_thread(lambda: sheet.get_values("A:D"))
+        all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
 
         if len(all_values) > 2:  # More than header + 1 row
             data_rows = all_values[1:]
@@ -1263,7 +1262,7 @@ async def freelance(update, context):
         month_display = (
             f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         )
-        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
 
         amount = amount * 1000
         sheet.update_acell(FREELANCE_CELL, amount)
@@ -1339,7 +1338,7 @@ async def salary(update, context):
         month_display = (
             f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         )
-        sheet = await asyncio.to_thread(get_or_create_monthly_sheet, target_month)
+        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
 
         amount = amount * 1000
         sheet.update_acell(SALARY_CELL, amount)
@@ -1392,9 +1391,7 @@ async def income(update, context):
         logger.info(f"Getting income summary for sheet {target_month}")
 
         try:
-            current_sheet = await asyncio.to_thread(
-                get_or_create_monthly_sheet, target_month
-            )
+            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(
@@ -1408,7 +1405,7 @@ async def income(update, context):
 
         try:
             previous_sheet = await asyncio.to_thread(
-                get_or_create_monthly_sheet, previous_month
+                get_cached_worksheet, previous_month
             )
             logger.info(f"Successfully obtained sheet for {previous_month}")
         except Exception as prev_sheet_error:

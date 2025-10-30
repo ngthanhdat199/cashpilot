@@ -5,7 +5,9 @@ import time
 import re
 import asyncio
 import datetime
+from dateutil.relativedelta import relativedelta
 from google.oauth2.service_account import Credentials
+from gspread.utils import a1_to_rowcol
 from src.track_py.utils.logger import logger
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.config import config, PROJECT_ROOT
@@ -20,7 +22,6 @@ from src.track_py.const import (
     OPPORTUNITY_INVEST_KEYWORDS,
     FREELANCE_CELL,
     SALARY_CELL,
-    EXPECTED_HEADERS,
     TOTAL_EXPENSE_CELL,
     CATEGORY_CELLS,
     FOOD_TRAVEL,
@@ -316,16 +317,23 @@ def get_or_create_monthly_sheet(target_month=None):
                     new_sheet = template_sheet.duplicate(new_sheet_name=sheet_name)
                     logger.info(f"Duplicated template sheet to create: {sheet_name}")
 
+                    cells_to_update = []
                     # write salary and freelance income from config
                     salary_income = new_sheet.acell(SALARY_CELL).value
                     if not salary_income or salary_income.strip() == "":
                         salary_income = config["income"]["salary"]
-                        new_sheet.update_acell(SALARY_CELL, salary_income)
+                        row, col = a1_to_rowcol(SALARY_CELL)
+                        cells_to_update.append(
+                            gspread.Cell(row=row, col=col, value=salary_income)
+                        )
 
                     freelance_income = new_sheet.acell(FREELANCE_CELL).value
                     if not freelance_income or freelance_income.strip() == "":
                         freelance_income = config["income"]["freelance"]
-                        new_sheet.update_acell(FREELANCE_CELL, freelance_income)
+                        row, col = a1_to_rowcol(FREELANCE_CELL)
+                        cells_to_update.append(
+                            gspread.Cell(row=row, col=col, value=freelance_income)
+                        )
 
                     # write category percentages from config
                     for category in config["budgets"]:
@@ -333,10 +341,21 @@ def get_or_create_monthly_sheet(target_month=None):
                             continue
 
                         cell = CATEGORY_CELLS[category]
-                        raw_value = new_sheet.acell(cell).value
+                        raw_value = new_sheet.acell(
+                            cell, value_render_option="UNFORMATTED_VALUE"
+                        ).value
                         if not raw_value or raw_value.strip() == "":
-                            percent = config["budgets"][category]
-                            new_sheet.update_acell(cell, percent)
+                            percent = f"{config['budgets'][category]}%"
+                            row, col = a1_to_rowcol(cell)
+                            cells_to_update.append(
+                                gspread.Cell(row=row, col=col, value=percent)
+                            )
+
+                    # update cells in batch to reduce API calls
+                    if cells_to_update:
+                        new_sheet.update_cells(
+                            cells_to_update, value_input_option="USER_ENTERED"
+                        )
 
                     logger.info(f"Created new sheet from template: {sheet_name}")
                     return new_sheet
@@ -1207,11 +1226,9 @@ def get_category_percentages_by_sheet(current_sheet):
 
 
 # helper for get percentage spend for a category
-def get_category_percentage(current_sheet, category):
-    # current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
+def get_category_percentage(current_sheet: gspread.Worksheet, category):
     cell = CATEGORY_CELLS.get(category)
-    raw_value = current_sheet.acell(cell).value
-
+    raw_value = current_sheet.acell(cell, value_render_option="UNFORMATTED_VALUE").value
     if not raw_value or not str(raw_value).strip().isdigit():
         percentage = config["budgets"].get(category, 0)
 

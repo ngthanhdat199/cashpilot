@@ -3,8 +3,11 @@ import asyncio
 import threading
 import time
 from flask import Flask, request, jsonify
+from dateutil.relativedelta import relativedelta
 from src.track_py.utils.logger import logger
 from telegram import Update
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from flask_cors import CORS
 from src.track_py.webhook.bot import setup_bot, setup_bot_commands
 from src.track_py.utils.bot import wait_for_background_tasks
 from src.track_py.const import (
@@ -23,7 +26,6 @@ from src.track_py.const import (
 from src.track_py.utils.sheet import (
     get_monthly_expense,
     get_records_summary_by_cat,
-    get_current_time,
     get_week_process_data,
     get_daily_process_data,
     get_month_budget,
@@ -31,9 +33,8 @@ from src.track_py.utils.sheet import (
     convert_values_to_records,
     get_category_percentages_by_month,
 )
-from src.track_py.config import config
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from flask_cors import CORS
+from src.track_py.utils.timezone import get_current_time
+from src.track_py.scheduler.job import scheduler, start_scheduler, monthly_sheet_job
 
 # Flask app for webhook
 app = Flask(__name__)
@@ -47,12 +48,84 @@ CORS(
     supports_credentials=True,
 )
 
+# Start the scheduler when the module is loaded
+start_scheduler()
+
 
 @app.route("/")
 def home():
-    response = jsonify({"message": "CashPilot is running with webhooks!"})
+    response = jsonify(
+        {
+            "message": "CashPilot is running with webhooks!",
+            "scheduler_status": "running" if scheduler.running else "stopped",
+            "scheduled_jobs": len(scheduler.get_jobs()),
+        }
+    )
     response.headers.add("Access-Control-Allow-Origin", "*")
     return response
+
+
+@app.route("/create_next_month_sheet", methods=["POST"])
+def manual_create_next_month_sheet():
+    """Manual endpoint to trigger next month sheet creation for testing"""
+    try:
+        logger.info("📋 Manual sheet creation triggered via API")
+        success = monthly_sheet_job()
+
+        if success:
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "message": "Next month's sheet created successfully",
+                    }
+                ),
+                200,
+            )
+        else:
+            return (
+                jsonify(
+                    {"success": False, "message": "Failed to create next month's sheet"}
+                ),
+                500,
+            )
+
+    except Exception as e:
+        logger.error(f"Error in manual sheet creation: {e}", exc_info=True)
+        return jsonify({"success": False, "message": f"Error: {str(e)}"}), 500
+
+
+@app.route("/scheduler/status", methods=["GET"])
+def scheduler_status():
+    """Get scheduler status and job information"""
+    try:
+        jobs = []
+        for job in scheduler.get_jobs():
+            jobs.append(
+                {
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": (
+                        job.next_run_time.isoformat() if job.next_run_time else None
+                    ),
+                    "trigger": str(job.trigger),
+                }
+            )
+
+        return (
+            jsonify(
+                {
+                    "scheduler_running": scheduler.running,
+                    "jobs": jobs,
+                    "timezone": str(scheduler.timezone),
+                }
+            ),
+            200,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting scheduler status: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/deploy", methods=["POST"])

@@ -10,7 +10,7 @@ from src.track_py.utils.sheet import (
     convert_values_to_records,
     parse_amount,
 )
-from src.track_py.const import LOG_ACTION, DELETE_ACTION
+from src.track_py.const import LOG_ACTION, DELETE_ACTION, TELEGRAM_TOKEN, CHAT_ID
 
 # Background expense logging queue for better performance
 log_expense_queue = deque()
@@ -150,7 +150,7 @@ async def process_delete_expense_queue():
 async def process_log_month_expenses(target_month, expenses):
     """Process all expenses for a specific month"""
     try:
-        logger.info(f"Processing expenses for month: {target_month}")
+        logger.info(f"Processing log expenses for month: {target_month}")
 
         # Send progress update if processing takes longer than expected
         for expense_data in expenses:
@@ -183,12 +183,16 @@ async def process_log_month_expenses(target_month, expenses):
         if len(rows_to_append) == 1:
             # Single expense - use append_row
             await asyncio.to_thread(
-                lambda: sheet.append_row(rows_to_append[0], value_input_option="RAW")
+                lambda: sheet.append_row(
+                    rows_to_append[0], value_input_option="RAW", table_range="A2:D"
+                )
             )
         else:
             # Multiple expenses - use batch append
             await asyncio.to_thread(
-                lambda: sheet.append_rows(rows_to_append, value_input_option="RAW")
+                lambda: sheet.append_rows(
+                    rows_to_append, value_input_option="RAW", table_range="A2:D"
+                )
             )
 
         # Invalidate cache since we've updated the sheet
@@ -215,7 +219,7 @@ async def process_log_month_expenses(target_month, expenses):
 async def process_delete_month_expenses(target_month, expenses):
     """Process all expenses for a specific month"""
     try:
-        logger.info(f"Processing expenses for month: {target_month}")
+        logger.info(f"Processing delete expenses for month: {target_month}")
 
         # Send progress update if processing takes longer than expected
         for expense_data in expenses:
@@ -414,6 +418,20 @@ async def send_progress_update(expense_data, progress_message):
 
     except Exception as progress_error:
         logger.warning(f"Could not send progress update: {progress_error}")
+
+
+async def send_message(text, parse_mode="Markdown"):
+    """Utility to send message via bot token"""
+    try:
+        bot = Bot(token=TELEGRAM_TOKEN)
+        await bot.send_message(
+            chat_id=CHAT_ID,
+            text=text,
+            parse_mode=parse_mode,
+        )
+        logger.info(f"Message sent to chat {CHAT_ID}")
+    except Exception as send_error:
+        logger.error(f"Failed to send message to chat {CHAT_ID}: {send_error}")
 
 
 async def background_log_expense(
