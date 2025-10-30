@@ -5,32 +5,13 @@ import time
 import re
 import asyncio
 import datetime
-from dateutil.relativedelta import relativedelta
 from google.oauth2.service_account import Credentials
 from gspread.utils import a1_to_rowcol
 from src.track_py.utils.logger import logger
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.config import config, PROJECT_ROOT
 from src.track_py.utils.logger import logger
-from src.track_py.const import (
-    FOOD_KEYWORDS,
-    DATING_KEYWORDS,
-    TRANSPORT_KEYWORDS,
-    RENT_KEYWORD,
-    LONG_INVEST_KEYWORDS,
-    SUPPORT_PARENT_KEYWORDS,
-    OPPORTUNITY_INVEST_KEYWORDS,
-    FREELANCE_CELL,
-    SALARY_CELL,
-    TOTAL_EXPENSE_CELL,
-    CATEGORY_CELLS,
-    FOOD_TRAVEL,
-    LONG_INVEST,
-    RENT,
-    OPPORTUNITY_INVEST,
-    SUPPORT_PARENT,
-    DATING,
-)
+import src.track_py.const as const
 from src.track_py.utils.util import get_month_display
 from src.track_py.utils.category import category_display
 
@@ -319,28 +300,28 @@ def get_or_create_monthly_sheet(target_month=None):
 
                     cells_to_update = []
                     # write salary and freelance income from config
-                    salary_income = new_sheet.acell(SALARY_CELL).value
+                    salary_income = new_sheet.acell(const.SALARY_CELL).value
                     if not salary_income or salary_income.strip() == "":
                         salary_income = config["income"]["salary"]
-                        row, col = a1_to_rowcol(SALARY_CELL)
+                        row, col = a1_to_rowcol(const.SALARY_CELL)
                         cells_to_update.append(
                             gspread.Cell(row=row, col=col, value=salary_income)
                         )
 
-                    freelance_income = new_sheet.acell(FREELANCE_CELL).value
+                    freelance_income = new_sheet.acell(const.FREELANCE_CELL).value
                     if not freelance_income or freelance_income.strip() == "":
                         freelance_income = config["income"]["freelance"]
-                        row, col = a1_to_rowcol(FREELANCE_CELL)
+                        row, col = a1_to_rowcol(const.FREELANCE_CELL)
                         cells_to_update.append(
                             gspread.Cell(row=row, col=col, value=freelance_income)
                         )
 
                     # write category percentages from config
                     for category in config["budgets"]:
-                        if category not in CATEGORY_CELLS:
+                        if category not in const.const.const.TRANSPORT_KEYWORDS:
                             continue
 
-                        cell = CATEGORY_CELLS[category]
+                        cell = const.const.const.TRANSPORT_KEYWORDS[category]
                         raw_value = new_sheet.acell(
                             cell, value_render_option="UNFORMATTED_VALUE"
                         ).value
@@ -420,7 +401,7 @@ def get_gas_total(month):
 
         for r in records:
             note = r.get("Note", "").lower()
-            if has_keyword(note, TRANSPORT_KEYWORDS):
+            if has_keyword(note, const.TRANSPORT_KEYWORDS):
                 amount = r.get("VND", 0)
                 if amount:
                     gas_expenses.append(r)
@@ -445,7 +426,7 @@ def get_food_total(month):
 
         for r in records:
             note = r.get("Note", "").lower()
-            if has_keyword(note, FOOD_KEYWORDS):
+            if has_keyword(note, const.FOOD_KEYWORDS):
                 amount = r.get("VND", 0)
                 if amount:
                     food_expenses.append(r)
@@ -477,7 +458,7 @@ def get_dating_total(month):
                     "Note": row[3] if len(row) > 3 else "",
                 }
                 note = r.get("Note", "").lower()
-                if has_keyword(note, DATING_KEYWORDS):
+                if has_keyword(note, const.DATING_KEYWORDS):
                     amount = r.get("VND", 0)
                     if amount:
                         date_expenses.append(r)
@@ -509,7 +490,7 @@ def get_rent_total(month):
                     "Note": row[3] if len(row) > 3 else "",
                 }
                 note = r.get("Note", "").lower()
-                if RENT_KEYWORD in note:
+                if const.RENT_KEYWORD in note:
                     amount = r.get("VND", 0)
                     if amount:
                         rent_expenses.append(r)
@@ -542,13 +523,13 @@ def get_other_total(month):
                 }
                 note = r.get("Note", "").lower()
                 if not (
-                    has_keyword(note, FOOD_KEYWORDS)
-                    or has_keyword(note, DATING_KEYWORDS)
-                    or has_keyword(note, TRANSPORT_KEYWORDS)
-                    or has_keyword(note, LONG_INVEST_KEYWORDS)
-                    or has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS)
-                    or has_keyword(note, SUPPORT_PARENT_KEYWORDS)
-                    or has_keyword(note, RENT_KEYWORD)
+                    has_keyword(note, const.FOOD_KEYWORDS)
+                    or has_keyword(note, const.DATING_KEYWORDS)
+                    or has_keyword(note, const.TRANSPORT_KEYWORDS)
+                    or has_keyword(note, const.LONG_INVEST_KEYWORDS)
+                    or has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS)
+                    or has_keyword(note, const.SUPPORT_PARENT_KEYWORDS)
+                    or has_keyword(note, const.RENT_KEYWORD)
                 ):
                     amount = r.get("VND", 0)
                     if amount:
@@ -581,7 +562,7 @@ def get_long_investment_total(month):
                     "Note": row[3] if len(row) > 3 else "",
                 }
                 note = r.get("Note", "").lower()
-                if has_keyword(note, LONG_INVEST_KEYWORDS):
+                if has_keyword(note, const.LONG_INVEST_KEYWORDS):
                     amount = r.get("VND", 0)
                     if amount:
                         invest_expenses.append(r)
@@ -612,7 +593,7 @@ def get_opportunity_investment_total(month):
                     "Note": row[3] if len(row) > 3 else "",
                 }
                 note = r.get("Note", "").lower()
-                if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
+                if has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS):
                     amount = r.get("VND", 0)
                     if amount:
                         invest_expenses.append(r)
@@ -646,8 +627,8 @@ def get_investment_total(month):
                     "Note": row[3] if len(row) > 3 else "",
                 }
                 note = r.get("Note", "").lower()
-                if has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS) or has_keyword(
-                    note, LONG_INVEST_KEYWORDS
+                if has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS) or has_keyword(
+                    note, const.LONG_INVEST_KEYWORDS
                 ):
                     amount = r.get("VND", 0)
                     if amount:
@@ -683,7 +664,7 @@ def get_support_parent_total(month):
                     "Note": row[3] if len(row) > 3 else "",
                 }
                 note = r.get("Note", "").lower()
-                if has_keyword(note, SUPPORT_PARENT_KEYWORDS):
+                if has_keyword(note, const.SUPPORT_PARENT_KEYWORDS):
                     amount = r.get("VND", 0)
                     if amount:
                         support_parent_expenses.append(r)
@@ -726,24 +707,24 @@ def get_records_summary_by_cat(records):
         totals["expenses"].append(r)
         totals["total"] += amount
 
-        if has_keyword(note, FOOD_KEYWORDS):
+        if has_keyword(note, const.FOOD_KEYWORDS):
             totals["food"] += amount
             totals["essential"] += amount
-        elif has_keyword(note, TRANSPORT_KEYWORDS):
+        elif has_keyword(note, const.TRANSPORT_KEYWORDS):
             totals["gas"] += amount
             totals["essential"] += amount
-        elif has_keyword(note, RENT_KEYWORD):
+        elif has_keyword(note, const.RENT_KEYWORD):
             totals["rent"] += amount
             totals["essential"] += amount
-        elif has_keyword(note, DATING_KEYWORDS):
+        elif has_keyword(note, const.DATING_KEYWORDS):
             totals["dating"] += amount
-        elif has_keyword(note, LONG_INVEST_KEYWORDS):
+        elif has_keyword(note, const.LONG_INVEST_KEYWORDS):
             totals["long_investment"] += amount
             totals["investment"] += amount
-        elif has_keyword(note, OPPORTUNITY_INVEST_KEYWORDS):
+        elif has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS):
             totals["opportunity_investment"] += amount
             totals["investment"] += amount
-        elif has_keyword(note, SUPPORT_PARENT_KEYWORDS):
+        elif has_keyword(note, const.SUPPORT_PARENT_KEYWORDS):
             totals["support_parent"] += amount
         else:
             totals["other"] += amount
@@ -759,8 +740,8 @@ def get_records_summary_by_cat(records):
 def get_total_income(sheet):
     """Helper to get total income from salary and freelance"""
     try:
-        salary = sheet.acell(SALARY_CELL).value
-        freelance = sheet.acell(FREELANCE_CELL).value
+        salary = sheet.acell(const.SALARY_CELL).value
+        freelance = sheet.acell(const.FREELANCE_CELL).value
 
         if not salary or salary.strip() == "":
             salary = config["income"]["salary"]
@@ -925,7 +906,7 @@ def get_monthly_expense(sheet_name):
         if sheet:
             # Get value from cell G2 (total expenses cell)
             try:
-                total_cell_value = sheet.acell(TOTAL_EXPENSE_CELL).value
+                total_cell_value = sheet.acell(const.TOTAL_EXPENSE_CELL).value
                 if total_cell_value:
                     # Parse the amount (remove currency symbols, commas, etc.)
                     total = parse_amount(total_cell_value)
@@ -958,12 +939,12 @@ def get_month_response(records, sheet, time_with_offset):
     total_income = get_month_budget_by_sheet(sheet)
 
     category_budget = get_category_percentages_by_sheet(sheet)
-    food_and_travel_budget = category_budget[FOOD_TRAVEL]
-    rent_budget = category_budget[RENT]
-    long_invest_budget = category_budget[LONG_INVEST]
-    opportunity_invest_budget = category_budget[OPPORTUNITY_INVEST]
-    support_parent_budget = category_budget[SUPPORT_PARENT]
-    dating_budget = category_budget[DATING]
+    food_and_travel_budget = category_budget[const.FOOD_TRAVEL]
+    rent_budget = category_budget[const.RENT]
+    long_invest_budget = category_budget[const.LONG_INVEST]
+    opportunity_invest_budget = category_budget[const.OPPORTUNITY_INVEST]
+    support_parent_budget = category_budget[const.SUPPORT_PARENT]
+    dating_budget = category_budget[const.DATING]
 
     count = len(month_expenses)
     month = time_with_offset.strftime("%m")
@@ -1151,8 +1132,8 @@ async def get_month_budget(month):
     current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
 
     # Get income from sheet
-    salary = current_sheet.acell(SALARY_CELL).value
-    freelance = current_sheet.acell(FREELANCE_CELL).value
+    salary = current_sheet.acell(const.SALARY_CELL).value
+    freelance = current_sheet.acell(const.FREELANCE_CELL).value
 
     # fallback from config if empty/invalid
     if not salary or not str(salary).strip().isdigit():
@@ -1171,7 +1152,7 @@ async def get_month_budget(month):
 # helper for month budget by sheet
 def get_month_budget_by_sheet(current_sheet):
     # Get income from sheet
-    result = current_sheet.batch_get([SALARY_CELL, FREELANCE_CELL])
+    result = current_sheet.batch_get([const.SALARY_CELL, const.FREELANCE_CELL])
     salary = (
         result[0][0][0]
         if result and len(result) > 0 and len(result[0]) > 0
@@ -1207,7 +1188,7 @@ def get_category_percentages_by_sheet(current_sheet):
         cell_range = "L2:Q2"
         result = current_sheet.get(cell_range)
         row = result[0] if result else []
-        categories = list(CATEGORY_CELLS.keys())
+        categories = list(const.const.const.TRANSPORT_KEYWORDS.keys())
         percentages = {}
 
         for i, category in enumerate(categories):
@@ -1222,12 +1203,15 @@ def get_category_percentages_by_sheet(current_sheet):
     except Exception as e:
         logger.error(f"Error fetching category percentages: {e}")
         # 4️⃣ Fail-safe fallback to config defaults
-        return {cat: config["budgets"].get(cat, 0) for cat in CATEGORY_CELLS}
+        return {
+            cat: config["budgets"].get(cat, 0)
+            for cat in const.const.const.TRANSPORT_KEYWORDS
+        }
 
 
 # helper for get percentage spend for a category
 def get_category_percentage(current_sheet: gspread.Worksheet, category):
-    cell = CATEGORY_CELLS.get(category)
+    cell = const.const.const.TRANSPORT_KEYWORDS.get(category)
     raw_value = current_sheet.acell(cell, value_render_option="UNFORMATTED_VALUE").value
     if not raw_value or not str(raw_value).strip().isdigit():
         percentage = config["budgets"].get(category, 0)

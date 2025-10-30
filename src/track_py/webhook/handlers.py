@@ -12,51 +12,12 @@ from collections import defaultdict
 from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
-from src.track_py.utils.sheet import (
-    get_current_time,
-    normalize_date,
-    normalize_time,
-    parse_amount,
-    format_expense,
-    get_gas_total,
-    get_food_total,
-    get_dating_total,
-    get_other_total,
-    safe_int,
-    get_investment_total,
-    get_total_income,
-    get_cached_sheet_data,
-    get_cached_worksheet,
-    invalidate_sheet_cache,
-    get_month_response,
-    get_week_process_data,
-    get_daily_process_data,
-    get_category_percentage,
-    convert_values_to_records,
-)
+import src.track_py.utils.sheet as sheet
 from src.track_py.utils.util import markdown_to_html
-from src.track_py.const import (
-    LOG_EXPENSE_MSG,
-    DELETE_EXPENSE_MSG,
-    FREELANCE_CELL,
-    SALARY_CELL,
-    SHORTCUTS,
-    HUGGING_FACE_TOKEN,
-    CATEGORY_ICONS,
-    CATEGORY_NAMES,
-    LONG_INVEST,
-    OPPORTUNITY_INVEST,
-    TELEGRAM_TOKEN,
-    LOG_ACTION,
-    DELETE_ACTION,
-)
+import src.track_py.const as const
 from src.track_py.config import config, save_config
 from src.track_py.utils.category import category_display
-from src.track_py.utils.bot import (
-    _background_tasks,
-    background_log_expense,
-    background_delete_expense,
-)
+import src.track_py.utils.bot as bot
 
 
 def safe_async_handler(handler_func):
@@ -189,7 +150,7 @@ async def log_expense(update, context):
         )
 
         # Quick shortcuts for common expenses
-        shortcuts = SHORTCUTS
+        shortcuts = const.SHORTCUTS
 
         # Parse different input formats
         entry_date = None
@@ -210,15 +171,15 @@ async def log_expense(update, context):
                 expanded_parts.append(shortcuts.get(part.lower(), part))
             note = " ".join(expanded_parts)
 
-            now = get_current_time()
+            now = sheet.get_current_time()
             # now = get_current_time() + datetime.timedelta(days=63)
-            entry_date = now.strftime("%d/%m")
-            entry_time = now.strftime("%H:%M:%S")
-            target_month = now.strftime("%m/%Y")
+            entry_date = sheet.get_current_time().strftime("%d/%m")
+            entry_time = sheet.get_current_time().strftime("%H:%M:%S")
+            target_month = sheet.get_current_time().strftime("%m/%Y")
 
         # Case B: Date Only - 02/09 5000 cafe or 02/09 5 cf
         elif "/" in parts[0] and len(parts) >= 2 and parts[1].isdigit():
-            entry_date = normalize_date(parts[0])
+            entry_date = sheet.normalize_date(parts[0])
             amount = int(parts[1])
             raw_note = " ".join(parts[2:]) if len(parts) > 2 else "Không có ghi chú"
 
@@ -232,7 +193,7 @@ async def log_expense(update, context):
             entry_time = "00:00:00"  # Default time
 
             day, month = entry_date.split("/")
-            current_year = get_current_time().year
+            current_year = sheet.get_current_time().year
             target_month = f"{month}/{current_year}"
 
         # Case C: Date + Time - 02/09 08:30 15000 breakfast or 02/09 08:30 15 cf
@@ -242,8 +203,8 @@ async def log_expense(update, context):
             and (":" in parts[1] or "h" in parts[1].lower())
             and parts[2].isdigit()
         ):
-            entry_date = normalize_date(parts[0])
-            entry_time = normalize_time(parts[1])
+            entry_date = sheet.normalize_date(parts[0])
+            entry_time = sheet.normalize_time(parts[1])
             amount = int(parts[2])
             raw_note = " ".join(parts[3:]) if len(parts) > 3 else "Không có ghi chú"
 
@@ -255,11 +216,11 @@ async def log_expense(update, context):
             note = " ".join(expanded_parts)
 
             day, month = entry_date.split("/")
-            current_year = get_current_time().year
+            current_year = sheet.get_current_time().year
             target_month = f"{month}/{current_year}"
 
         else:
-            await update.message.reply_text(LOG_EXPENSE_MSG)
+            await update.message.reply_text(const.LOG_EXPENSE_MSG)
             return
 
         # Smart amount multipliers for faster typing
@@ -271,7 +232,7 @@ async def log_expense(update, context):
 
         # ENHANCED PRELOADING: Send immediate response with better loading UX
         response = (
-            f"⚡ *Đã ghi nhận {LOG_ACTION}!*\n"
+            f"⚡ *Đã ghi nhận {const.LOG_ACTION}!*\n"
             f"💰 {amount:,} VND\n"
             f"📝 {note}\n"
             f"📅 {entry_date} • {entry_time}\n\n"
@@ -289,11 +250,11 @@ async def log_expense(update, context):
             bot_token = context.bot.token
         except Exception:
             # Fallback to config token
-            bot_token = TELEGRAM_TOKEN
+            bot_token = const.TELEGRAM_TOKEN
 
         # Create background task (fire and forget) but ensure it can complete
         task = asyncio.create_task(
-            background_log_expense(
+            bot.background_log_expense(
                 entry_date,
                 entry_time,
                 amount,
@@ -307,8 +268,8 @@ async def log_expense(update, context):
         )
 
         # Add task to background tasks set for tracking
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
+        bot._background_tasks.add(task)
+        task.add_done_callback(bot._background_tasks.discard)
 
         logger.info(
             f"Background logging task created for expense: {amount} VND - {note} at {entry_date} {entry_time}"
@@ -338,21 +299,21 @@ async def delete_expense(update, context):
         parts = text.split()
         # Only "del 00h11s00" -> assume today's date
         if len(parts) == 2:
-            entry_date = get_current_time().strftime("%d/%m")
-            entry_time = normalize_time(parts[1])
+            entry_date = sheet.get_current_time().strftime("%d/%m")
+            entry_time = sheet.normalize_time(parts[1])
         # Parse delete command: "del 14/10 00h11s00"
         elif len(parts) >= 3:
-            entry_date = normalize_date(parts[1])
-            entry_time = normalize_time(parts[2])
+            entry_date = sheet.normalize_date(parts[1])
+            entry_time = sheet.normalize_time(parts[2])
             logger.info(f"Attempting to delete expense: {entry_date} {entry_time}")
         else:
-            await update.message.reply_text(DELETE_EXPENSE_MSG)
+            await update.message.reply_text(const.DELETE_EXPENSE_MSG)
             return
 
         # Determine target month
-        now = get_current_time()
+        now = sheet.get_current_time()
         # now = get_current_time() + datetime.timedelta(days=63)
-        target_month = now.strftime("%m/%Y")
+        target_month = sheet.get_current_time().strftime("%m/%Y")
 
         # Check if different month
         if "/" in entry_date:
@@ -363,7 +324,7 @@ async def delete_expense(update, context):
         logger.info(f"Target sheet: {target_month}")
 
         response = (
-            f"🔄 *Đã ghi nhận {DELETE_ACTION}*\n"
+            f"🔄 *Đã ghi nhận {const.DELETE_ACTION}*\n"
             f"📅 {entry_date} • {entry_time}\n\n"
             f"📊 *Đang đồng bộ với Google Sheets...*\n"
         )
@@ -378,11 +339,11 @@ async def delete_expense(update, context):
             bot_token = context.bot.token
         except Exception:
             # Fallback to config token
-            bot_token = TELEGRAM_TOKEN
+            bot_token = const.TELEGRAM_TOKEN
 
         # Create background task (fire and forget) but ensure it can complete
         task = asyncio.create_task(
-            background_delete_expense(
+            bot.background_delete_expense(
                 entry_date,
                 entry_time,
                 target_month,
@@ -394,8 +355,8 @@ async def delete_expense(update, context):
         )
 
         # Add task to background tasks set for tracking
-        _background_tasks.add(task)
-        task.add_done_callback(_background_tasks.discard)
+        bot._background_tasks.add(task)
+        task.add_done_callback(bot._background_tasks.discard)
 
     except Exception as e:
         logger.error(
@@ -416,17 +377,17 @@ async def delete_expense(update, context):
 async def sort(update, context):
     """Manually sort sheet data when needed (can be called periodically with /sort command)"""
     try:
-        now = get_current_time()
+        now = sheet.get_current_time()
         target_month = now.strftime("%m/%Y")
 
         # Allow specifying different month: /sort 09/2025
         if context.args and len(context.args) > 0:
             target_month = context.args[0]
 
-        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+        sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
 
         # Get all data
-        all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+        all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, target_month)
 
         if len(all_values) > 2:  # More than header + 1 row
             data_rows = all_values[1:]
@@ -458,7 +419,7 @@ async def sort(update, context):
             )
 
             # Invalidate cache
-            invalidate_sheet_cache(target_month)
+            sheet.invalidate_sheet_cache(target_month)
 
             await update.message.reply_text(
                 f"✅ Đã sắp xếp {len(sorted_data)} dòng dữ liệu trong sheet {target_month}"
@@ -482,10 +443,10 @@ async def today(update, context):
     try:
         logger.info(f"Today command requested by user {update.effective_user.id}")
 
-        now = get_current_time()
+        now = sheet.get_current_time()
         # now = get_current_time() + datetime.timedelta(days=63)
 
-        today_data = await get_daily_process_data(now)
+        today_data = await sheet.get_daily_process_data(now)
         total = today_data["total"]
         today_expenses = today_data["today_expenses"]
         count = len(today_expenses)
@@ -499,7 +460,7 @@ async def today(update, context):
 
         if today_expenses:
             details = "\n".join(
-                format_expense(r, i + 1) for i, r in enumerate(today_expenses)
+                sheet.format_expense(r, i + 1) for i, r in enumerate(today_expenses)
             )
             response += f"\n📝 Chi tiết:\n{details}"
 
@@ -534,9 +495,9 @@ async def week(update, context: CallbackContext):
             pass
 
     try:
-        now = get_current_time() + datetime.timedelta(weeks=offset)
+        now = sheet.get_current_time() + datetime.timedelta(weeks=offset)
 
-        week_data = await get_week_process_data(now)
+        week_data = await sheet.get_week_process_data(now)
         total = week_data["total"]
         week_expenses = week_data["week_expenses"]
         count = len(week_expenses)
@@ -553,10 +514,10 @@ async def week(update, context: CallbackContext):
         for day, rows in sorted(
             grouped.items(), key=lambda d: datetime.datetime.strptime(d[0], "%d/%m/%Y")
         ):
-            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
             details_lines.append(f"\n📅 {day}: {day_total:,.0f} VND")
             details_lines.extend(
-                format_expense(r, i) for i, r in enumerate(rows, start=1)
+                sheet.format_expense(r, i) for i, r in enumerate(rows, start=1)
             )
 
         response_parts = [
@@ -592,13 +553,15 @@ async def month(update, context: CallbackContext):
     try:
         logger.info(f"Month command requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
 
         logger.info(f"Getting month expenses for sheet {target_month}")
 
         try:
-            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+            current_sheet = await asyncio.to_thread(
+                sheet.get_cached_worksheet, target_month
+            )
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(
@@ -611,7 +574,9 @@ async def month(update, context: CallbackContext):
             return
 
         try:
-            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+            all_values = await asyncio.to_thread(
+                sheet.get_cached_sheet_data, target_month
+            )
             logger.info(f"Retrieved {len(all_values)} records from sheet")
         except Exception as records_error:
             logger.error(
@@ -622,9 +587,9 @@ async def month(update, context: CallbackContext):
             )
             return
 
-        records = convert_values_to_records(all_values)
+        records = sheet.convert_values_to_records(all_values)
 
-        response = get_month_response(records, current_sheet, now)
+        response = sheet.get_month_response(records, current_sheet, now)
         await update.message.reply_text(response)
         logger.info(
             f"Month summary sent successfully to user {update.effective_user.id}"
@@ -659,13 +624,15 @@ async def ai_analyze(update, context: CallbackContext):
     try:
         logger.info(f"Month command requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
 
         logger.info(f"Getting month expenses for sheet {target_month}")
 
         try:
-            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+            current_sheet = await asyncio.to_thread(
+                sheet.get_cached_worksheet, target_month
+            )
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(
@@ -678,7 +645,9 @@ async def ai_analyze(update, context: CallbackContext):
             return
 
         try:
-            all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+            all_values = await asyncio.to_thread(
+                sheet.get_cached_sheet_data, target_month
+            )
             logger.info(f"Retrieved {len(all_values)} records from sheet")
         except Exception as records_error:
             logger.error(
@@ -689,10 +658,10 @@ async def ai_analyze(update, context: CallbackContext):
             )
             return
 
-        records = convert_values_to_records(all_values)
-        raw_data = get_month_response(records, current_sheet, now)
+        records = sheet.convert_values_to_records(all_values)
+        raw_data = sheet.get_month_response(records, current_sheet, now)
 
-        client = InferenceClient(token=HUGGING_FACE_TOKEN)
+        client = InferenceClient(token=const.HUGGING_FACE_TOKEN)
         model = "meta-llama/Llama-3.1-8B-Instruct"
 
         # Use chat_completion for instruction/chat models
@@ -767,13 +736,13 @@ async def gas(update, context):
     try:
         logger.info(f"Gas command requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting gas expenses for sheet {target_month}")
 
-        gas_expenses, total = get_gas_total(target_month)
+        gas_expenses, total = sheet.get_gas_total(target_month)
         count = len(gas_expenses)
         logger.info(f"Found {count} gas expenses for this month with total {total} VND")
 
@@ -789,12 +758,12 @@ async def gas(update, context):
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
-                details += format_expense(r, i) + "\n"
+                details += sheet.format_expense(r, i) + "\n"
 
-        _, previous_total = get_gas_total(previous_month)
+        _, previous_total = sheet.get_gas_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
@@ -848,13 +817,13 @@ async def food(update, context):
     try:
         logger.info(f"Food command requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting food expenses for sheet {target_month}")
 
-        food_expenses, total = get_food_total(target_month)
+        food_expenses, total = sheet.get_food_total(target_month)
         count = len(food_expenses)
         logger.info(
             f"Found {count} food expenses for this month with total {total} VND"
@@ -872,12 +841,12 @@ async def food(update, context):
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
-                details += format_expense(r, i) + "\n"
+                details += sheet.format_expense(r, i) + "\n"
 
-        _, previous_total = get_food_total(previous_month)
+        _, previous_total = sheet.get_food_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
@@ -933,13 +902,13 @@ async def dating(update, context):
     try:
         logger.info(f"Dating command requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting dating expenses for sheet {target_month}")
 
-        dating_expenses, total = get_dating_total(target_month)
+        dating_expenses, total = sheet.get_dating_total(target_month)
         count = len(dating_expenses)
         logger.info(
             f"Found {count} dating expenses for this month with total {total} VND"
@@ -957,12 +926,12 @@ async def dating(update, context):
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
-                details += format_expense(r, i) + "\n"
+                details += sheet.format_expense(r, i) + "\n"
 
-        _, previous_total = get_dating_total(previous_month)
+        _, previous_total = sheet.get_dating_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
@@ -1018,13 +987,13 @@ async def other(update, context):
     try:
         logger.info(f"Other command requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting other expenses for sheet {target_month}")
 
-        other_expenses, total = get_other_total(target_month)
+        other_expenses, total = sheet.get_other_total(target_month)
         count = len(other_expenses)
         logger.info(
             f"Found {count} other expenses for this month with total {total} VND"
@@ -1042,12 +1011,12 @@ async def other(update, context):
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
-                details += format_expense(r, i) + "\n"
+                details += sheet.format_expense(r, i) + "\n"
 
-        _, previous_total = get_other_total(previous_month)
+        _, previous_total = sheet.get_other_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
@@ -1105,14 +1074,16 @@ async def investment(update, context):
     try:
         logger.info(f"Investment command requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting investment expenses for sheet {target_month}")
 
         try:
-            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+            current_sheet = await asyncio.to_thread(
+                sheet.get_cached_worksheet, target_month
+            )
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(
@@ -1124,7 +1095,7 @@ async def investment(update, context):
             )
             return
 
-        investment_expenses, total = get_investment_total(target_month)
+        investment_expenses, total = sheet.get_investment_total(target_month)
         count = len(investment_expenses)
         logger.info(
             f"Found {count} investment expenses for this month with total {total} VND"
@@ -1142,12 +1113,12 @@ async def investment(update, context):
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
-                details += format_expense(r, i) + "\n"
+                details += sheet.format_expense(r, i) + "\n"
 
-        _, previous_total = get_investment_total(previous_month)
+        _, previous_total = sheet.get_investment_total(previous_month)
 
         # Calculate percentage change
         if previous_total > 0:
@@ -1162,10 +1133,12 @@ async def investment(update, context):
             percentage_text = ""
 
         # Get income from sheet
-        total_income = get_total_income(current_sheet)
-        long_invest_budget = get_category_percentage(current_sheet, LONG_INVEST)
-        opportunity_invest_budget = get_category_percentage(
-            current_sheet, OPPORTUNITY_INVEST
+        total_income = sheet.get_total_income(current_sheet)
+        long_invest_budget = sheet.get_category_percentage(
+            current_sheet, const.LONG_INVEST
+        )
+        opportunity_invest_budget = sheet.get_category_percentage(
+            current_sheet, const.OPPORTUNITY_INVEST
         )
         long_invest_estimate = (
             total_income * (long_invest_budget / 100) if total_income > 0 else 0
@@ -1242,7 +1215,7 @@ async def freelance(update, context):
                 offset = int(args[0])
             except ValueError:
                 offset = 0
-            amount = safe_int(args[1])
+            amount = sheet.safe_int(args[1])
     else:
         await update.message.reply_text(
             "❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'"
@@ -1256,16 +1229,16 @@ async def freelance(update, context):
         return
 
     try:
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         target_year = now.strftime("%Y")
         month_display = (
             f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         )
-        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+        sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
 
         amount = amount * 1000
-        sheet.update_acell(FREELANCE_CELL, amount)
+        sheet.update_acell(const.FREELANCE_CELL, amount)
 
         # Update config
         if offset == 0:
@@ -1318,7 +1291,7 @@ async def salary(update, context):
                 offset = int(args[0])
             except ValueError:
                 offset = 0
-            amount = safe_int(args[1])
+            amount = sheet.safe_int(args[1])
     else:
         await update.message.reply_text(
             "❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/sl 200' hoặc '/sl 1 200'"
@@ -1332,16 +1305,16 @@ async def salary(update, context):
         return
 
     try:
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         target_year = now.strftime("%Y")
         month_display = (
             f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         )
-        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+        sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
 
         amount = amount * 1000
-        sheet.update_acell(SALARY_CELL, amount)
+        sheet.update_acell(const.SALARY_CELL, amount)
 
         if offset == 0:
             # Update config
@@ -1384,14 +1357,16 @@ async def income(update, context):
     try:
         logger.info(f"Income summary requested by user {update.effective_user.id}")
 
-        now = get_current_time() + relativedelta(months=offset)
+        now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
 
         logger.info(f"Getting income summary for sheet {target_month}")
 
         try:
-            current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+            current_sheet = await asyncio.to_thread(
+                sheet.get_cached_worksheet, target_month
+            )
             logger.info(f"Successfully obtained sheet for {target_month}")
         except Exception as sheet_error:
             logger.error(
@@ -1405,7 +1380,7 @@ async def income(update, context):
 
         try:
             previous_sheet = await asyncio.to_thread(
-                get_cached_worksheet, previous_month
+                sheet.get_cached_worksheet, previous_month
             )
             logger.info(f"Successfully obtained sheet for {previous_month}")
         except Exception as prev_sheet_error:
@@ -1419,8 +1394,8 @@ async def income(update, context):
             return
 
         # Get income from current month's sheet
-        freelance_income = current_sheet.acell(FREELANCE_CELL).value
-        salary_income = current_sheet.acell(SALARY_CELL).value
+        freelance_income = current_sheet.acell(const.FREELANCE_CELL).value
+        salary_income = current_sheet.acell(const.SALARY_CELL).value
 
         if not freelance_income or freelance_income.strip() == "":
             logger.info("Freelance income cell is empty, using config fallback")
@@ -1436,12 +1411,12 @@ async def income(update, context):
             )
             return
 
-        freelance_income = safe_int(freelance_income)
-        salary_income = safe_int(salary_income)
+        freelance_income = sheet.safe_int(freelance_income)
+        salary_income = sheet.safe_int(salary_income)
 
         # Get income from previous month's sheet for comparison
-        prev_freelance_income = previous_sheet.acell(FREELANCE_CELL).value
-        prev_salary_income = previous_sheet.acell(SALARY_CELL).value
+        prev_freelance_income = previous_sheet.acell(const.FREELANCE_CELL).value
+        prev_salary_income = previous_sheet.acell(const.SALARY_CELL).value
 
         if not prev_freelance_income or prev_freelance_income.strip() == "":
             logger.info(
@@ -1453,8 +1428,8 @@ async def income(update, context):
             logger.info("Previous salary income cell is empty, using config fallback")
             prev_salary_income = 0
 
-        prev_freelance_income = safe_int(prev_freelance_income)
-        prev_salary_income = safe_int(prev_salary_income)
+        prev_freelance_income = sheet.safe_int(prev_freelance_income)
+        prev_salary_income = sheet.safe_int(prev_salary_income)
 
         prev_total_income = prev_freelance_income + prev_salary_income
         total_income = freelance_income + salary_income
@@ -1552,7 +1527,7 @@ async def categories(update, context):
     """Show expense categories"""
 
     message = f"{category_display['categories']} chi tiêu hiện có:\n\n"
-    for category, icon in CATEGORY_ICONS.items():
-        message += f"• {icon} {CATEGORY_NAMES[category]}\n"
+    for category, icon in const.CATEGORY_ICONS.items():
+        message += f"• {icon} {const.CATEGORY_NAMES[category]}\n"
 
     await update.message.reply_text(message)

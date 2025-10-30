@@ -1,7 +1,6 @@
 import datetime
 import asyncio
 import threading
-import time
 from flask import Flask, request, jsonify
 from dateutil.relativedelta import relativedelta
 from src.track_py.utils.logger import logger
@@ -10,29 +9,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask_cors import CORS
 from src.track_py.webhook.bot import setup_bot, setup_bot_commands
 from src.track_py.utils.bot import wait_for_background_tasks
-from src.track_py.const import (
-    bot_app,
-    webhook_failures,
-    last_failure_time,
-    use_fresh_bots,
-    MAX_FAILURES,
-    FAILURE_RESET_TIME,
-    WSGI_FILE,
-    MONTH_NAMES_SHORT,
-    CATEGORY_ICONS,
-    CATEGORY_COLORS,
-    CATEGORY_NAMES,
-)
-from src.track_py.utils.sheet import (
-    get_monthly_expense,
-    get_records_summary_by_cat,
-    get_week_process_data,
-    get_daily_process_data,
-    get_month_budget,
-    get_cached_sheet_data,
-    convert_values_to_records,
-    get_category_percentages_by_month,
-)
+import src.track_py.const as const
+import src.track_py.utils.sheet as sheet
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.scheduler.job import scheduler, start_scheduler, monthly_sheet_job
 
@@ -141,7 +119,7 @@ def deploy():
         project_dir = os.path.dirname(os.path.abspath(__file__))
 
         # Execute deployment commands
-        wsgi_path = f"/var/www/{WSGI_FILE}"
+        wsgi_path = f"/var/www/{const.WSGI_FILE}"
         commands = [
             ["git", "pull", "origin", "--no-ff"],
             ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
@@ -198,10 +176,11 @@ def webhook():
 
         # Check circuit breaker
         current_time = datetime.datetime.now()
-        if webhook_failures >= MAX_FAILURES:
+        if webhook_failures >= const.MAX_FAILURES:
             if (
                 last_failure_time
-                and (current_time - last_failure_time).seconds < FAILURE_RESET_TIME
+                and (current_time - last_failure_time).seconds
+                < const.FAILURE_RESET_TIME
             ):
                 logger.warning(
                     f"Circuit breaker open: {webhook_failures} failures, rejecting request"
@@ -241,7 +220,7 @@ def webhook():
 
         try:
             # Create Update object
-            update = Update.de_json(update_data, bot_app.bot)
+            update = Update.de_json(update_data, const.bot_app.bot)
             if not update:
                 logger.warning("Failed to create Update object from data")
                 return "Invalid update data", 400
@@ -258,7 +237,7 @@ def webhook():
                 logger.info("Processing update asynchronously")
 
                 # Try fresh bot instance first if enabled
-                if use_fresh_bots:
+                if const.use_fresh_bots:
                     fresh_bot_app = None
                     try:
                         fresh_bot_app = setup_bot()
@@ -447,10 +426,12 @@ def expense_summary():
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {}
             for month_num in range(1, 13):
-                month_name = MONTH_NAMES_SHORT[month_num - 1]
+                month_name = const.MONTH_NAMES_SHORT[month_num - 1]
                 sheet_name = f"{month_num:02d}/{year}"  # Format as "mm/yyyy"
 
-                futures[executor.submit(get_monthly_expense, sheet_name)] = month_name
+                futures[executor.submit(sheet.get_monthly_expense, sheet_name)] = (
+                    month_name
+                )
 
             monthly_expenses = []
             for future in as_completed(futures):
@@ -488,12 +469,12 @@ async def expense_dashboard():
         now = get_current_time()
         target_month = now.strftime("%m/%Y")
 
-        month_value = await asyncio.to_thread(get_cached_sheet_data, target_month)
+        month_value = await asyncio.to_thread(sheet.get_cached_sheet_data, target_month)
 
         # Get week and daily data concurrently
-        week_data_task = get_week_process_data(now)
-        daily_data_task = get_daily_process_data(now)
-        month_budget_task = get_month_budget(target_month)
+        week_data_task = sheet.get_week_process_data(now)
+        daily_data_task = sheet.get_daily_process_data(now)
+        month_budget_task = sheet.get_month_budget(target_month)
 
         week_data, daily_data, month_budget = await asyncio.gather(
             week_data_task, daily_data_task, month_budget_task
@@ -508,11 +489,11 @@ async def expense_dashboard():
         day_records = daily_data["records"]
 
         # Summarize records by category concurrently
-        month_summary = get_records_summary_by_cat(
-            convert_values_to_records(month_value)
+        month_summary = sheet.get_records_summary_by_cat(
+            sheet.convert_values_to_records(month_value)
         )
-        week_summary = get_records_summary_by_cat(week_records)
-        day_summary = get_records_summary_by_cat(day_records)
+        week_summary = sheet.get_records_summary_by_cat(week_records)
+        day_summary = sheet.get_records_summary_by_cat(day_records)
 
         today_budget = month_budget / now.day
         week_budget = today_budget * 7
@@ -537,12 +518,12 @@ async def expense_dashboard():
         week_categories = []
         day_categories = []
 
-        category_percent = await get_category_percentages_by_month(target_month)
+        category_percent = await sheet.get_category_percentages_by_month(target_month)
         cat_meta = {
             cat: {
-                "color": CATEGORY_COLORS.get(cat, "#000000"),
-                "icon": CATEGORY_ICONS.get(cat, "🌟"),
-                "name": CATEGORY_NAMES.get(cat, "Unknown"),
+                "color": const.CATEGORY_COLORS.get(cat, "#000000"),
+                "icon": const.CATEGORY_ICONS.get(cat, "🌟"),
+                "name": const.CATEGORY_NAMES.get(cat, "Unknown"),
                 "percent": category_percent[cat],
             }
             for cat in category_percent

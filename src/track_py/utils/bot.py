@@ -3,14 +3,8 @@ import time
 from telegram import Bot
 from collections import defaultdict, deque
 from src.track_py.utils.logger import logger
-from src.track_py.utils.sheet import (
-    get_cached_worksheet,
-    invalidate_sheet_cache,
-    get_cached_sheet_data,
-    convert_values_to_records,
-    parse_amount,
-)
-from src.track_py.const import LOG_ACTION, DELETE_ACTION, TELEGRAM_TOKEN, CHAT_ID
+import src.track_py.utils.sheet as sheet
+import src.track_py.const as const
 
 # Background expense logging queue for better performance
 log_expense_queue = deque()
@@ -86,7 +80,7 @@ async def process_log_expense_queue():
                     # Send error notifications for this month's expenses
                     for expense_data in expenses:
                         await send_error_notification(
-                            expense_data, month_error, LOG_ACTION
+                            expense_data, month_error, const.LOG_ACTION
                         )
 
             # Small delay between batches to avoid overwhelming the API
@@ -135,7 +129,7 @@ async def process_delete_expense_queue():
                     # Send error notifications for this month's expenses
                     for expense_data in expenses:
                         await send_error_notification(
-                            expense_data, month_error, DELETE_ACTION
+                            expense_data, month_error, const.DELETE_ACTION
                         )
 
             # Small delay between batches to avoid overwhelming the API
@@ -155,7 +149,7 @@ async def process_log_month_expenses(target_month, expenses):
         # Send progress update if processing takes longer than expected
         for expense_data in expenses:
             progress_message = (
-                f"⚡ *Đã ghi nhận {LOG_ACTION}!*\n"
+                f"⚡ *Đã ghi nhận {const.LOG_ACTION}!*\n"
                 f"💰 {expense_data['amount']:,} VND\n"
                 f"📝 {expense_data['note']}\n"
                 f"📅 {expense_data['entry_date']} • {expense_data['entry_time']}\n\n"
@@ -165,8 +159,10 @@ async def process_log_month_expenses(target_month, expenses):
             await send_progress_update(expense_data, progress_message)
 
         # Get sheet once for all expenses in this month
-        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
-        logger.info(f"Got sheet for month {target_month}: {sheet.title}")
+        current_sheet = await asyncio.to_thread(
+            sheet.get_cached_worksheet, target_month
+        )
+        logger.info(f"Got sheet for month {target_month}: {current_sheet.title}")
 
         # Prepare all rows for batch append
         rows_to_append = []
@@ -183,27 +179,27 @@ async def process_log_month_expenses(target_month, expenses):
         if len(rows_to_append) == 1:
             # Single expense - use append_row
             await asyncio.to_thread(
-                lambda: sheet.append_row(
+                lambda: current_sheet.append_row(
                     rows_to_append[0], value_input_option="RAW", table_range="A2:D"
                 )
             )
         else:
             # Multiple expenses - use batch append
             await asyncio.to_thread(
-                lambda: sheet.append_rows(
+                lambda: current_sheet.append_rows(
                     rows_to_append, value_input_option="RAW", table_range="A2:D"
                 )
             )
 
         # Invalidate cache since we've updated the sheet
-        invalidate_sheet_cache(target_month)
+        sheet.invalidate_sheet_cache(target_month)
 
         logger.info(f"Batch processed {len(expenses)} expenses for {target_month}")
 
         # Send success notifications after sheet operations complete
         for expense_data in expenses:
             try:
-                await send_success_notification(expense_data, LOG_ACTION)
+                await send_success_notification(expense_data, const.LOG_ACTION)
             except Exception as notification_error:
                 logger.warning(
                     f"Failed to send success notification: {notification_error}"
@@ -224,7 +220,7 @@ async def process_delete_month_expenses(target_month, expenses):
         # Send progress update if processing takes longer than expected
         for expense_data in expenses:
             progress_message = (
-                f"⚡ *Đã ghi nhận {DELETE_ACTION}!*\n"
+                f"⚡ *Đã ghi nhận {const.DELETE_ACTION}!*\n"
                 f"📅 {expense_data['entry_date']} • {expense_data['entry_time']}\n\n"
                 f"📊 *Đang xử lý batch ({len(expenses)} giao dịch)...*\n"
                 f"⏳ _Kết nối Google Sheets thành công_"
@@ -232,8 +228,10 @@ async def process_delete_month_expenses(target_month, expenses):
             await send_progress_update(expense_data, progress_message)
 
         # Get sheet once for all expenses in this month
-        sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
-        logger.info(f"Got sheet for month {target_month}: {sheet.title}")
+        current_sheet = await asyncio.to_thread(
+            sheet.get_cached_worksheet, target_month
+        )
+        logger.info(f"Got sheet for month {target_month}: {current_sheet.title}")
 
         # Process each delete request
         for expense_data in expenses:
@@ -243,21 +241,23 @@ async def process_delete_month_expenses(target_month, expenses):
             try:
                 # Get all sheet data to search for the expense
                 all_values = await asyncio.to_thread(
-                    get_cached_sheet_data, target_month
+                    sheet.get_cached_sheet_data, target_month
                 )
                 if not all_values or len(all_values) < 2:
                     logger.warning(f"No data in sheet {target_month} for deletion")
                     await send_error_notification(
-                        expense_data, "Không có dữ liệu trong sheet này", DELETE_ACTION
+                        expense_data,
+                        "Không có dữ liệu trong sheet này",
+                        const.DELETE_ACTION,
                     )
                     continue
-                records = convert_values_to_records(all_values)
+                records = sheet.convert_values_to_records(all_values)
 
                 found_row = None
                 for i, r in enumerate(records):
                     row_date = r.get("Date", "")
                     row_time = r.get("Time", "")
-                    row_amount = parse_amount(r.get("VND", 0))
+                    row_amount = sheet.parse_amount(r.get("VND", 0))
                     row_note = r.get("Note", "")
                     expense_data["amount"] = int(row_amount)
                     expense_data["note"] = row_note
@@ -270,7 +270,9 @@ async def process_delete_month_expenses(target_month, expenses):
 
                 if found_row:
                     # Delete the row from the sheet
-                    await asyncio.to_thread(lambda: sheet.delete_rows(found_row))
+                    await asyncio.to_thread(
+                        lambda: current_sheet.delete_rows(found_row)
+                    )
                     logger.info(
                         f"Successfully deleted expense: {entry_date} {entry_time} from row {found_row}"
                     )
@@ -279,7 +281,7 @@ async def process_delete_month_expenses(target_month, expenses):
                     await send_error_notification(
                         expense_data,
                         f"Không tìm thấy giao dịch: {entry_date} {entry_time}",
-                        DELETE_ACTION,
+                        const.DELETE_ACTION,
                     )
                     continue
 
@@ -289,19 +291,19 @@ async def process_delete_month_expenses(target_month, expenses):
                     exc_info=True,
                 )
                 await send_error_notification(
-                    expense_data, f"Lỗi khi xóa: {delete_error}", DELETE_ACTION
+                    expense_data, f"Lỗi khi xóa: {delete_error}", const.DELETE_ACTION
                 )
                 continue
 
         # Invalidate cache since we've updated the sheet
-        invalidate_sheet_cache(target_month)
+        sheet.invalidate_sheet_cache(target_month)
 
         logger.info(f"Batch processed {len(expenses)} expenses for {target_month}")
 
         # Send success notifications after sheet operations complete
         for expense_data in expenses:
             try:
-                await send_success_notification(expense_data, DELETE_ACTION)
+                await send_success_notification(expense_data, const.DELETE_ACTION)
             except Exception as notification_error:
                 logger.warning(
                     f"Failed to send success notification: {notification_error}"
@@ -423,15 +425,15 @@ async def send_progress_update(expense_data, progress_message):
 async def send_message(text, parse_mode="Markdown"):
     """Utility to send message via bot token"""
     try:
-        bot = Bot(token=TELEGRAM_TOKEN)
+        bot = Bot(token=const.TELEGRAM_TOKEN)
         await bot.send_message(
-            chat_id=CHAT_ID,
+            chat_id=const.CHAT_ID,
             text=text,
             parse_mode=parse_mode,
         )
-        logger.info(f"Message sent to chat {CHAT_ID}")
+        logger.info(f"Message sent to chat {const.CHAT_ID}")
     except Exception as send_error:
-        logger.error(f"Failed to send message to chat {CHAT_ID}: {send_error}")
+        logger.error(f"Failed to send message to chat {const.CHAT_ID}: {send_error}")
 
 
 async def background_log_expense(
@@ -470,7 +472,7 @@ async def background_log_expense(
         # Send queue position update if there are multiple items waiting
         if queue_position > 1:
             queue_update_message = (
-                f"⚡ *Đã ghi nhận {LOG_ACTION}!*\n"
+                f"⚡ *Đã ghi nhận {const.LOG_ACTION}!*\n"
                 f"💰 {amount:,} VND\n"
                 f"📝 {note}\n"
                 f"📅 {entry_date} • {entry_time}\n\n"
@@ -517,7 +519,7 @@ async def background_log_expense(
             "chat_id": chat_id,
             "bot_token": bot_token,
         }
-        await send_error_notification(expense_data, bg_error, LOG_ACTION)
+        await send_error_notification(expense_data, bg_error, const.LOG_ACTION)
 
 
 async def background_delete_expense(
@@ -546,7 +548,7 @@ async def background_delete_expense(
         # Send queue position update if there are multiple items waiting
         if queue_position > 1:
             queue_update_message = (
-                f"⚡ *Đã ghi nhận {DELETE_ACTION}!*\n"
+                f"⚡ *Đã ghi nhận {const.DELETE_ACTION}!*\n"
                 f"📅 {entry_date} • {entry_time}\n\n"
                 f"📋 *Vị trí trong hàng đợi: #{queue_position}*\n"
                 f"⏳ _Ước tính: {queue_position * 2}-{queue_position * 3} giây_"
@@ -589,4 +591,4 @@ async def background_delete_expense(
             "chat_id": chat_id,
             "bot_token": bot_token,
         }
-        await send_error_notification(expense_data, bg_error, DELETE_ACTION)
+        await send_error_notification(expense_data, bg_error, const.DELETE_ACTION)
