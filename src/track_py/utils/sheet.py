@@ -318,10 +318,10 @@ def get_or_create_monthly_sheet(target_month=None):
 
                     # write category percentages from config
                     for category in config["budgets"]:
-                        if category not in const.const.const.TRANSPORT_KEYWORDS:
+                        if category not in const.CATEGORY_CELLS:
                             continue
 
-                        cell = const.const.const.TRANSPORT_KEYWORDS[category]
+                        cell = const.CATEGORY_CELLS[category]
                         raw_value = new_sheet.acell(
                             cell, value_render_option="UNFORMATTED_VALUE"
                         ).value
@@ -1188,7 +1188,7 @@ def get_category_percentages_by_sheet(current_sheet):
         cell_range = "L2:Q2"
         result = current_sheet.get(cell_range)
         row = result[0] if result else []
-        categories = list(const.const.const.TRANSPORT_KEYWORDS.keys())
+        categories = list(const.CATEGORY_CELLS.keys())
         percentages = {}
 
         for i, category in enumerate(categories):
@@ -1204,14 +1204,13 @@ def get_category_percentages_by_sheet(current_sheet):
         logger.error(f"Error fetching category percentages: {e}")
         # 4️⃣ Fail-safe fallback to config defaults
         return {
-            cat: config["budgets"].get(cat, 0)
-            for cat in const.const.const.TRANSPORT_KEYWORDS
+            cat: config["budgets"].get(cat, 0) for cat in const.CATEGORY_CELLS.keys()
         }
 
 
 # helper for get percentage spend for a category
 def get_category_percentage(current_sheet: gspread.Worksheet, category):
-    cell = const.const.const.TRANSPORT_KEYWORDS.get(category)
+    cell = const.CATEGORY_CELLS.get(category)
     raw_value = current_sheet.acell(cell, value_render_option="UNFORMATTED_VALUE").value
     if not raw_value or not str(raw_value).strip().isdigit():
         percentage = config["budgets"].get(category, 0)
