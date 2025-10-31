@@ -39,6 +39,7 @@ def get_categories_display():
     )
     total_display = f"{CATEGORY_ICONS.get('total')} {CATEGORY_NAMES.get('total')}"
     balance_display = f"{CATEGORY_ICONS.get('balance')} {CATEGORY_NAMES.get('balance')}"
+    sync_display = f"{CATEGORY_ICONS.get('sync')} {CATEGORY_NAMES.get('sync')}"
 
     category_display = {
         "rent": rent_display,
@@ -63,6 +64,7 @@ def get_categories_display():
         "categories": categories_display,
         "total": total_display,
         "balance": balance_display,
+        "sync": sync_display,
     }
 
     return category_display

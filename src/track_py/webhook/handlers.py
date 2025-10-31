@@ -1563,7 +1563,7 @@ async def sync_config(update, context):
 
         sheet.sync_config_to_sheet(target_month)
         await update.message.reply_text(
-            f"✅ {category_display['sync']} cấu hình {month_display} thành công!"
+            f"{category_display['sync']} cấu hình {month_display} thành công!"
         )
 
         logger.info(
