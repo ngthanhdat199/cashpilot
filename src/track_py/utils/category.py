@@ -38,6 +38,7 @@ def get_categories_display():
         f"{CATEGORY_ICONS.get('categories')} {CATEGORY_NAMES.get('categories')}"
     )
     total_display = f"{CATEGORY_ICONS.get('total')} {CATEGORY_NAMES.get('total')}"
+    balance_display = f"{CATEGORY_ICONS.get('balance')} {CATEGORY_NAMES.get('balance')}"
 
     category_display = {
         "rent": rent_display,
@@ -61,6 +62,7 @@ def get_categories_display():
         "compare": compare_display,
         "categories": categories_display,
         "total": total_display,
+        "balance": balance_display,
     }
 
     return category_display

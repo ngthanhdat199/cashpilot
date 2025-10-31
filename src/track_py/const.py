@@ -155,7 +155,7 @@ DATING_KEYWORDS = [
     "hẹn hò",
     "date",
 ]
-TRANSPORT_KEYWORDS = ["grab", "giao hàng", "taxi", "bus", "gửi xe", "xăng"]
+TRANSPORT_KEYWORDS = ["grab", "giao hàng", "taxi", "bus", "gửi xe", "xăng", "thay nhớt"]
 LONG_INVEST_KEYWORDS = [
     "chứng khoán",
     "cổ phiếu",
@@ -212,7 +212,8 @@ CATEGORY_ICONS = {
     "other": "🌟",
     "summarized": "📊",
     "spend": "💸",
-    "income": "💰",
+    "income": "💵",
+    "balance": "💰",
     "transaction": "📝",
     "detail": "🔍",
     "estimate_budget": "📌",
@@ -257,6 +258,7 @@ CATEGORY_NAMES = {
     "freelance": "Làm thêm",
     "categories": "Danh mục",
     "total": "Tổng cộng",
+    "balance": "Tiết kiệm",
 }
 
 CATEGORY_COLORS = {

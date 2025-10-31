@@ -969,9 +969,10 @@ def get_month_response(records, sheet, time_with_offset):
 
     response = (
         f"{category_display['summarized']} {month_display}:\n"
-        f"{category_display['spend']}: {total:,.0f} VND\n"
         f"{category_display['income']}: {total_income:,.0f} VND\n"
-        f"{category_display['transaction']}: {count}\n\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n"
+        f"{category_display['balance']}: {total_income - total:,.0f} VND\n\n"
         f"{category_display['estimate_budget']}:\n"
         f"{category_display['rent']}: {rent_budget:.0f}% = {rent_estimate:,.0f} VND\n"
         f"{category_display['food_and_travel']}: {food_and_travel_budget:.0f}% = {food_and_travel_estimate:,.0f} VND\n"
@@ -990,6 +991,7 @@ def get_month_response(records, sheet, time_with_offset):
         f"{category_display['rent']}: {rent_total:,.0f} VND\n"
         f"{category_display['food']}: {food_total:,.0f} VND\n"
         f"{category_display['gas']}: {gas_total:,.0f} VND\n"
+        f"{category_display['support_parent']}: {support_parent_total:,.0f} VND\n"
         f"{category_display['dating']}: {dating_total:,.0f} VND\n"
         f"{category_display['investment']}: {investment_total:,.0f} VND\n"
         f"{category_display['other']}: {other_total:,.0f} VND\n"
