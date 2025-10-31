@@ -103,7 +103,7 @@ async def setup_bot_commands(bot_app):
                 f"{const.CATEGORY_ICONS['categories']} Show expense categories",
             ),
             BotCommand(
-                "sync", f"{const.CATEGORY_ICONS['sync']} Sync config with sheet"
+                "sync", f"{const.CATEGORY_ICONS['sync']} Sync config with sheet of next month"
             ),
         ]
         await bot_app.bot.set_my_commands(commands)
