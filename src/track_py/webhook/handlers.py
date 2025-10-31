@@ -1315,7 +1315,9 @@ async def salary(update, context):
         month_display = (
             f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
         )
-        current_sheet = await asyncio.to_thread(sheet.get_cached_worksheet, target_month)
+        current_sheet = await asyncio.to_thread(
+            sheet.get_cached_worksheet, target_month
+        )
 
         amount = amount * 1000
         current_sheet.update_acell(const.SALARY_CELL, amount)
@@ -1530,8 +1532,16 @@ async def stats(update, context):
 async def categories(update, context):
     """Show expense categories"""
 
+    now = sheet.get_current_time()
+    target_month = now.strftime("%m/%Y")
+
     message = f"{category_display['categories']} chi tiêu hiện có:\n\n"
-    for category, icon in const.CATEGORY_ICONS.items():
-        message += f"• {icon} {const.CATEGORY_NAMES[category]}\n"
+    category_percent = await sheet.get_category_percentages_by_month(target_month)
+
+    for key in const.CATEGORY_CELLS.keys():
+        icon = const.CATEGORY_ICONS[key]
+        category = const.CATEGORY_NAMES[key]
+        percent = category_percent[key]
+        message += f"• {icon} {category}: {percent}%\n"
 
     await update.message.reply_text(message)

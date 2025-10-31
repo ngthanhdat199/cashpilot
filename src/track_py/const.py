@@ -200,14 +200,14 @@ SUPPORT_PARENT = "support_parent"
 DATING = "dating"
 
 CATEGORY_ICONS = {
+    FOOD_TRAVEL: "🍔/⛽",
+    DATING: "💖",
+    LONG_INVEST: "📈",
+    OPPORTUNITY_INVEST: "🚀",
+    RENT: "🏠",
+    SUPPORT_PARENT: "👨‍👩‍👧‍👦",
     "food": "🍔",
     "gas": "⛽",
-    "food_and_travel": "🍔/⛽",
-    "dating": "💖",
-    "long_investment": "📈",
-    "opportunity_investment": "🚀",
-    "rent": "🏠",
-    "support_parent": "👨‍👩‍👧‍👦",
     "investment": "💹",
     "other": "🌟",
     "summarized": "📊",
@@ -235,14 +235,14 @@ CATEGORY_ICONS = {
 }
 
 CATEGORY_NAMES = {
+    FOOD_TRAVEL: "Ăn uống & Đi lại",
+    DATING: "Hẹn hò/Giải trí",
+    LONG_INVEST: "Đầu tư dài hạn",
+    OPPORTUNITY_INVEST: "Đầu tư cơ hội",
+    RENT: "Thuê nhà",
+    SUPPORT_PARENT: "Hỗ trợ ba mẹ",
     "food": "Ăn uống",
     "gas": "Xăng / Đi lại",
-    "food_and_travel": "Ăn uống & Đi lại",
-    "dating": "Hẹn hò/Giải trí",
-    "long_investment": "Đầu tư dài hạn",
-    "opportunity_investment": "Đầu tư cơ hội",
-    "rent": "Thuê nhà",
-    "support_parent": "Hỗ trợ ba mẹ",
     "investment": "Đầu tư",
     "other": "Khác",
     "summarized": "Tổng kết",
