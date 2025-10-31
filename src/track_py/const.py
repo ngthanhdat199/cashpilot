@@ -232,6 +232,7 @@ CATEGORY_ICONS = {
     "stats": "📊",
     "categories": "🗂",
     "total": "💲",
+    "sync": "🔄",
 }
 
 CATEGORY_NAMES = {
@@ -259,6 +260,7 @@ CATEGORY_NAMES = {
     "categories": "Danh mục",
     "total": "Tổng cộng",
     "balance": "Tiết kiệm",
+    "sync": "Đồng bộ",
 }
 
 CATEGORY_COLORS = {

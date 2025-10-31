@@ -1534,8 +1534,10 @@ async def categories(update, context):
 
     now = sheet.get_current_time()
     target_month = now.strftime("%m/%Y")
+    year = now.strftime("%Y")
+    month_display = sheet.get_month_display(target_month, year)
 
-    message = f"{category_display['categories']} chi tiêu hiện có:\n\n"
+    message = f"{category_display['categories']} chi tiêu {month_display}:\n\n"
     category_percent = await sheet.get_category_percentages_by_month(target_month)
 
     for key in const.CATEGORY_CELLS.keys():
@@ -1545,3 +1547,38 @@ async def categories(update, context):
         message += f"• {icon} {category}: {percent}%\n"
 
     await update.message.reply_text(message)
+
+
+@safe_async_handler
+async def sync_config(update, context):
+    """Sync configuration to Google Sheets"""
+    try:
+        logger.info(f"Sync config command requested by user {update.effective_user.id}")
+
+        now = sheet.get_current_time()
+        target_month = now.strftime("%m/%Y")
+        year = now.strftime("%Y")
+        month_display = sheet.get_month_display(target_month, year)
+
+        sheet.sync_config_to_sheet(target_month)
+        await update.message.reply_text(
+            f"✅ {category_display['sync']} cấu hình {month_display} thành công!"
+        )
+
+        logger.info(
+            f"Config sync completed successfully for user {update.effective_user.id}"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error in sync_config command for user {update.effective_user.id}: {e}",
+            exc_info=True,
+        )
+        try:
+            await update.message.reply_text(
+                f"❌ Không thể đồng bộ cấu hình. Vui lòng thử lại!\n\nLỗi: {e}"
+            )
+        except Exception as reply_error:
+            logger.error(
+                f"Failed to send error message in sync_config command: {reply_error}"
+            )

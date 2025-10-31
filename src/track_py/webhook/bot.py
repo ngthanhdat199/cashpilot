@@ -29,6 +29,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["ai", "a"], handlers.ai_analyze))
         bot_app.add_handler(CommandHandler(["stats", "stat"], handlers.stats))
         bot_app.add_handler(CommandHandler(["categories", "cat"], handlers.categories))
+        bot_app.add_handler(CommandHandler(["sync", "sync"], handlers.sync_config))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(
@@ -100,6 +101,9 @@ async def setup_bot_commands(bot_app):
             BotCommand(
                 "categories",
                 f"{const.CATEGORY_ICONS['categories']} Show expense categories",
+            ),
+            BotCommand(
+                "sync", f"{const.CATEGORY_ICONS['sync']} Sync config with sheet"
             ),
         ]
         await bot_app.bot.set_my_commands(commands)

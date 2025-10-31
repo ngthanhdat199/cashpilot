@@ -298,44 +298,12 @@ def get_or_create_monthly_sheet(target_month=None):
                     new_sheet = template_sheet.duplicate(new_sheet_name=sheet_name)
                     logger.info(f"Duplicated template sheet to create: {sheet_name}")
 
-                    cells_to_update = []
-                    # write salary and freelance income from config
-                    salary_income = new_sheet.acell(const.SALARY_CELL).value
-                    if not salary_income or salary_income.strip() == "":
-                        salary_income = config["income"]["salary"]
-                        row, col = a1_to_rowcol(const.SALARY_CELL)
-                        cells_to_update.append(
-                            gspread.Cell(row=row, col=col, value=salary_income)
-                        )
-
-                    freelance_income = new_sheet.acell(const.FREELANCE_CELL).value
-                    if not freelance_income or freelance_income.strip() == "":
-                        freelance_income = config["income"]["freelance"]
-                        row, col = a1_to_rowcol(const.FREELANCE_CELL)
-                        cells_to_update.append(
-                            gspread.Cell(row=row, col=col, value=freelance_income)
-                        )
-
-                    # write category percentages from config
-                    for category in config["budgets"]:
-                        if category not in const.CATEGORY_CELLS:
-                            continue
-
-                        cell = const.CATEGORY_CELLS[category]
-                        raw_value = new_sheet.acell(
-                            cell, value_render_option="UNFORMATTED_VALUE"
-                        ).value
-                        if not raw_value or raw_value.strip() == "":
-                            percent = f"{config['budgets'][category]}%"
-                            row, col = a1_to_rowcol(cell)
-                            cells_to_update.append(
-                                gspread.Cell(row=row, col=col, value=percent)
-                            )
-
-                    # update cells in batch to reduce API calls
-                    if cells_to_update:
-                        new_sheet.update_cells(
-                            cells_to_update, value_input_option="USER_ENTERED"
+                    try:
+                        update_config_to_sheet(new_sheet)
+                    except Exception as e:
+                        logger.error(
+                            f"Error updating config to new sheet {sheet_name}: {e}",
+                            exc_info=True,
                         )
 
                     logger.info(f"Created new sheet from template: {sheet_name}")
@@ -1214,7 +1182,63 @@ def get_category_percentages_by_sheet(current_sheet):
 def get_category_percentage(current_sheet: gspread.Worksheet, category):
     cell = const.CATEGORY_CELLS.get(category)
     raw_value = current_sheet.acell(cell, value_render_option="UNFORMATTED_VALUE").value
-    if not raw_value or not str(raw_value).strip().isdigit():
+    if not raw_value:
         percentage = config["budgets"].get(category, 0)
 
     return percentage
+
+
+# helper for sync config command
+def sync_config_to_sheet(target_month):
+    """Helper to sync config to sheet for a given month"""
+    try:
+        logger.info(f"Syncing config to sheet for month {target_month}")
+        current_sheet = get_cached_worksheet(target_month)
+        update_config_to_sheet(current_sheet)
+        logger.info(
+            f"✅ Đồng bộ cấu hình thành công to sheet for month {target_month}!"
+        )
+    except Exception as e:
+        logger.error(
+            f"Error syncing config to sheet for month {target_month}: {e}",
+            exc_info=True,
+        )
+
+
+# helper for update config to sheet
+def update_config_to_sheet(current_sheet: gspread.Worksheet):
+    """Helper to update config to sheet for a given month"""
+    try:
+        cells_to_update = []
+        salary_income = config["income"]["salary"]
+        row, col = a1_to_rowcol(const.SALARY_CELL)
+        cells_to_update.append(gspread.Cell(row=row, col=col, value=salary_income))
+
+        freelance_income = config["income"]["freelance"]
+        row, col = a1_to_rowcol(const.FREELANCE_CELL)
+        cells_to_update.append(gspread.Cell(row=row, col=col, value=freelance_income))
+
+        # write category percentages from config
+        for category in config["budgets"]:
+            if category not in const.CATEGORY_CELLS:
+                continue
+
+            cell = const.CATEGORY_CELLS[category]
+            percent = f"{config['budgets'][category]}%"
+            logger.info(
+                f"Updating category {category} percentage to {percent} in cell {cell}"
+            )
+            row, col = a1_to_rowcol(cell)
+            cells_to_update.append(gspread.Cell(row=row, col=col, value=percent))
+
+        # update cells in batch to reduce API calls
+        if cells_to_update:
+            current_sheet.update_cells(
+                cells_to_update, value_input_option="USER_ENTERED"
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error updating config to sheet: {e}",
+            exc_info=True,
+        )
