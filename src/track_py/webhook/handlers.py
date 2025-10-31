@@ -1551,11 +1551,12 @@ async def categories(update, context):
 
 @safe_async_handler
 async def sync_config(update, context):
-    """Sync configuration to Google Sheets"""
+    """Sync configuration to Google Sheets of next month"""
     try:
         logger.info(f"Sync config command requested by user {update.effective_user.id}")
 
-        now = sheet.get_current_time()
+        # next month
+        now = sheet.get_current_time() + relativedelta(months=1)
         target_month = now.strftime("%m/%Y")
         year = now.strftime("%Y")
         month_display = sheet.get_month_display(target_month, year)
