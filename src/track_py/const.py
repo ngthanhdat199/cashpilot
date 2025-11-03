@@ -163,6 +163,7 @@ LONG_INVEST_KEYWORDS = [
     "ccq",
     "dcds",
     "vesaf",
+    "vàng",
 ]
 OPPORTUNITY_INVEST_KEYWORDS = [
     "crypto",
@@ -240,6 +241,7 @@ CATEGORY_ICONS = {
     "total": "💲",
     "sync": "🔄",
     "keywords": "🔑",
+    "asset": "💎",
 }
 
 CATEGORY_NAMES = {
@@ -269,6 +271,7 @@ CATEGORY_NAMES = {
     "balance": "Tiết kiệm",
     "sync": "Đồng bộ",
     "keywords": "Từ khoá",
+    "asset": "Tài sản",
 }
 
 CATEGORY_COLORS = {

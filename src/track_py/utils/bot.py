@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 from src.track_py.utils.logger import logger
 import src.track_py.utils.sheet as sheet
 import src.track_py.const as const
+from src.track_py.config import config
 
 # Background expense logging queue for better performance
 log_expense_queue = deque()
@@ -164,8 +165,14 @@ async def process_log_month_expenses(target_month, expenses):
         )
         logger.info(f"Got sheet for month {target_month}: {current_sheet.title}")
 
+        asset_sheet = await asyncio.to_thread(
+            sheet.get_cached_worksheet, config["settings"]["assets_sheet_name"]
+        )
+        logger.info(f"Got asset sheet: {asset_sheet.title}")
+
         # Prepare all rows for batch append
         rows_to_append = []
+        assets_to_append = []
         for expense_data in expenses:
             row = [
                 expense_data["entry_date"],
@@ -174,6 +181,20 @@ async def process_log_month_expenses(target_month, expenses):
                 expense_data["note"],
             ]
             rows_to_append.append(row)
+
+            # Check if this expense should also be logged to asset sheet
+            note = expense_data["note"].lower()
+            if sheet.has_keyword(note, const.LONG_INVEST_KEYWORDS) or sheet.has_keyword(
+                note, const.OPPORTUNITY_INVEST_KEYWORDS
+            ):
+                logger.info(f"Logging asset expense for note: {expense_data}")
+                asset_row = [
+                    f"{expense_data['entry_date']}/{expense_data['entry_year']}",
+                    expense_data["entry_time"],
+                    int(expense_data["amount"]),
+                    expense_data["note"],
+                ]
+                assets_to_append.append(asset_row)
 
         # Batch append all rows at once (more efficient than individual appends)
         if len(rows_to_append) == 1:
@@ -188,6 +209,20 @@ async def process_log_month_expenses(target_month, expenses):
             await asyncio.to_thread(
                 lambda: current_sheet.append_rows(
                     rows_to_append, value_input_option="RAW", table_range="A2:D"
+                )
+            )
+
+        # Also log to asset sheet if applicable
+        if assets_to_append:
+            await asyncio.to_thread(
+                lambda: asset_sheet.append_row(
+                    assets_to_append[0], value_input_option="RAW", table_range="A2:D"
+                )
+            )
+        else:
+            await asyncio.to_thread(
+                lambda: asset_sheet.append_rows(
+                    assets_to_append, value_input_option="RAW", table_range="A2:D"
                 )
             )
 
@@ -439,6 +474,7 @@ async def send_message(text, parse_mode="Markdown"):
 async def background_log_expense(
     entry_date,
     entry_time,
+    entry_year,
     amount,
     note,
     target_month,
@@ -453,6 +489,7 @@ async def background_log_expense(
         expense_data = {
             "entry_date": entry_date,
             "entry_time": entry_time,
+            "entry_year": entry_year,
             "amount": amount,
             "note": note,
             "target_month": target_month,

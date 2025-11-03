@@ -43,6 +43,7 @@ def get_categories_display():
     keywords_display = (
         f"{CATEGORY_ICONS.get('keywords')} {CATEGORY_NAMES.get('keywords')}"
     )
+    asset_display = f"{CATEGORY_ICONS.get('asset')} {CATEGORY_NAMES.get('asset')}"
 
     category_display = {
         "rent": rent_display,
@@ -69,6 +70,7 @@ def get_categories_display():
         "balance": balance_display,
         "sync": sync_display,
         "keywords": keywords_display,
+        "assets": asset_display,
     }
 
     return category_display

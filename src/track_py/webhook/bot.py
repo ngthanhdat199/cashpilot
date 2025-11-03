@@ -31,6 +31,7 @@ def setup_bot():
         bot_app.add_handler(CommandHandler(["categories", "cat"], handlers.categories))
         bot_app.add_handler(CommandHandler(["sync", "sync"], handlers.sync_config))
         bot_app.add_handler(CommandHandler(["keywords", "kw"], handlers.list_keywords))
+        bot_app.add_handler(CommandHandler(["assets", "as"], handlers.assets))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(
@@ -109,6 +110,9 @@ async def setup_bot_commands(bot_app):
             ),
             BotCommand(
                 "keywords", f"{const.CATEGORY_ICONS['keywords']} List all keywords"
+            ),
+            BotCommand(
+                "assets", f"{const.CATEGORY_ICONS['asset']} Show assets summary"
             ),
         ]
         await bot_app.bot.set_my_commands(commands)

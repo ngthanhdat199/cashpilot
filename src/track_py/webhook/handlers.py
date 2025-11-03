@@ -156,6 +156,7 @@ async def log_expense(update, context):
         # Parse different input formats
         entry_date = None
         entry_time = None
+        entry_year = None
         amount = None
         note = ""
         target_month = None
@@ -176,6 +177,7 @@ async def log_expense(update, context):
             # now = get_current_time() + datetime.timedelta(days=63)
             entry_date = sheet.get_current_time().strftime("%d/%m")
             entry_time = sheet.get_current_time().strftime("%H:%M:%S")
+            entry_year = sheet.get_current_time().year
             target_month = sheet.get_current_time().strftime("%m/%Y")
 
         # Case B: Date Only - 02/09 5000 cafe or 02/09 5 cf
@@ -194,8 +196,8 @@ async def log_expense(update, context):
             entry_time = "00:00:00"  # Default time
 
             day, month = entry_date.split("/")
-            current_year = sheet.get_current_time().year
-            target_month = f"{month}/{current_year}"
+            entry_year = sheet.get_current_time().year
+            target_month = f"{month}/{entry_year}"
 
         # Case C: Date + Time - 02/09 08:30 15000 breakfast or 02/09 08:30 15 cf
         elif (
@@ -206,6 +208,7 @@ async def log_expense(update, context):
         ):
             entry_date = sheet.normalize_date(parts[0])
             entry_time = sheet.normalize_time(parts[1])
+            entry_year = sheet.get_current_time().year
             amount = int(parts[2])
             raw_note = " ".join(parts[3:]) if len(parts) > 3 else "Không có ghi chú"
 
@@ -258,6 +261,7 @@ async def log_expense(update, context):
             bot.background_log_expense(
                 entry_date,
                 entry_time,
+                entry_year,
                 amount,
                 note,
                 target_month,
@@ -1636,4 +1640,30 @@ async def list_keywords(update: Update, context):
         except Exception as reply_error:
             logger.error(
                 f"Failed to send error message in list_keywords command: {reply_error}"
+            )
+
+
+@safe_async_handler
+async def assets(update: Update, context):
+    """Show total assets"""
+    try:
+        logger.info(f"Assets command requested by user {update.effective_user.id}")
+        response = await sheet.get_assets_response()
+        await update.message.reply_text(response, parse_mode="Markdown")
+        logger.info(
+            f"Assets summary sent successfully to user {update.effective_user.id}"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error in assets command for user {update.effective_user.id}: {e}",
+            exc_info=True,
+        )
+        try:
+            await update.message.reply_text(
+                f"❌ Không thể lấy dữ liệu tài sản. Vui lòng thử lại!\n\nLỗi: {e}"
+            )
+        except Exception as reply_error:
+            logger.error(
+                f"Failed to send error message in assets command: {reply_error}"
             )

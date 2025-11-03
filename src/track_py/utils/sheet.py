@@ -7,6 +7,7 @@ import asyncio
 import datetime
 from google.oauth2.service_account import Credentials
 from gspread.utils import a1_to_rowcol
+from collections import defaultdict
 from src.track_py.utils.logger import logger
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.config import config, PROJECT_ROOT
@@ -1244,3 +1245,96 @@ def update_config_to_sheet(current_sheet: gspread.Worksheet):
             f"Error updating config to sheet: {e}",
             exc_info=True,
         )
+
+
+# helper to get assets response
+async def get_assets_response():
+    """Helper to calculate total assets from config"""
+    try:
+        sheet_name = config["settings"]["assets_sheet_name"]
+        logger.info(f"Successfully obtained sheet for {sheet_name}")
+
+        all_values = await asyncio.to_thread(get_cached_sheet_data, sheet_name)
+        logger.info(f"Retrieved {len(all_values)} records from sheet")
+        records = convert_values_to_records(all_values)
+        assets_summary = get_assets_records_summary(records)
+        assets_expenses = assets_summary["expenses"]
+
+        grouped = defaultdict(list)
+        for r in assets_expenses:
+            date_str = r["Date"]
+            grouped[date_str].append(r)
+
+        details_lines = []
+        for date_str in sorted(grouped.keys(), reverse=True):
+            entries = grouped[date_str]
+            date_total = sum(parse_amount(r["VND"]) for r in entries)
+            details_lines.append(f"📅 {date_str}: {date_total:,.0f} VND")
+            details_lines.extend(
+                format_expense(r, i) for i, r in enumerate(entries, start=1)
+            )
+
+        response = (
+            f"{category_display["assets"]} hiện tại: {assets_summary["total"]:,.0f} VND\n"
+            f"🏦 Đầu tư dài hạn: \n"
+            f"   ├─ 🏅 Vàng → {assets_summary["gold"]:,.0f} VND\n"
+            f"   ├─ 🧾 ETF → {assets_summary["etf"]:,.0f} VND\n"
+            f"   ├─ 📊 DCDS → {assets_summary["dcds"]:,.0f} VND\n"
+            f"   └─ 📈 VESAF → {assets_summary["vesaf"]:,.0f} VND\n"
+            f"🌐 Đầu tư cơ hội: \n"
+            f"   ├─ ₿ Bitcoin → {assets_summary["bitcoin"]:,.0f} VND\n"
+            f"   └─ ✨ Ethereum → {assets_summary["ethereum"]:,.0f} VND\n"
+        )
+
+        if details_lines:
+            response += "\n📋 Chi tiết:\n"
+            response += "\n".join(details_lines)
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error calculating total assets: {e}", exc_info=True)
+        return ""
+
+
+# helper for totals summary
+def get_assets_records_summary(records):
+    """Helper to get total assets summary from records"""
+    summary = {
+        "gold": 0,
+        "etf": 0,
+        "dcds": 0,
+        "vesaf": 0,
+        "bitcoin": 0,
+        "ethereum": 0,
+        "total": 0,
+        "expenses": [],
+        "other": 0,
+    }
+
+    for r in records:
+        note = r.get("Note", "").lower()
+        amount = parse_amount(r.get("VND", 0))
+
+        if amount == 0:
+            continue
+
+        summary["expenses"].append(r)
+        summary["total"] += amount
+
+        if has_keyword(note, ["vàng"]):
+            summary["gold"] += amount
+        elif has_keyword(note, ["etf"]):
+            summary["etf"] += amount
+        elif has_keyword(note, ["dcds"]):
+            summary["dcds"] += amount
+        elif has_keyword(note, ["vesaf"]):
+            summary["vesaf"] += amount
+        elif has_keyword(note, ["btc"]):
+            summary["bitcoin"] += amount
+        elif has_keyword(note, ["eth"]):
+            summary["ethereum"] += amount
+        else:
+            summary["other"] += amount
+
+    return summary
