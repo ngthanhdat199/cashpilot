@@ -160,24 +160,20 @@ LONG_INVEST_KEYWORDS = [
     "chứng khoán",
     "cổ phiếu",
     "etf",
+    "ccq",
+    "dcds",
+    "vesaf",
+]
+OPPORTUNITY_INVEST_KEYWORDS = [
+    "crypto",
     "bitcoin",
     "btc",
     "ethereum",
     "eth",
 ]
-OPPORTUNITY_INVEST_KEYWORDS = [
-    "crypto",
-    "altcoin",
-    "sol",
-    "avax",
-    "link",
-    "growth stock",
-    "small-cap",
-    "thematic etf",
-    "cổ phiếu tăng trưởng",
-]
 RENT_KEYWORD = ["thuê nhà"]
 SUPPORT_PARENT_KEYWORDS = ["gửi mẹ"]
+
 SALARY_CELL = "I2"
 FREELANCE_CELL = "J2"
 TOTAL_EXPENSE_CELL = "G2"
@@ -198,6 +194,16 @@ RENT = "rent"
 OPPORTUNITY_INVEST = "opportunity_investment"
 SUPPORT_PARENT = "support_parent"
 DATING = "dating"
+
+# Keywords mapping for categories
+LIST_KEYWORDS = {
+    FOOD_TRAVEL: FOOD_KEYWORDS,
+    DATING: DATING_KEYWORDS,
+    LONG_INVEST: LONG_INVEST_KEYWORDS,
+    OPPORTUNITY_INVEST: OPPORTUNITY_INVEST_KEYWORDS,
+    RENT: RENT_KEYWORD,
+    SUPPORT_PARENT: SUPPORT_PARENT_KEYWORDS,
+}
 
 CATEGORY_ICONS = {
     FOOD_TRAVEL: "🍔/⛽",
@@ -233,13 +239,14 @@ CATEGORY_ICONS = {
     "categories": "🗂",
     "total": "💲",
     "sync": "🔄",
+    "keywords": "🔑",
 }
 
 CATEGORY_NAMES = {
     FOOD_TRAVEL: "Ăn uống & Đi lại",
-    DATING: "Hẹn hò/Giải trí",
-    LONG_INVEST: "Đầu tư dài hạn",
-    OPPORTUNITY_INVEST: "Đầu tư cơ hội",
+    DATING: "Hẹn hò & Giải trí",
+    LONG_INVEST: "Đầu tư dài hạn (CCQ)",
+    OPPORTUNITY_INVEST: "Đầu tư cơ hội (Crypto)",
     RENT: "Thuê nhà",
     SUPPORT_PARENT: "Hỗ trợ ba mẹ",
     "food": "Ăn uống",
@@ -261,6 +268,7 @@ CATEGORY_NAMES = {
     "total": "Tổng cộng",
     "balance": "Tiết kiệm",
     "sync": "Đồng bộ",
+    "keywords": "Từ khoá",
 }
 
 CATEGORY_COLORS = {

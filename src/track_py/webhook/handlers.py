@@ -4,6 +4,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     WebAppInfo,
+    Update,
 )
 from telegram.ext import CallbackContext
 import datetime
@@ -750,9 +751,7 @@ async def gas(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-        )
+        month_display = sheet.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in gas_expenses:
@@ -833,9 +832,7 @@ async def food(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-        )
+        month_display = sheet.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in food_expenses:
@@ -918,9 +915,7 @@ async def dating(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-        )
+        month_display = sheet.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in dating_expenses:
@@ -1003,9 +998,7 @@ async def other(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-        )
+        month_display = sheet.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in other_expenses:
@@ -1105,9 +1098,7 @@ async def investment(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-        )
+        month_display = sheet.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in investment_expenses:
@@ -1143,10 +1134,10 @@ async def investment(update, context):
             current_sheet, const.OPPORTUNITY_INVEST
         )
         long_invest_estimate = (
-            total_income * (long_invest_budget / 100) if total_income > 0 else 0
+            total_income * long_invest_budget if total_income > 0 else 0
         )
         opportunity_invest_estimate = (
-            total_income * (opportunity_invest_budget / 100) if total_income > 0 else 0
+            total_income * opportunity_invest_budget if total_income > 0 else 0
         )
 
         response = (
@@ -1157,14 +1148,13 @@ async def investment(update, context):
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 Phân bổ danh mục\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            f"📈 Đầu tư dài hạn: {long_invest_estimate:,.0f} VND\n"
-            f"   • 📊 ETF (60%) → {long_invest_estimate * 0.6:,.0f} VND\n"
-            f"   • ₿ BTC/ETH (40%) → {long_invest_estimate * 0.4:,.0f} VND\n"
-            f"      - ₿ BTC (70%) → {long_invest_estimate * 0.4 * 0.7:,.0f} VND\n"
-            f"      - Ξ ETH (30%) → {long_invest_estimate * 0.4 * 0.3:,.0f} VND\n\n"
-            f"🚀 Đầu tư cơ hội: {opportunity_invest_estimate:,.0f} VND\n"
-            f"   • 🪙 Altcoin (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n"
-            f"   • 📈 Growth Stocks / Thematic ETF (50%) → {opportunity_invest_estimate * 0.5:,.0f} VND\n\n"
+            f"💰 Danh mục đầu tư\n\n"
+            f"🏦 Đầu tư dài hạn (CCQ): {long_invest_estimate:,.0f} VND\n"
+            f"   ├─ 📊 DCDS (50%) → {long_invest_estimate * 0.5:,.0f} VND\n"
+            f"   └─ 📈 VESAF (50%) → {long_invest_estimate * 0.5:,.0f} VND\n\n"
+            f"🌐 Đầu tư cơ hội (Crypto): {opportunity_invest_estimate:,.0f} VND\n"
+            f"   ├─ ₿ Bitcoin (70%) → {opportunity_invest_estimate * 0.7:,.0f} VND\n"
+            f"   └─ ✨ Ethereum (30%) → {opportunity_invest_estimate * 0.3:,.0f} VND\n"
             "━━━━━━━━━━━━━━━━━━\n"
             "📌 Lịch sử giao dịch\n"
             "━━━━━━━━━━━━━━━━━━\n"
@@ -1234,9 +1224,7 @@ async def freelance(update, context):
         now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         target_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
-        )
+        month_display = sheet.get_month_display(target_month, target_year)
         current_sheet = await asyncio.to_thread(
             sheet.get_cached_worksheet, target_month
         )
@@ -1312,9 +1300,7 @@ async def salary(update, context):
         now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         target_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(now.strftime('%m'), now.strftime('%m'))}/{target_year}"
-        )
+        month_display = sheet.get_month_display(target_month, target_year)
         current_sheet = await asyncio.to_thread(
             sheet.get_cached_worksheet, target_month
         )
@@ -1456,9 +1442,7 @@ async def income(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = (
-            f"{MONTH_NAMES.get(current_month, current_month)}/{current_year}"
-        )
+        month_display = sheet.get_month_display(current_month, current_year)
 
         response = (
             f"{category_display['income']} {month_display}:\n"
@@ -1529,24 +1513,44 @@ async def stats(update, context):
 
 
 @safe_async_handler
-async def categories(update, context):
+async def categories(update: Update, context):
     """Show expense categories"""
+    try:
+        logger.info(f"Categories command requested by user {update.effective_user.id}")
 
-    now = sheet.get_current_time()
-    target_month = now.strftime("%m/%Y")
-    year = now.strftime("%Y")
-    month_display = sheet.get_month_display(target_month, year)
+        now = sheet.get_current_time()
+        target_month = now.strftime("%m")
+        year = now.strftime("%Y")
+        month_display = sheet.get_month_display(target_month, year)
+        sheet_name = f"{target_month}/{year}"
 
-    message = f"{category_display['categories']} chi tiêu {month_display}:\n\n"
-    category_percent = await sheet.get_category_percentages_by_month(target_month)
+        message = f"{category_display['categories']} chi tiêu {month_display}:\n"
 
-    for key in const.CATEGORY_CELLS.keys():
-        icon = const.CATEGORY_ICONS[key]
-        category = const.CATEGORY_NAMES[key]
-        percent = category_percent[key]
-        message += f"• {icon} {category}: {percent}%\n"
+        category_percent = await sheet.get_category_percentages_by_sheet_name(
+            sheet_name
+        )
 
-    await update.message.reply_text(message)
+        for key in const.CATEGORY_CELLS.keys():
+            icon = const.CATEGORY_ICONS[key]
+            category = const.CATEGORY_NAMES[key]
+            percent = category_percent[key]
+            message += f"• {icon} {category}: {percent}%\n"
+
+        await update.message.reply_text(message, parse_mode="MarkdownV2")
+    except Exception as e:
+        logger.error(
+            f"Error in categories command for user {update.effective_user.id}: {e}",
+            exc_info=True,
+        )
+        try:
+            await update.message.reply_text(
+                f"❌ Không thể lấy danh mục chi tiêu. Vui lòng thử lại!\n\nLỗi: {e}"
+            )
+        except Exception as reply_error:
+            logger.error(
+                f"Failed to send error message in categories command: {reply_error}"
+            )
+        return
 
 
 @safe_async_handler
@@ -1557,7 +1561,7 @@ async def sync_config(update, context):
 
         # next month
         now = sheet.get_current_time() + relativedelta(months=1)
-        target_month = now.strftime("%m/%Y")
+        target_month = now.strftime("%m")
         year = now.strftime("%Y")
         month_display = sheet.get_month_display(target_month, year)
 
@@ -1582,4 +1586,54 @@ async def sync_config(update, context):
         except Exception as reply_error:
             logger.error(
                 f"Failed to send error message in sync_config command: {reply_error}"
+            )
+
+
+@safe_async_handler
+async def list_keywords(update: Update, context):
+    """List all keywords from constants"""
+    try:
+        logger.info(
+            f"List keywords command requested by user {update.effective_user.id}"
+        )
+
+        keywords = const.LIST_KEYWORDS
+        message_lines = [f"{category_display['keywords']}\n"]
+
+        for category, words in keywords.items():
+            icon = const.CATEGORY_ICONS.get(category, "🏷️")
+            category_name = const.CATEGORY_NAMES.get(category, category)
+
+            # Category header
+            message_lines.append(f"{icon} {category_name}")
+            message_lines.append("-" * 35)
+
+            # Format keywords in 2–3 columns
+            per_line = 3
+            for i in range(0, len(words), per_line):
+                chunk = " • ".join(words[i : i + per_line])
+                message_lines.append(f"   {chunk}")
+
+            message_lines.append("")  # Add spacing between categories
+
+        # Wrap entire message in a Telegram code block
+        message = "```\n" + "\n".join(message_lines) + "\n```"
+
+        await update.message.reply_text(message, parse_mode="MarkdownV2")
+        logger.info(
+            f"Keywords list sent successfully to user {update.effective_user.id}"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error in list_keywords command for user {update.effective_user.id}: {e}",
+            exc_info=True,
+        )
+        try:
+            await update.message.reply_text(
+                f"❌ Không thể lấy danh sách từ khóa. Vui lòng thử lại!\n\nLỗi: {e}"
+            )
+        except Exception as reply_error:
+            logger.error(
+                f"Failed to send error message in list_keywords command: {reply_error}"
             )

@@ -469,8 +469,9 @@ async def expense_dashboard():
 
         now = get_current_time()
         target_month = now.strftime("%m/%Y")
+        sheet_name = now.strftime("%m/%Y")
 
-        month_value = await asyncio.to_thread(sheet.get_cached_sheet_data, target_month)
+        month_value = await asyncio.to_thread(sheet.get_cached_sheet_data, sheet_name)
 
         # Get week and daily data concurrently
         week_data_task = sheet.get_week_process_data(now)
@@ -519,7 +520,9 @@ async def expense_dashboard():
         week_categories = []
         day_categories = []
 
-        category_percent = await sheet.get_category_percentages_by_month(target_month)
+        category_percent = await sheet.get_category_percentages_by_sheet_name(
+            sheet_name
+        )
         cat_meta = {
             cat: {
                 "color": const.CATEGORY_COLORS.get(cat, "#000000"),

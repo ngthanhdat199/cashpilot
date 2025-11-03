@@ -1142,8 +1142,8 @@ def get_month_budget_by_sheet(current_sheet):
 
 
 # helper for month budget percentages
-async def get_category_percentages_by_month(month):
-    current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
+async def get_category_percentages_by_sheet_name(sheet_name):
+    current_sheet = await asyncio.to_thread(get_cached_worksheet, sheet_name)
     percentages = get_category_percentages_by_sheet(current_sheet)
     return percentages
 
@@ -1181,8 +1181,10 @@ def get_category_percentages_by_sheet(current_sheet):
 # helper for get percentage spend for a category
 def get_category_percentage(current_sheet: gspread.Worksheet, category):
     cell = const.CATEGORY_CELLS.get(category)
-    raw_value = current_sheet.acell(cell, value_render_option="UNFORMATTED_VALUE").value
-    if not raw_value:
+    percentage = current_sheet.acell(
+        cell, value_render_option="UNFORMATTED_VALUE"
+    ).value
+    if not percentage:
         percentage = config["budgets"].get(category, 0)
 
     return percentage
