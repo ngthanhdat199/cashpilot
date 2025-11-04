@@ -391,57 +391,18 @@ async def sort(update, context):
             target_month = context.args[0]
 
         sheet_name = target_month
-        await asset.sort_expenses_by_date(sheet_name)
 
-        # current_sheet = await asyncio.to_thread(
-        #     sheet.get_cached_worksheet, target_month
-        # )
-
-        # # Get all data
-        # all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, target_month)
-
-        # if len(all_values) > 2:  # More than header + 1 row
-        #     data_rows = all_values[1:]
-
-        #     # Sort by date and time
-        #     sorted_data = sorted(
-        #         data_rows,
-        #         key=lambda x: (
-        #             x[0] if len(x) > 0 else "",  # Date
-        #             x[1] if len(x) > 1 else "",  # Time
-        #         ),
-        #     )
-
-        #     # Clean up amounts
-        #     for row in sorted_data:
-        #         if len(row) >= 3 and row[2]:
-        #             try:
-        #                 row[2] = int(
-        #                     float(str(row[2]).replace(",", "").replace("₫", "").strip())
-        #                 )
-        #             except (ValueError, TypeError):
-        #                 pass
-
-        #     # Update the sorted data
-        #     await asyncio.to_thread(
-        #         lambda: current_sheet.update(
-        #             f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
-        #         )
-        #     )
-
-        #     # Invalidate cache
-        #     sheet.invalidate_sheet_cache(target_month)
-
-        #     await update.message.reply_text(
-        #         f"✅ Đã sắp xếp {len(sorted_data)} dòng dữ liệu trong sheet {target_month}"
-        #     )
-        #     logger.info(
-        #         f"Manually sorted {len(sorted_data)} rows in sheet {target_month}"
-        #     )
-        # else:
-        #     await update.message.reply_text(
-        #         "📋 Sheet không cần sắp xếp (ít hơn 2 dòng dữ liệu)"
-        #     )
+        try:
+            sorted_count = await sheet.sort_expenses_by_date(sheet_name)
+            await update.message.reply_text(
+                f"✅ Đã sắp xếp {sorted_count} dòng dữ liệu trong sheet {target_month}"
+            )
+        except Exception as sort_error:
+            logger.error(f"Error sorting sheet {sheet_name}: {sort_error}")
+            await update.message.reply_text(
+                f"❌ Có lỗi khi sắp xếp sheet {sheet_name}: {sort_error}"
+            )
+            return
 
     except Exception as e:
         logger.error(f"Error sorting sheet data: {e}")

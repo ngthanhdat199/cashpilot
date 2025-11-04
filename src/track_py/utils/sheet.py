@@ -15,6 +15,7 @@ from src.track_py.utils.logger import logger
 import src.track_py.const as const
 import src.track_py.utils.util as util
 from src.track_py.utils.category import category_display
+from src.track_py.utils.datetime import parse_date_time
 
 # Performance optimization: Cache for sheet data to reduce API calls
 _sheet_cache = {}
@@ -1245,3 +1246,48 @@ def update_config_to_sheet(current_sheet: gspread.Worksheet):
             f"Error updating config to sheet: {e}",
             exc_info=True,
         )
+
+
+async def sort_expenses_by_date(sheet_name):
+    """Helper to sort expenses in a given month sheet by date"""
+    try:
+        logger.info(f"Sorting expenses in sheet {sheet_name}...")
+        current_sheet = await asyncio.to_thread(get_cached_worksheet, sheet_name)
+
+        # Get all data
+        all_values = await asyncio.to_thread(get_cached_sheet_data, sheet_name)
+
+        if len(all_values) > 2:  # More than header + 1 row
+            data_rows = all_values[1:]
+            sorted_data = sorted(data_rows, key=parse_date_time)
+
+            # format amounts VND
+            for row in sorted_data:
+                if len(row) >= 3 and row[2]:
+                    try:
+                        row[2] = int(
+                            float(str(row[2]).replace(",", "").replace("₫", "").strip())
+                        )
+                    except (ValueError, TypeError):
+                        pass
+
+            # Update the sorted data
+            await asyncio.to_thread(
+                lambda: current_sheet.update(
+                    f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
+                )
+            )
+
+            # Invalidate cache
+            invalidate_sheet_cache(sheet_name)
+            logger.info(
+                f"Manually sorted {len(sorted_data)} rows in sheet {sheet_name}"
+            )
+            return len(sorted_data)
+        else:
+            logger.info(f"No data to sort in sheet {sheet_name}")
+            return 0
+
+    except Exception as e:
+        logger.error(f"Error starting sort for sheet {sheet_name}: {e}", exc_info=True)
+        return 0

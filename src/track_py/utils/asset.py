@@ -9,7 +9,6 @@ from src.track_py.utils.logger import logger
 import src.track_py.const as const
 import src.track_py.utils.util as util
 from src.track_py.utils.category import category_display
-from src.track_py.utils.datetime import parse_date_time
 import src.track_py.utils.sheet as sheet
 
 
@@ -22,7 +21,7 @@ async def get_assets_response():
 
         # sort
         try:
-            await sort_expenses_by_date(sheet_name)
+            await sheet.sort_expenses_by_date(sheet_name)
         except Exception as sort_error:
             logger.error(f"Error sorting assets sheet {sheet_name}: {sort_error}")
 
@@ -218,44 +217,3 @@ def get_assets_expenses_records(records, year):
             expenses_row.append(row)
 
     return expenses_row
-
-
-async def sort_expenses_by_date(sheet_name):
-    try:
-        logger.info(f"Sorting expenses in sheet {sheet_name}...")
-        current_sheet = await asyncio.to_thread(sheet.get_cached_worksheet, sheet_name)
-
-        # Get all data
-        all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, sheet_name)
-
-        if len(all_values) > 2:  # More than header + 1 row
-            data_rows = all_values[1:]
-            sorted_data = sorted(data_rows, key=parse_date_time)
-
-            # format amounts VND
-            for row in sorted_data:
-                if len(row) >= 3 and row[2]:
-                    try:
-                        row[2] = int(
-                            float(str(row[2]).replace(",", "").replace("₫", "").strip())
-                        )
-                    except (ValueError, TypeError):
-                        pass
-
-            # Update the sorted data
-            await asyncio.to_thread(
-                lambda: current_sheet.update(
-                    f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
-                )
-            )
-
-            # Invalidate cache
-            sheet.invalidate_sheet_cache(sheet_name)
-            logger.info(
-                f"Manually sorted {len(sorted_data)} rows in sheet {sheet_name}"
-            )
-        else:
-            logger.info(f"No data to sort in sheet {sheet_name}")
-
-    except Exception as e:
-        logger.error(f"Error starting sort for sheet {sheet_name}: {e}", exc_info=True)
