@@ -14,6 +14,7 @@ from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
 import src.track_py.utils.sheet as sheet
+import src.track_py.utils.asset as asset
 from src.track_py.utils.util import markdown_to_html
 import src.track_py.const as const
 from src.track_py.config import config, save_config
@@ -389,55 +390,58 @@ async def sort(update, context):
         if context.args and len(context.args) > 0:
             target_month = context.args[0]
 
-        current_sheet = await asyncio.to_thread(
-            sheet.get_cached_worksheet, target_month
-        )
+        sheet_name = target_month
+        await asset.sort_expenses_by_date(sheet_name)
 
-        # Get all data
-        all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, target_month)
+        # current_sheet = await asyncio.to_thread(
+        #     sheet.get_cached_worksheet, target_month
+        # )
 
-        if len(all_values) > 2:  # More than header + 1 row
-            data_rows = all_values[1:]
+        # # Get all data
+        # all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, target_month)
 
-            # Sort by date and time
-            sorted_data = sorted(
-                data_rows,
-                key=lambda x: (
-                    x[0] if len(x) > 0 else "",  # Date
-                    x[1] if len(x) > 1 else "",  # Time
-                ),
-            )
+        # if len(all_values) > 2:  # More than header + 1 row
+        #     data_rows = all_values[1:]
 
-            # Clean up amounts
-            for row in sorted_data:
-                if len(row) >= 3 and row[2]:
-                    try:
-                        row[2] = int(
-                            float(str(row[2]).replace(",", "").replace("₫", "").strip())
-                        )
-                    except (ValueError, TypeError):
-                        pass
+        #     # Sort by date and time
+        #     sorted_data = sorted(
+        #         data_rows,
+        #         key=lambda x: (
+        #             x[0] if len(x) > 0 else "",  # Date
+        #             x[1] if len(x) > 1 else "",  # Time
+        #         ),
+        #     )
 
-            # Update the sorted data
-            await asyncio.to_thread(
-                lambda: current_sheet.update(
-                    f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
-                )
-            )
+        #     # Clean up amounts
+        #     for row in sorted_data:
+        #         if len(row) >= 3 and row[2]:
+        #             try:
+        #                 row[2] = int(
+        #                     float(str(row[2]).replace(",", "").replace("₫", "").strip())
+        #                 )
+        #             except (ValueError, TypeError):
+        #                 pass
 
-            # Invalidate cache
-            sheet.invalidate_sheet_cache(target_month)
+        #     # Update the sorted data
+        #     await asyncio.to_thread(
+        #         lambda: current_sheet.update(
+        #             f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
+        #         )
+        #     )
 
-            await update.message.reply_text(
-                f"✅ Đã sắp xếp {len(sorted_data)} dòng dữ liệu trong sheet {target_month}"
-            )
-            logger.info(
-                f"Manually sorted {len(sorted_data)} rows in sheet {target_month}"
-            )
-        else:
-            await update.message.reply_text(
-                "📋 Sheet không cần sắp xếp (ít hơn 2 dòng dữ liệu)"
-            )
+        #     # Invalidate cache
+        #     sheet.invalidate_sheet_cache(target_month)
+
+        #     await update.message.reply_text(
+        #         f"✅ Đã sắp xếp {len(sorted_data)} dòng dữ liệu trong sheet {target_month}"
+        #     )
+        #     logger.info(
+        #         f"Manually sorted {len(sorted_data)} rows in sheet {target_month}"
+        #     )
+        # else:
+        #     await update.message.reply_text(
+        #         "📋 Sheet không cần sắp xếp (ít hơn 2 dòng dữ liệu)"
+        #     )
 
     except Exception as e:
         logger.error(f"Error sorting sheet data: {e}")
@@ -1644,11 +1648,11 @@ async def list_keywords(update: Update, context):
 
 
 @safe_async_handler
-async def assets(update: Update, context):
+async def list_assets(update: Update, context):
     """Show total assets"""
     try:
         logger.info(f"Assets command requested by user {update.effective_user.id}")
-        response = await sheet.get_assets_response()
+        response = await asset.get_assets_response()
         await update.message.reply_text(response, parse_mode="Markdown")
         logger.info(
             f"Assets summary sent successfully to user {update.effective_user.id}"
@@ -1666,4 +1670,32 @@ async def assets(update: Update, context):
         except Exception as reply_error:
             logger.error(
                 f"Failed to send error message in assets command: {reply_error}"
+            )
+
+
+@safe_async_handler
+async def migrate_assets(update: Update, context):
+    """Migrate assets data to new format"""
+    try:
+        logger.info(
+            f"Migrate assets command requested by user {update.effective_user.id}"
+        )
+        result = asset.migrate_assets_data()
+        await update.message.reply_text(result, parse_mode="Markdown")
+        logger.info(
+            f"Assets migration completed successfully for user {update.effective_user.id}"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error in migrate_assets command for user {update.effective_user.id}: {e}",
+            exc_info=True,
+        )
+        try:
+            await update.message.reply_text(
+                f"❌ Không thể di chuyển dữ liệu tài sản. Vui lòng thử lại!\n\nLỗi: {e}"
+            )
+        except Exception as reply_error:
+            logger.error(
+                f"Failed to send error message in migrate_assets command: {reply_error}"
             )

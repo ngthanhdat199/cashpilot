@@ -1,4 +1,7 @@
 import re
+import json
+from datetime import datetime
+from decimal import Decimal
 from src.track_py.const import MONTH_NAMES
 
 
@@ -11,3 +14,17 @@ def markdown_to_html(text: str) -> str:
 
 def get_month_display(month: int, year: int) -> str:
     return f"{MONTH_NAMES.get(month, month)}/{year}"
+
+
+def to_json(data, indent=2):
+    """Safely convert any object to a JSON string with pretty formatting."""
+
+    def default(o):
+        if isinstance(o, (datetime, Decimal)):
+            return str(o)
+        return f"<<non-serializable: {type(o).__name__}>>"
+
+    try:
+        return json.dumps(data, indent=indent, ensure_ascii=False, default=default)
+    except Exception as e:
+        return f"<<JSON encode error: {e}>>"

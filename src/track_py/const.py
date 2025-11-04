@@ -242,6 +242,7 @@ CATEGORY_ICONS = {
     "sync": "🔄",
     "keywords": "🔑",
     "asset": "💎",
+    "migrate_assets": "🚚",
 }
 
 CATEGORY_NAMES = {
@@ -272,6 +273,7 @@ CATEGORY_NAMES = {
     "sync": "Đồng bộ",
     "keywords": "Từ khoá",
     "asset": "Tài sản",
+    "migrate_assets": "Di chuyển tài sản",
 }
 
 CATEGORY_COLORS = {

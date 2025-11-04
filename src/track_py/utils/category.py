@@ -44,6 +44,9 @@ def get_categories_display():
         f"{CATEGORY_ICONS.get('keywords')} {CATEGORY_NAMES.get('keywords')}"
     )
     asset_display = f"{CATEGORY_ICONS.get('asset')} {CATEGORY_NAMES.get('asset')}"
+    migrate_assets_display = (
+        f"{CATEGORY_ICONS.get('migrate_assets')} {CATEGORY_NAMES.get('migrate_assets')}"
+    )
 
     category_display = {
         "rent": rent_display,
@@ -71,6 +74,7 @@ def get_categories_display():
         "sync": sync_display,
         "keywords": keywords_display,
         "assets": asset_display,
+        "migrate_assets": migrate_assets_display,
     }
 
     return category_display
