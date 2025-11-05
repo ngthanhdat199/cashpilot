@@ -96,7 +96,7 @@ def format_expense(r: Record, index=None):
         note_icon = const.CATEGORY_ICONS[const.OPPORTUNITY_INVEST]
     elif has_keyword(note_str, const.SUPPORT_PARENT_KEYWORDS):
         note_icon = const.CATEGORY_ICONS[const.SUPPORT_PARENT]
-    elif const.RENT_KEYWORD in note_str:
+    elif has_keyword(note_str, const.RENT_KEYWORD):
         note_icon = const.CATEGORY_ICONS[const.RENT]
     else:
         note_icon = "📝"
