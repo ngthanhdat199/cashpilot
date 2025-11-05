@@ -6,7 +6,7 @@ import src.track_py.webhook.handlers as handlers
 
 
 # Initialize bot application immediately
-def setup_bot():
+def setup_bot() -> Application:
     """Setup the bot application (synchronous part only)"""
     try:
         bot_app = Application.builder().token(const.TELEGRAM_TOKEN).build()
@@ -65,7 +65,7 @@ def setup_bot():
         raise
 
 
-async def setup_bot_commands(bot_app):
+async def setup_bot_commands(bot_app: Application) -> None:
     """Setup bot commands and menu (async part)"""
     try:
         # Set custom menu button
@@ -116,10 +116,6 @@ async def setup_bot_commands(bot_app):
             ),
             BotCommand(
                 "assets", f"{const.CATEGORY_ICONS['asset']} Show assets summary"
-            ),
-            BotCommand(
-                "migrate_assets",
-                f"{const.CATEGORY_ICONS['migrate_assets']} Migrate assets data",
             ),
         ]
         await bot_app.bot.set_my_commands(commands)

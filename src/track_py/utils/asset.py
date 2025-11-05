@@ -13,7 +13,7 @@ import src.track_py.utils.sheet as sheet
 
 
 # helper to get assets response
-async def get_assets_response():
+async def get_assets_response() -> str:
     """Helper to calculate total assets from config"""
     try:
         sheet_name = config["settings"]["assets_sheet_name"]
@@ -32,14 +32,14 @@ async def get_assets_response():
 
         grouped = defaultdict(list)
         for r in assets_expenses:
-            date_str = r["Date"]
+            date_str = r["date"]
             grouped[date_str].append(r)
 
         details_lines = []
         for day, rows in sorted(
             grouped.items(), key=lambda x: datetime.datetime.strptime(x[0], "%d/%m/%Y")
         ):
-            date_total = sum(sheet.parse_amount(r["VND"]) for r in rows)
+            date_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details_lines.append(f"\n📅 {day}: {date_total:,.0f} VND")
             details_lines.extend(
                 sheet.format_expense(r, i) for i, r in enumerate(rows, start=1)
@@ -69,7 +69,7 @@ async def get_assets_response():
 
 
 # helper for totals summary
-def get_assets_records_summary(records):
+def get_assets_records_summary(records: list[sheet.Record]) -> dict:
     """Helper to get total assets summary from records"""
     summary = {
         "gold": 0,
@@ -84,8 +84,8 @@ def get_assets_records_summary(records):
     }
 
     for r in records:
-        note = r.get("Note", "").lower()
-        amount = sheet.parse_amount(r.get("VND", 0))
+        note = r["note"].lower()
+        amount = sheet.parse_amount(r["vnd"])
 
         if amount == 0:
             continue
@@ -111,7 +111,7 @@ def get_assets_records_summary(records):
     return summary
 
 
-def migrate_assets_data():
+def migrate_assets_data() -> str:
     """Helper to migrate assets data from expenses sheet to assets sheet"""
     try:
         current_time = datetime.datetime.now()
@@ -176,7 +176,7 @@ def migrate_assets_data():
         return
 
 
-def get_assets_expenses(sheet_name, year):
+def get_assets_expenses(sheet_name: str, year: int) -> list[list]:
     """Fetch total expense for a given month sheet"""
     try:
         current_sheet = sheet.get_monthly_sheet_if_exists(sheet_name)
@@ -195,11 +195,11 @@ def get_assets_expenses(sheet_name, year):
     return []
 
 
-def get_assets_expenses_records(records, year):
+def get_assets_expenses_records(records: list[sheet.Record], year: int) -> list[list]:
     expenses_row = []
 
     for r in records:
-        note = r.get("Note", "").lower()
+        note = r["note"].lower()
         if (
             sheet.has_keyword(note, ["vàng"])
             or sheet.has_keyword(note, ["etf"])
@@ -208,12 +208,12 @@ def get_assets_expenses_records(records, year):
             or sheet.has_keyword(note, ["btc"])
             or sheet.has_keyword(note, ["eth"])
         ):
-            date = r.get("Date", "").strip()
+            date = r["date"].strip()
             # Check if year is already in date, if not add it
             if date and "/" in date and len(date.split("/")) == 2:
-                r["Date"] = f"{date}/{year}"
+                r["date"] = f"{date}/{year}"
 
-            row = [r["Date"], r["Time"], sheet.parse_amount(r["VND"]), r["Note"]]
+            row = [r["date"], r["time"], sheet.parse_amount(r["vnd"]), r["note"]]
             expenses_row.append(row)
 
     return expenses_row

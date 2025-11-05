@@ -20,12 +20,13 @@ import src.track_py.const as const
 from src.track_py.config import config, save_config
 from src.track_py.utils.category import category_display
 import src.track_py.utils.bot as bot
+import src.track_py.utils.util as util
 
 
 def safe_async_handler(handler_func):
     """Decorator to ensure handlers run in a safe async context"""
 
-    async def wrapper(update, context):
+    async def wrapper(update: Update, context: CallbackContext):
         try:
             # Get information about the current async context
             try:
@@ -76,7 +77,7 @@ def safe_async_handler(handler_func):
 
 
 @safe_async_handler
-async def start(update, context):
+async def start(update: Update, context: CallbackContext):
     """Send welcome message when bot starts"""
     try:
         logger.info(f"Start command requested by user {update.effective_user.id}")
@@ -111,7 +112,7 @@ async def start(update, context):
 
 
 @safe_async_handler
-async def help(update, context):
+async def help(update: Update, context: CallbackContext):
     """Show help message"""
     try:
         logger.info(f"Help command requested by user {update.effective_user.id}")
@@ -133,7 +134,7 @@ async def help(update, context):
 
 
 @safe_async_handler
-async def log_expense(update, context):
+async def log_expense(update: Update, context: CallbackContext):
     """Log expense to Google Sheet with smart date/time parsing - Enhanced UX with Progressive Loading
 
     Features:
@@ -293,7 +294,7 @@ async def log_expense(update, context):
 
 
 @safe_async_handler
-async def delete_expense(update, context):
+async def delete_expense(update: Update, context: CallbackContext):
     """Delete expense entry from Google Sheet"""
     text = update.message.text.strip()
 
@@ -380,7 +381,7 @@ async def delete_expense(update, context):
 
 
 @safe_async_handler
-async def sort(update, context):
+async def sort(update: Update, context: CallbackContext):
     """Manually sort sheet data when needed (can be called periodically with /sort command)"""
     try:
         now = sheet.get_current_time()
@@ -410,7 +411,7 @@ async def sort(update, context):
 
 
 @safe_async_handler
-async def today(update, context):
+async def today(update: Update, context: CallbackContext):
     """Get today's total expenses"""
     try:
         logger.info(f"Today command requested by user {update.effective_user.id}")
@@ -457,7 +458,7 @@ async def today(update, context):
 
 
 @safe_async_handler
-async def week(update, context: CallbackContext):
+async def week(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -478,7 +479,6 @@ async def week(update, context: CallbackContext):
 
         grouped = defaultdict(list)
         for r in week_expenses:
-            # grouped[r.get("Date", "")].append(r)
             date_str = r["expense_date"].strftime("%d/%m/%Y")
             grouped[date_str].append(r)
 
@@ -486,7 +486,7 @@ async def week(update, context: CallbackContext):
         for day, rows in sorted(
             grouped.items(), key=lambda d: datetime.datetime.strptime(d[0], "%d/%m/%Y")
         ):
-            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details_lines.append(f"\n📅 {day}: {day_total:,.0f} VND")
             details_lines.extend(
                 sheet.format_expense(r, i) for i, r in enumerate(rows, start=1)
@@ -512,7 +512,7 @@ async def week(update, context: CallbackContext):
 
 
 @safe_async_handler
-async def month(update, context: CallbackContext):
+async def month(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -583,7 +583,7 @@ async def month(update, context: CallbackContext):
 
 
 @safe_async_handler
-async def ai_analyze(update, context: CallbackContext):
+async def ai_analyze(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -695,7 +695,7 @@ async def ai_analyze(update, context: CallbackContext):
 
 
 @safe_async_handler
-async def gas(update, context):
+async def gas(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -720,7 +720,7 @@ async def gas(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(current_month, current_year)
+        month_display = util.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in gas_expenses:
@@ -728,7 +728,7 @@ async def gas(update, context):
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
                 details += sheet.format_expense(r, i) + "\n"
@@ -774,7 +774,7 @@ async def gas(update, context):
 
 
 @safe_async_handler
-async def food(update, context):
+async def food(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -801,15 +801,16 @@ async def food(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(current_month, current_year)
+        month_display = util.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in food_expenses:
-            grouped[r.get("Date", "")].append(r)
+            date_str = r["date"]
+            grouped[date_str].append(r)
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
                 details += sheet.format_expense(r, i) + "\n"
@@ -857,7 +858,7 @@ async def food(update, context):
 
 
 @safe_async_handler
-async def dating(update, context):
+async def dating(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -884,15 +885,16 @@ async def dating(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(current_month, current_year)
+        month_display = util.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in dating_expenses:
-            grouped[r.get("Date", "")].append(r)
+            date_str = r["date"]
+            grouped[date_str].append(r)
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
                 details += sheet.format_expense(r, i) + "\n"
@@ -940,7 +942,7 @@ async def dating(update, context):
 
 
 @safe_async_handler
-async def other(update, context):
+async def other(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -967,15 +969,16 @@ async def other(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(current_month, current_year)
+        month_display = util.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in other_expenses:
-            grouped[r.get("Date", "")].append(r)
+            date_str = r["date"]
+            grouped[date_str].append(r)
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
                 details += sheet.format_expense(r, i) + "\n"
@@ -1025,7 +1028,7 @@ async def other(update, context):
 
 
 @safe_async_handler
-async def investment(update, context):
+async def investment(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -1067,15 +1070,16 @@ async def investment(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(current_month, current_year)
+        month_display = util.get_month_display(current_month, current_year)
 
         grouped = defaultdict(list)
         for r in investment_expenses:
-            grouped[r.get("Date", "")].append(r)
+            date_str = r["date"]
+            grouped[date_str].append(r)
 
         details = ""
         for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r.get("VND", 0)) for r in rows)
+            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details += f"\n📅 {day}: {day_total:,.0f} VND\n"
             for i, r in enumerate(rows, start=1):
                 details += sheet.format_expense(r, i) + "\n"
@@ -1154,7 +1158,7 @@ async def investment(update, context):
 
 @safe_async_handler
 # 200
-async def freelance(update, context):
+async def freelance(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     amount = 0
@@ -1193,7 +1197,7 @@ async def freelance(update, context):
         now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         target_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(target_month, target_year)
+        month_display = util.get_month_display(target_month, target_year)
         current_sheet = await asyncio.to_thread(
             sheet.get_cached_worksheet, target_month
         )
@@ -1230,7 +1234,7 @@ async def freelance(update, context):
 
 @safe_async_handler
 # 200
-async def salary(update, context):
+async def salary(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     amount = 0
@@ -1269,7 +1273,7 @@ async def salary(update, context):
         now = sheet.get_current_time() + relativedelta(months=offset)
         target_month = now.strftime("%m/%Y")
         target_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(target_month, target_year)
+        month_display = util.get_month_display(target_month, target_year)
         current_sheet = await asyncio.to_thread(
             sheet.get_cached_worksheet, target_month
         )
@@ -1305,7 +1309,7 @@ async def salary(update, context):
 
 
 @safe_async_handler
-async def income(update, context):
+async def income(update: Update, context: CallbackContext):
     args = context.args
     offset = 0
     if args:
@@ -1411,7 +1415,7 @@ async def income(update, context):
 
         current_month = now.strftime("%m")
         current_year = now.strftime("%Y")
-        month_display = sheet.get_month_display(current_month, current_year)
+        month_display = util.get_month_display(current_month, current_year)
 
         response = (
             f"{category_display['income']} {month_display}:\n"
@@ -1442,7 +1446,7 @@ async def income(update, context):
 
 
 @safe_async_handler
-async def handle_message(update, context):
+async def handle_message(update: Update, context: CallbackContext):
     """Route messages to appropriate handlers"""
     try:
         text = update.message.text.strip()
@@ -1472,7 +1476,7 @@ async def handle_message(update, context):
 
 
 @safe_async_handler
-async def stats(update, context):
+async def stats(update: Update, context: CallbackContext):
     """Show dashboard link"""
     dashboard_webapp = WebAppInfo(url="https://track-money-ui.vercel.app/")
     keyboard = [[InlineKeyboardButton("📊 Mở Dashboard", web_app=dashboard_webapp)]]
@@ -1490,11 +1494,10 @@ async def categories(update: Update, context):
         now = sheet.get_current_time()
         target_month = now.strftime("%m")
         year = now.strftime("%Y")
-        month_display = sheet.get_month_display(target_month, year)
+        month_display = util.get_month_display(target_month, year)
         sheet_name = f"{target_month}/{year}"
 
         message = f"{category_display['categories']} chi tiêu {month_display}:\n"
-
         category_percent = await sheet.get_category_percentages_by_sheet_name(
             sheet_name
         )
@@ -1523,7 +1526,7 @@ async def categories(update: Update, context):
 
 
 @safe_async_handler
-async def sync_config(update, context):
+async def sync_config(update: Update, context: CallbackContext):
     """Sync configuration to Google Sheets of next month"""
     try:
         logger.info(f"Sync config command requested by user {update.effective_user.id}")
@@ -1532,7 +1535,7 @@ async def sync_config(update, context):
         now = sheet.get_current_time() + relativedelta(months=1)
         target_month = now.strftime("%m")
         year = now.strftime("%Y")
-        month_display = sheet.get_month_display(target_month, year)
+        month_display = util.get_month_display(target_month, year)
 
         sheet.sync_config_to_sheet(target_month)
         await update.message.reply_text(
@@ -1559,7 +1562,7 @@ async def sync_config(update, context):
 
 
 @safe_async_handler
-async def list_keywords(update: Update, context):
+async def list_keywords(update: Update, context: CallbackContext):
     """List all keywords from constants"""
     try:
         logger.info(
@@ -1609,7 +1612,7 @@ async def list_keywords(update: Update, context):
 
 
 @safe_async_handler
-async def list_assets(update: Update, context):
+async def list_assets(update: Update, context: CallbackContext):
     """Show total assets"""
     try:
         logger.info(f"Assets command requested by user {update.effective_user.id}")
@@ -1635,7 +1638,7 @@ async def list_assets(update: Update, context):
 
 
 @safe_async_handler
-async def migrate_assets(update: Update, context):
+async def migrate_assets(update: Update, context: CallbackContext):
     """Migrate assets data to new format"""
     try:
         logger.info(

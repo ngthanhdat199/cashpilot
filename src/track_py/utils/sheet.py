@@ -16,6 +16,15 @@ import src.track_py.const as const
 import src.track_py.utils.util as util
 from src.track_py.utils.category import category_display
 from src.track_py.utils.datetime import parse_date_time
+from typing import TypedDict
+
+
+class Record(TypedDict):
+    date: str
+    time: str
+    vnd: int
+    note: str
+
 
 # Performance optimization: Cache for sheet data to reduce API calls
 _sheet_cache = {}
@@ -50,38 +59,45 @@ except Exception as e:
     exit(1)
 
 
-# Helper functions for parsing and formatting
-def parse_amount(value):
+def parse_amount(value: int | float | str) -> int:
     """
     Convert an amount from int/float/str into a float (VND).
     Handles commas, dots, '₫', 'VND', etc.
     Returns 0 if parsing fails.
     """
     if isinstance(value, (int, float)):
-        return float(value)
+        return int(value)
 
     if isinstance(value, str):
         # Remove everything except digits
         cleaned = re.sub(r"[^\d]", "", value)
         if cleaned.isdigit():
-            return float(cleaned)
+            return int(cleaned)
 
     logger.warning(f"Invalid amount format '{value}' in today summary")
-    return 0.0
+    return 0
 
 
-def format_expense(r, index=None):
-    time_str = r.get("Time", "") or "—"
-    amount_str = f"{parse_amount(r.get('VND', 0)):,.0f} VND"
-    note_str = r.get("Note", "") or ""
-    note_norm = normalize_text(note_str)
+def format_expense(r: Record, index=None):
+    """Format an expense record into a readable string"""
+    time_str = r["time"] or "—"
+    amount_str = f"{parse_amount(r['vnd']):,.0f} VND"
+    note_str = r["note"].lower() or ""
 
-    if "xang" in note_norm:
-        note_icon = "⛽"
-    elif any(k in note_norm for k in ["an", "lunch", "com", "pho", "bun", "mien"]):
-        note_icon = "🍽️"
-    elif any(k in note_norm for k in ["cafe", "coffee", "ca phe", "caphe"]):
-        note_icon = "☕"
+    if has_keyword(note_str, const.FOOD_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS["food"]
+    elif has_keyword(note_str, const.TRANSPORT_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS["gas"]
+    elif has_keyword(note_str, const.DATING_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.DATING]
+    elif has_keyword(note_str, const.LONG_INVEST_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.LONG_INVEST]
+    elif has_keyword(note_str, const.OPPORTUNITY_INVEST_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.OPPORTUNITY_INVEST]
+    elif has_keyword(note_str, const.SUPPORT_PARENT_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.SUPPORT_PARENT]
+    elif const.RENT_KEYWORD in note_str:
+        note_icon = const.CATEGORY_ICONS[const.RENT]
     else:
         note_icon = "📝"
 
@@ -90,6 +106,7 @@ def format_expense(r, index=None):
 
 
 def normalize_text(s: str) -> str:
+    """Normalize text for consistent searching/comparison"""
     if not s:
         return ""
     s = str(s).replace("\xa0", " ")  # NBSP → space
@@ -194,51 +211,41 @@ def has_keyword(note: str, keywords: list[str]) -> bool:
     return False
 
 
-def safe_int(value):
-    """Convert a value to int safely, removing non-digit characters"""
+def safe_int(value: str) -> int:
+    """Convert a string value to int safely, removing non-digit characters"""
     if not value:
         return 0
+
     text = str(value).strip()
     text = re.sub(r"[^\d]", "", text)
     return int(text) if text.isdigit() else 0
 
 
-def convert_values_to_records(all_values):
+def convert_values_to_records(all_values: list[list[str]]) -> list[Record]:
     """Convert raw sheet values to record format (list of dicts) with optimization"""
     if not all_values or len(all_values) < 2:  # Need at least header + 1 data row
         return []
 
     records = []
-    header = all_values[0] if all_values else ["Date", "Time", "VND", "Note"]
-
     for row in all_values[1:]:  # Skip header
-        if len(row) >= 4:  # Ensure we have all columns
-            # Create record with proper error handling
-            record = {
-                "Date": (row[0] if len(row) > 0 else "").strip(),
-                "Time": (row[1] if len(row) > 1 else "").strip(),
-                "VND": row[2] if len(row) > 2 else 0,
-                "Note": (row[3] if len(row) > 3 else "").strip(),
+        # Create record with proper error handling
+        record = Record(
+            {
+                "date": (row[0] if len(row) > 0 else "").strip(),
+                "time": (row[1] if len(row) > 1 else "").strip(),
+                "vnd": row[2] if len(row) > 2 else 0,
+                "note": (row[3] if len(row) > 3 else "").strip(),
             }
+        )
 
-            # Only add records that have at least a date or amount
-            if record["Date"] or record["VND"]:
-                records.append(record)
-        elif len(row) > 0:
-            # Handle partial rows - fill missing columns with defaults
-            record = {
-                "Date": (row[0] if len(row) > 0 else "").strip(),
-                "Time": (row[1] if len(row) > 1 else "").strip(),
-                "VND": row[2] if len(row) > 2 else 0,
-                "Note": (row[3] if len(row) > 3 else "").strip(),
-            }
-            if record["Date"] or record["VND"]:
-                records.append(record)
+        # Only add records that have at least a date or amount
+        if record["date"] or record["vnd"]:
+            records.append(record)
 
     return records
 
 
-def get_monthly_sheet_if_exists(target_month):
+def get_monthly_sheet_if_exists(target_month: str) -> gspread.Worksheet | None:
     """Get month's sheet if it exists, return None if it doesn't exist"""
     try:
         sheet_name = target_month
@@ -264,7 +271,7 @@ def get_monthly_sheet_if_exists(target_month):
         return None
 
 
-def get_or_create_monthly_sheet(target_month=None):
+def get_or_create_monthly_sheet(target_month=None) -> gspread.Worksheet:
     """Get month's sheet or create a new one for target month"""
     try:
         if target_month:
@@ -359,7 +366,7 @@ def get_or_create_monthly_sheet(target_month=None):
             raise
 
 
-def get_gas_total(month):
+def get_gas_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total gas expenses for a given month"""
     try:
         # Use cached data for read-only operations
@@ -370,9 +377,9 @@ def get_gas_total(month):
         total = 0
 
         for r in records:
-            note = r.get("Note", "").lower()
+            note = r["note"].lower()
             if has_keyword(note, const.TRANSPORT_KEYWORDS):
-                amount = r.get("VND", 0)
+                amount = r["vnd"]
                 if amount:
                     gas_expenses.append(r)
                     total += parse_amount(amount)
@@ -384,7 +391,7 @@ def get_gas_total(month):
 
 
 # helper for food totals
-def get_food_total(month):
+def get_food_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total food expenses for a given month"""
     try:
         # Use cached data for read-only operations
@@ -395,9 +402,9 @@ def get_food_total(month):
         total = 0
 
         for r in records:
-            note = r.get("Note", "").lower()
+            note = r["note"].lower()
             if has_keyword(note, const.FOOD_KEYWORDS):
-                amount = r.get("VND", 0)
+                amount = r["vnd"]
                 if amount:
                     food_expenses.append(r)
                     total += parse_amount(amount)
@@ -409,30 +416,24 @@ def get_food_total(month):
 
 
 # helper for dating totals
-def get_dating_total(month):
+def get_dating_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total date expenses for a given month"""
     try:
-        # Use cached data for read-only operations
-        all_values = get_cached_sheet_data(month)
-
         # Skip header row and convert to records-like format
         date_expenses = []
         total = 0
 
-        for row in all_values[1:]:  # Skip header
-            if len(row) >= 4:  # Ensure we have all columns
-                r = {
-                    "Date": row[0] if len(row) > 0 else "",
-                    "Time": row[1] if len(row) > 1 else "",
-                    "VND": row[2] if len(row) > 2 else 0,
-                    "Note": row[3] if len(row) > 3 else "",
-                }
-                note = r.get("Note", "").lower()
-                if has_keyword(note, const.DATING_KEYWORDS):
-                    amount = r.get("VND", 0)
-                    if amount:
-                        date_expenses.append(r)
-                        total += parse_amount(amount)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+
+        for r in records:
+            note = r["note"].lower()
+            if has_keyword(note, const.DATING_KEYWORDS):
+                amount = r["vnd"]
+                if amount:
+                    date_expenses.append(r)
+                    total += parse_amount(amount)
 
         return date_expenses, total
     except Exception as e:
@@ -441,30 +442,24 @@ def get_dating_total(month):
 
 
 # helper for rent totals
-def get_rent_total(month):
+def get_rent_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total rent expenses for a given month"""
     try:
-        # Use cached data for read-only operations
-        all_values = get_cached_sheet_data(month)
-
         # Skip header row and convert to records-like format
         rent_expenses = []
         total = 0
 
-        for row in all_values[1:]:  # Skip header
-            if len(row) >= 4:  # Ensure we have all columns
-                r = {
-                    "Date": row[0] if len(row) > 0 else "",
-                    "Time": row[1] if len(row) > 1 else "",
-                    "VND": row[2] if len(row) > 2 else 0,
-                    "Note": row[3] if len(row) > 3 else "",
-                }
-                note = r.get("Note", "").lower()
-                if const.RENT_KEYWORD in note:
-                    amount = r.get("VND", 0)
-                    if amount:
-                        rent_expenses.append(r)
-                        total += parse_amount(amount)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+
+        for r in records:
+            note = r["note"].lower()
+            if const.RENT_KEYWORD in note:
+                amount = r["vnd"]
+                if amount:
+                    rent_expenses.append(r)
+                    total += parse_amount(amount)
 
         return rent_expenses, total
     except Exception as e:
@@ -473,38 +468,32 @@ def get_rent_total(month):
 
 
 # helper for other totals
-def get_other_total(month):
+def get_other_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total other expenses for a given month"""
     try:
-        # Use cached data for read-only operations
-        all_values = get_cached_sheet_data(month)
-
         # Skip header row and convert to records-like format
         other_expenses = []
         total = 0
 
-        for row in all_values[1:]:  # Skip header
-            if len(row) >= 4:  # Ensure we have all columns
-                r = {
-                    "Date": row[0] if len(row) > 0 else "",
-                    "Time": row[1] if len(row) > 1 else "",
-                    "VND": row[2] if len(row) > 2 else 0,
-                    "Note": row[3] if len(row) > 3 else "",
-                }
-                note = r.get("Note", "").lower()
-                if not (
-                    has_keyword(note, const.FOOD_KEYWORDS)
-                    or has_keyword(note, const.DATING_KEYWORDS)
-                    or has_keyword(note, const.TRANSPORT_KEYWORDS)
-                    or has_keyword(note, const.LONG_INVEST_KEYWORDS)
-                    or has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS)
-                    or has_keyword(note, const.SUPPORT_PARENT_KEYWORDS)
-                    or has_keyword(note, const.RENT_KEYWORD)
-                ):
-                    amount = r.get("VND", 0)
-                    if amount:
-                        other_expenses.append(r)
-                        total += parse_amount(amount)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+
+        for r in records:
+            note = r["note"].lower()
+            if not (
+                has_keyword(note, const.FOOD_KEYWORDS)
+                or has_keyword(note, const.DATING_KEYWORDS)
+                or has_keyword(note, const.TRANSPORT_KEYWORDS)
+                or has_keyword(note, const.LONG_INVEST_KEYWORDS)
+                or has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS)
+                or has_keyword(note, const.SUPPORT_PARENT_KEYWORDS)
+                or has_keyword(note, const.RENT_KEYWORD)
+            ):
+                amount = r["vnd"]
+                if amount:
+                    other_expenses.append(r)
+                    total += parse_amount(amount)
 
         return other_expenses, total
     except Exception as e:
@@ -513,30 +502,24 @@ def get_other_total(month):
 
 
 # helper for investment totals
-def get_long_investment_total(month):
+def get_long_investment_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total investment expenses for a given month"""
     try:
-        # Use cached data for read-only operations
-        all_values = get_cached_sheet_data(month)
-
         # Skip header row and convert to records-like format
         invest_expenses = []
         total = 0
 
-        for row in all_values[1:]:  # Skip header
-            if len(row) >= 4:  # Ensure we have all columns
-                r = {
-                    "Date": row[0] if len(row) > 0 else "",
-                    "Time": row[1] if len(row) > 1 else "",
-                    "VND": row[2] if len(row) > 2 else 0,
-                    "Note": row[3] if len(row) > 3 else "",
-                }
-                note = r.get("Note", "").lower()
-                if has_keyword(note, const.LONG_INVEST_KEYWORDS):
-                    amount = r.get("VND", 0)
-                    if amount:
-                        invest_expenses.append(r)
-                        total += parse_amount(amount)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+
+        for r in records:
+            note = r["note"].lower()
+            if has_keyword(note, const.LONG_INVEST_KEYWORDS):
+                amount = r["vnd"]
+                if amount:
+                    invest_expenses.append(r)
+                    total += parse_amount(amount)
 
         return invest_expenses, total
     except Exception as e:
@@ -544,30 +527,24 @@ def get_long_investment_total(month):
         return [], 0
 
 
-def get_opportunity_investment_total(month):
+def get_opportunity_investment_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total opportunity investment expenses for a given month"""
     try:
-        # Use cached data for read-only operations
-        all_values = get_cached_sheet_data(month)
-
         # Skip header row and convert to records-like format
         invest_expenses = []
         total = 0
 
-        for row in all_values[1:]:  # Skip header
-            if len(row) >= 4:  # Ensure we have all columns
-                r = {
-                    "Date": row[0] if len(row) > 0 else "",
-                    "Time": row[1] if len(row) > 1 else "",
-                    "VND": row[2] if len(row) > 2 else 0,
-                    "Note": row[3] if len(row) > 3 else "",
-                }
-                note = r.get("Note", "").lower()
-                if has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS):
-                    amount = r.get("VND", 0)
-                    if amount:
-                        invest_expenses.append(r)
-                        total += parse_amount(amount)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+
+        for r in records:
+            note = r["note"].lower()
+            if has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS):
+                amount = r["vnd"]
+                if amount:
+                    invest_expenses.append(r)
+                    total += parse_amount(amount)
 
         return invest_expenses, total
     except Exception as e:
@@ -578,32 +555,26 @@ def get_opportunity_investment_total(month):
         return [], 0
 
 
-def get_investment_total(month):
+def get_investment_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total investment expenses for a given month"""
     try:
-        # Use cached data for read-only operations
-        all_values = get_cached_sheet_data(month)
-
         # Skip header row and convert to records-like format
         invest_expenses = []
         total = 0
 
-        for row in all_values[1:]:  # Skip header
-            if len(row) >= 4:  # Ensure we have all columns
-                r = {
-                    "Date": row[0] if len(row) > 0 else "",
-                    "Time": row[1] if len(row) > 1 else "",
-                    "VND": row[2] if len(row) > 2 else 0,
-                    "Note": row[3] if len(row) > 3 else "",
-                }
-                note = r.get("Note", "").lower()
-                if has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS) or has_keyword(
-                    note, const.LONG_INVEST_KEYWORDS
-                ):
-                    amount = r.get("VND", 0)
-                    if amount:
-                        invest_expenses.append(r)
-                        total += parse_amount(amount)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+
+        for r in records:
+            note = r["note"].lower()
+            if has_keyword(note, const.OPPORTUNITY_INVEST_KEYWORDS) or has_keyword(
+                note, const.LONG_INVEST_KEYWORDS
+            ):
+                amount = r["vnd"]
+                if amount:
+                    invest_expenses.append(r)
+                    total += parse_amount(amount)
 
         return invest_expenses, total
     except Exception as e:
@@ -615,30 +586,24 @@ def get_investment_total(month):
 
 
 # helper for support parent totals
-def get_support_parent_total(month):
+def get_support_parent_total(month: str) -> tuple[list[Record], int]:
     """Helper to get total support parent expenses for a given month"""
     try:
-        # Use cached data for read-only operations
-        all_values = get_cached_sheet_data(month)
-
         # Skip header row and convert to records-like format
         support_parent_expenses = []
         total = 0
 
-        for row in all_values[1:]:  # Skip header
-            if len(row) >= 4:  # Ensure we have all columns
-                r = {
-                    "Date": row[0] if len(row) > 0 else "",
-                    "Time": row[1] if len(row) > 1 else "",
-                    "VND": row[2] if len(row) > 2 else 0,
-                    "Note": row[3] if len(row) > 3 else "",
-                }
-                note = r.get("Note", "").lower()
-                if has_keyword(note, const.SUPPORT_PARENT_KEYWORDS):
-                    amount = r.get("VND", 0)
-                    if amount:
-                        support_parent_expenses.append(r)
-                        total += parse_amount(amount)
+        # Use cached data for read-only operations
+        all_values = get_cached_sheet_data(month)
+        records = convert_values_to_records(all_values)
+
+        for r in records:
+            note = r["note"].lower()
+            if has_keyword(note, const.SUPPORT_PARENT_KEYWORDS):
+                amount = r["vnd"]
+                if amount:
+                    support_parent_expenses.append(r)
+                    total += parse_amount(amount)
 
         return support_parent_expenses, total
     except Exception as e:
@@ -649,7 +614,7 @@ def get_support_parent_total(month):
 
 
 # helper for totals summary
-def get_records_summary_by_cat(records):
+def get_records_summary_by_cat(records: list[Record]) -> dict:
     """Helper to get total expenses summary for a given month"""
     totals = {
         "expenses": [],
@@ -668,8 +633,8 @@ def get_records_summary_by_cat(records):
     }
 
     for r in records:
-        note = r.get("Note", "").lower()
-        amount = parse_amount(r.get("VND", 0))
+        note = r["note"].lower()
+        amount = parse_amount(r["vnd"])
 
         if amount == 0:
             continue
@@ -707,7 +672,7 @@ def get_records_summary_by_cat(records):
 
 
 # helper for get total income
-def get_total_income(sheet):
+def get_total_income(sheet: gspread.Worksheet) -> int:
     """Helper to get total income from salary and freelance"""
     try:
         salary = sheet.acell(const.SALARY_CELL).value
@@ -724,10 +689,12 @@ def get_total_income(sheet):
         return total_income
     except Exception as e:
         logger.error(f"Error getting total income: {e}", exc_info=True)
-        return 0, 0, 0
+        return 0
 
 
-def get_cached_worksheet(sheet_name, force_refresh=False):
+def get_cached_worksheet(
+    sheet_name: str, force_refresh: bool = False
+) -> gspread.Worksheet:
     """Get cached worksheet object or fetch fresh if expired"""
     current_time = time.time()
     cache_key = f"worksheet_{sheet_name}"
@@ -752,7 +719,9 @@ def get_cached_worksheet(sheet_name, force_refresh=False):
         raise
 
 
-def get_cached_sheet_data(sheet_name, force_refresh=False):
+def get_cached_sheet_data(
+    sheet_name: str, force_refresh: bool = False
+) -> list[list[str]]:
     """Get cached sheet data or fetch fresh if expired"""
     current_time = time.time()
     cache_key = f"data_{sheet_name}"
@@ -779,7 +748,9 @@ def get_cached_sheet_data(sheet_name, force_refresh=False):
         raise
 
 
-def get_cached_today_data(sheet_name, today_str, force_refresh=False):
+def get_cached_today_data(
+    sheet_name: str, today_str: str, force_refresh: bool = False
+) -> list[list[str]]:
     """Get cached today's data with shorter cache timeout for better freshness"""
     current_time = time.time()
     cache_key = f"today_data_{sheet_name}_{today_str}"
@@ -843,7 +814,7 @@ def get_cached_today_data(sheet_name, today_str, force_refresh=False):
             raise
 
 
-def invalidate_sheet_cache(sheet_name):
+def invalidate_sheet_cache(sheet_name: str):
     """Invalidate cache for a specific sheet"""
     data_key = f"data_{sheet_name}"
     worksheet_key = f"worksheet_{sheet_name}"
@@ -867,9 +838,9 @@ def invalidate_sheet_cache(sheet_name):
         logger.debug(f"Invalidated today cache: {key}")
 
 
-def get_monthly_expense(sheet_name):
+def get_monthly_expense(sheet_name: str) -> int:
     """Fetch total expense for a given month sheet"""
-    total = 0.0
+    total = 0
     try:
         # Try to get the sheet for this month (don't create if it doesn't exist)
         sheet = get_monthly_sheet_if_exists(sheet_name)
@@ -891,7 +862,9 @@ def get_monthly_expense(sheet_name):
 
 
 # helper for month response
-def get_month_response(records, sheet, time_with_offset):
+def get_month_response(
+    records: list[Record], sheet: gspread.Worksheet, time_with_offset: datetime.datetime
+) -> str:
     summary = get_records_summary_by_cat(records)
     month_expenses = summary["expenses"]
     total = summary["total"]
@@ -971,7 +944,7 @@ def get_month_response(records, sheet, time_with_offset):
 
 
 # Helper to get week's expenses from relevant month sheets
-async def get_week_process_data(time_with_offset):
+async def get_week_process_data(time_with_offset: datetime.datetime) -> dict:
     now = time_with_offset
     # Calculate week boundaries
     week_start = now - datetime.timedelta(days=now.weekday())  # Monday
@@ -1001,8 +974,8 @@ async def get_week_process_data(time_with_offset):
             records = convert_values_to_records(all_values)
             year = target_month.split("/")[1]
             for r in records:
-                raw_date = (r.get("Date") or "").strip()
-                raw_amount = r.get("VND", 0)
+                raw_date = r["date"].strip()
+                raw_amount = r["vnd"]
 
                 if not raw_date or not raw_amount:
                     continue
@@ -1049,7 +1022,7 @@ async def get_week_process_data(time_with_offset):
 
 
 # Helper to get today's expenses from relevant month sheet
-async def get_daily_process_data(time_with_offset):
+async def get_daily_process_data(time_with_offset: datetime.datetime) -> dict:
     now = time_with_offset
     today_str = now.strftime("%d/%m")
     target_month = now.strftime("%m/%Y")
@@ -1073,12 +1046,12 @@ async def get_daily_process_data(time_with_offset):
     today_records = []
     records = convert_values_to_records(all_values)
     for r in records:
-        record_date = r.get("Date", "").strip().lstrip("'")
+        record_date = r["date"].strip().lstrip("'")
         if record_date and record_date > today_str:
             continue
 
         if record_date == today_str:
-            record_amount = r.get("VND", 0)
+            record_amount = r["vnd"]
             amount = parse_amount(record_amount)
             if amount > 0:  # Only include records with valid amounts
                 today_expenses.append(r)
@@ -1100,7 +1073,7 @@ async def get_daily_process_data(time_with_offset):
 
 
 # helper for month budget
-async def get_month_budget(month):
+async def get_month_budget(month: str) -> int:
     current_sheet = await asyncio.to_thread(get_cached_worksheet, month)
 
     # Get income from sheet
@@ -1122,7 +1095,7 @@ async def get_month_budget(month):
 
 
 # helper for month budget by sheet
-def get_month_budget_by_sheet(current_sheet):
+def get_month_budget_by_sheet(current_sheet: gspread.Worksheet) -> int:
     # Get income from sheet
     result = current_sheet.batch_get([const.SALARY_CELL, const.FREELANCE_CELL])
     salary = (
@@ -1144,13 +1117,13 @@ def get_month_budget_by_sheet(current_sheet):
 
 
 # helper for month budget percentages
-async def get_category_percentages_by_sheet_name(sheet_name):
+async def get_category_percentages_by_sheet_name(sheet_name: str) -> dict:
     current_sheet = await asyncio.to_thread(get_cached_worksheet, sheet_name)
-    percentages = get_category_percentages_by_sheet(current_sheet)
-    return percentages
+    cat_percentage = get_category_percentages_by_sheet(current_sheet)
+    return cat_percentage
 
 
-def get_category_percentages_by_sheet(current_sheet):
+def get_category_percentages_by_sheet(current_sheet: gspread.Worksheet) -> dict:
     """
     Reads all category percentages from a single row (L2:Q2) efficiently.
     Falls back to config defaults if cells are empty or invalid.
@@ -1161,16 +1134,16 @@ def get_category_percentages_by_sheet(current_sheet):
         result = current_sheet.get(cell_range)
         row = result[0] if result else []
         categories = list(const.CATEGORY_CELLS.keys())
-        percentages = {}
+        cat_percentage = {}
 
         for i, category in enumerate(categories):
             raw_value = row[i] if i < len(row) else None
             if not raw_value or not str(raw_value).strip().isdigit():
-                percentages[category] = config["budgets"].get(category, 0)
+                cat_percentage[category] = config["budgets"].get(category, 0)
             else:
-                percentages[category] = int(raw_value)
+                cat_percentage[category] = int(raw_value)
 
-        return percentages
+        return cat_percentage
 
     except Exception as e:
         logger.error(f"Error fetching category percentages: {e}")
@@ -1181,7 +1154,7 @@ def get_category_percentages_by_sheet(current_sheet):
 
 
 # helper for get percentage spend for a category
-def get_category_percentage(current_sheet: gspread.Worksheet, category):
+def get_category_percentage(current_sheet: gspread.Worksheet, category: str) -> float:
     cell = const.CATEGORY_CELLS.get(category)
     percentage = current_sheet.acell(
         cell, value_render_option="UNFORMATTED_VALUE"
@@ -1189,11 +1162,11 @@ def get_category_percentage(current_sheet: gspread.Worksheet, category):
     if not percentage:
         percentage = config["budgets"].get(category, 0)
 
-    return percentage
+    return float(percentage)
 
 
 # helper for sync config command
-def sync_config_to_sheet(target_month):
+def sync_config_to_sheet(target_month: str):
     """Helper to sync config to sheet for a given month"""
     try:
         logger.info(f"Syncing config to sheet for month {target_month}")
@@ -1248,7 +1221,7 @@ def update_config_to_sheet(current_sheet: gspread.Worksheet):
         )
 
 
-async def sort_expenses_by_date(sheet_name):
+async def sort_expenses_by_date(sheet_name: str) -> int:
     """Helper to sort expenses in a given month sheet by date"""
     try:
         logger.info(f"Sorting expenses in sheet {sheet_name}...")

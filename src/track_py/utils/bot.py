@@ -15,7 +15,7 @@ _delete_queue_processor_running = False
 _background_tasks = set()  # Keep track of background tasks
 
 
-async def wait_for_background_tasks(timeout=30):
+async def wait_for_background_tasks(timeout=30) -> bool:
     """Wait for all background tasks (log + delete) to complete before shutdown"""
     if not _background_tasks and not log_expense_queue and not delete_expense_queue:
         logger.info("No background tasks to wait for")
@@ -44,7 +44,7 @@ async def wait_for_background_tasks(timeout=30):
         return True
 
 
-async def process_log_expense_queue():
+async def process_log_expense_queue() -> None:
     """Process expenses from queue in batches for better API efficiency"""
     global _log_queue_processor_running
 
@@ -93,7 +93,7 @@ async def process_log_expense_queue():
         _log_queue_processor_running = False
 
 
-async def process_delete_expense_queue():
+async def process_delete_expense_queue() -> None:
     """Process expenses from queue in batches for better API efficiency"""
     global _delete_queue_processor_running
 
@@ -142,7 +142,7 @@ async def process_delete_expense_queue():
         _delete_queue_processor_running = False
 
 
-async def process_log_month_expenses(target_month, expenses):
+async def process_log_month_expenses(target_month: str, expenses: list[dict]) -> None:
     """Process all expenses for a specific month"""
     try:
         logger.info(f"Processing log expenses for month: {target_month}")
@@ -247,7 +247,9 @@ async def process_log_month_expenses(target_month, expenses):
         raise
 
 
-async def process_delete_month_expenses(target_month, expenses):
+async def process_delete_month_expenses(
+    target_month: str, expenses: list[dict]
+) -> None:
     """Process all expenses for a specific month"""
     try:
         logger.info(f"Processing delete expenses for month: {target_month}")
@@ -290,10 +292,10 @@ async def process_delete_month_expenses(target_month, expenses):
 
                 found_row = None
                 for i, r in enumerate(records):
-                    row_date = r.get("Date", "")
-                    row_time = r.get("Time", "")
-                    row_amount = sheet.parse_amount(r.get("VND", 0))
-                    row_note = r.get("Note", "")
+                    row_date = r["date"]
+                    row_time = r["time"]
+                    row_amount = sheet.parse_amount(r["vnd"])
+                    row_note = r["note"]
                     expense_data["amount"] = int(row_amount)
                     expense_data["note"] = row_note
 
@@ -351,7 +353,7 @@ async def process_delete_month_expenses(target_month, expenses):
         raise
 
 
-async def send_success_notification(expense_data, action):
+async def send_success_notification(expense_data, action: str) -> None:
     """Edit original message to show success after background processing completes"""
     try:
         # Edit the original message to show success
@@ -398,7 +400,7 @@ async def send_success_notification(expense_data, action):
         logger.warning(f"Could not send success notification: {msg_error}")
 
 
-async def send_error_notification(expense_data, error, action):
+async def send_error_notification(expense_data, error: str, action: str) -> None:
     """Edit original message to show error if processing fails"""
     try:
         # Edit the original message to show error
@@ -439,7 +441,7 @@ async def send_error_notification(expense_data, error, action):
         logger.error(f"Failed to send error notification: {notify_error}")
 
 
-async def send_progress_update(expense_data, progress_message):
+async def send_progress_update(expense_data, progress_message: str) -> None:
     """Send intermediate progress update to improve UX for longer operations"""
     try:
         bot_token = expense_data.get("bot_token")
@@ -457,7 +459,7 @@ async def send_progress_update(expense_data, progress_message):
         logger.warning(f"Could not send progress update: {progress_error}")
 
 
-async def send_message(text, parse_mode="Markdown"):
+async def send_message(text: str, parse_mode: str = "Markdown") -> None:
     """Utility to send message via bot token"""
     try:
         bot = Bot(token=const.TELEGRAM_TOKEN)
@@ -482,7 +484,7 @@ async def background_log_expense(
     chat_id,
     bot_token,
     message_id,
-):
+) -> None:
     """Background task to queue expense for processing"""
     try:
         # Add expense to queue
@@ -561,7 +563,7 @@ async def background_log_expense(
 
 async def background_delete_expense(
     entry_date, entry_time, target_month, user_id, chat_id, bot_token, message_id
-):
+) -> None:
     """Background task to delete expense from processing queue"""
     try:
         # Add expense to queue

@@ -4,7 +4,7 @@ from src.track_py.const import CATEGORY_ICONS, CATEGORY_NAMES
 category_display = {}
 
 
-def get_categories_display():
+def get_categories_display() -> dict:
     rent_display = f"{CATEGORY_ICONS.get('rent')} {CATEGORY_NAMES.get('rent')}"
     support_parent_display = (
         f"{CATEGORY_ICONS.get('support_parent')} {CATEGORY_NAMES.get('support_parent')}"

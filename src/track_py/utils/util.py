@@ -16,7 +16,7 @@ def get_month_display(month: int, year: int) -> str:
     return f"{MONTH_NAMES.get(month, month)}/{year}"
 
 
-def to_json(data, indent=2):
+def to_json(data, indent=2) -> str:
     """Safely convert any object to a JSON string with pretty formatting."""
 
     def default(o):

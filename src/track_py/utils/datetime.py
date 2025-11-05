@@ -1,10 +1,10 @@
 import datetime
 import src.track_py.utils.sheet as sheet
-import src.track_py.utils.logger as logger
+from src.track_py.utils.logger import logger
 
 
 # Sort by date and time
-def parse_date_time(row):
+def parse_date_time(row: list[str]) -> datetime.datetime:
     if len(row) < 2 or not row[0]:
         return datetime.datetime.min
 

@@ -2,7 +2,7 @@ import os
 from src.track_py.config import PROJECT_ROOT
 
 
-def get_version():
+def get_version() -> str:
     try:
         version_file = os.path.join(PROJECT_ROOT, "VERSION")
         with open(version_file) as f:
