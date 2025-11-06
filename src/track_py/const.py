@@ -248,7 +248,7 @@ CATEGORY_ICONS = {
 CATEGORY_NAMES = {
     FOOD_TRAVEL: "Ăn uống & Đi lại",
     DATING: "Hẹn hò & Giải trí",
-    LONG_INVEST: "Đầu tư dài hạn", 
+    LONG_INVEST: "Đầu tư dài hạn",
     OPPORTUNITY_INVEST: "Đầu tư cơ hội",
     RENT: "Thuê nhà",
     SUPPORT_PARENT: "Hỗ trợ ba mẹ",
@@ -274,6 +274,7 @@ CATEGORY_NAMES = {
     "keywords": "Từ khoá",
     "asset": "Tài sản",
     "migrate_assets": "Di chuyển tài sản",
+    "sort": "Sắp xếp",
 }
 
 CATEGORY_COLORS = {

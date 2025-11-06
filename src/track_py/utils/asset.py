@@ -3,7 +3,6 @@ import datetime
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import itertools
-from src.track_py.utils.logger import logger
 from src.track_py.config import config
 from src.track_py.utils.logger import logger
 import src.track_py.const as const
@@ -42,8 +41,9 @@ async def get_assets_response() -> str:
             date_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
             details_lines.append(f"\n📅 {day}: {date_total:,.0f} VND")
             details_lines.extend(
-                sheet.format_expense(r, i) for i, r in enumerate(rows, start=1)
+                "\n" + sheet.format_expense(r, i) for i, r in enumerate(rows, start=1)
             )
+            details_lines.append("\n")
 
         response = (
             f"{category_display["assets"]} hiện tại: {assets_summary["total"]:,.0f} VND\n"
@@ -58,8 +58,7 @@ async def get_assets_response() -> str:
         )
 
         if details_lines:
-            response += "\n📋 Chi tiết:\n"
-            response += "\n".join(details_lines)
+            response += f"\n📝 Chi tiết:{''.join(details_lines)}"
 
         return response
 

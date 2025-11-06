@@ -1,4 +1,6 @@
-from src.track_py.const import CATEGORY_ICONS, CATEGORY_NAMES
+from src.track_py.const import CATEGORY_ICONS, CATEGORY_NAMES, CATEGORY_CELLS
+from src.track_py.utils import sheet, util
+
 
 # Global dictionary to hold category display strings
 category_display = {}
@@ -47,6 +49,11 @@ def get_categories_display() -> dict:
     migrate_assets_display = (
         f"{CATEGORY_ICONS.get('migrate_assets')} {CATEGORY_NAMES.get('migrate_assets')}"
     )
+    sort_display = f"{CATEGORY_ICONS.get('sort')} {CATEGORY_NAMES.get('sort')}"
+    salary_display = f"{CATEGORY_ICONS.get('salary')} {CATEGORY_NAMES.get('salary')}"
+    freelance_display = (
+        f"{CATEGORY_ICONS.get('freelance')} {CATEGORY_NAMES.get('freelance')}"
+    )
 
     category_display = {
         "rent": rent_display,
@@ -75,6 +82,9 @@ def get_categories_display() -> dict:
         "keywords": keywords_display,
         "assets": asset_display,
         "migrate_assets": migrate_assets_display,
+        "sort": sort_display,
+        "salary": salary_display,
+        "freelance": freelance_display,
     }
 
     return category_display
@@ -86,3 +96,21 @@ try:
 except Exception as e:
     print(f"⚠️  Failed to get category display: {e}")
     exit(1)
+
+
+async def get_categories_response() -> str:
+    now = sheet.get_current_time()
+    target_month = now.strftime("%m")
+    year = now.strftime("%Y")
+    month_display = util.get_month_display(target_month, year)
+    sheet_name = f"{target_month}/{year}"
+    category_percent = await sheet.get_category_percentages_by_sheet_name(sheet_name)
+
+    response = f"{category_display['categories']} chi tiêu {month_display}:\n"
+    for key in CATEGORY_CELLS.keys():
+        icon = CATEGORY_ICONS[key]
+        category = CATEGORY_NAMES[key]
+        percent = category_percent[key]
+        response += f"• {icon} {category}: {percent}%\n"
+
+    return response

@@ -1,4 +1,3 @@
-from dateutil.relativedelta import relativedelta
 from telegram import (
     ReplyKeyboardMarkup,
     InlineKeyboardButton,
@@ -7,20 +6,16 @@ from telegram import (
     Update,
 )
 from telegram.ext import CallbackContext
-import datetime
 import asyncio
-from collections import defaultdict
-from huggingface_hub import InferenceClient
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
 import src.track_py.utils.sheet as sheet
 import src.track_py.utils.asset as asset
-from src.track_py.utils.util import markdown_to_html
+import src.track_py.utils.keyword as keyword
+import src.track_py.utils.investment as invest
 import src.track_py.const as const
-from src.track_py.config import config, save_config
-from src.track_py.utils.category import category_display
+from src.track_py.utils.category import get_categories_response
 import src.track_py.utils.bot as bot
-import src.track_py.utils.util as util
 
 
 def safe_async_handler(handler_func):
@@ -175,8 +170,6 @@ async def log_expense(update: Update, context: CallbackContext):
                 expanded_parts.append(shortcuts.get(part.lower(), part))
             note = " ".join(expanded_parts)
 
-            # now = sheet.get_current_time()
-            # now = get_current_time() + datetime.timedelta(days=63)
             entry_date = sheet.get_current_time().strftime("%d/%m")
             entry_time = sheet.get_current_time().strftime("%H:%M:%S")
             entry_year = sheet.get_current_time().year
@@ -319,7 +312,6 @@ async def delete_expense(update: Update, context: CallbackContext):
 
         # Determine target month
         now = sheet.get_current_time()
-        # now = get_current_time() + datetime.timedelta(days=63)
         target_month = sheet.get_current_time().strftime("%m/%Y")
 
         # Check if different month
@@ -381,29 +373,57 @@ async def delete_expense(update: Update, context: CallbackContext):
 
 
 @safe_async_handler
+async def handle_message(update: Update, context: CallbackContext):
+    """Route messages to appropriate handlers"""
+    try:
+        text = update.message.text.strip()
+        user_id = update.effective_user.id
+        logger.info(f"Message received from user {user_id}: '{text}'")
+
+        if text.lower().startswith("del "):
+            logger.info(f"Routing to delete_expense for user {user_id}")
+            await delete_expense(update, context)
+        else:
+            logger.info(f"Routing to log_expense for user {user_id}")
+            await log_expense(update, context)
+
+    except Exception as e:
+        logger.error(
+            f"Error in handle_message for user {update.effective_user.id}: {e}",
+            exc_info=True,
+        )
+        try:
+            await update.message.reply_text(
+                f"❌ Có lỗi xảy ra khi xử lý tin nhắn. Vui lòng thử lại!\n\nLỗi: {e}"
+            )
+        except Exception as reply_error:
+            logger.error(
+                f"Failed to send error message in handle_message: {reply_error}"
+            )
+
+
+@safe_async_handler
 async def sort(update: Update, context: CallbackContext):
     """Manually sort sheet data when needed (can be called periodically with /sort command)"""
-    try:
-        now = sheet.get_current_time()
-        target_month = now.strftime("%m/%Y")
-
-        # Allow specifying different month: /sort 09/2025
-        if context.args and len(context.args) > 0:
-            target_month = context.args[0]
-
-        sheet_name = target_month
-
+    args = context.args
+    offset = 0
+    if args:
         try:
-            sorted_count = await sheet.sort_expenses_by_date(sheet_name)
-            await update.message.reply_text(
-                f"✅ Đã sắp xếp {sorted_count} dòng dữ liệu trong sheet {target_month}"
-            )
-        except Exception as sort_error:
-            logger.error(f"Error sorting sheet {sheet_name}: {sort_error}")
-            await update.message.reply_text(
-                f"❌ Có lỗi khi sắp xếp sheet {sheet_name}: {sort_error}"
-            )
-            return
+            offset = int(args[0])
+        except ValueError:
+            pass
+
+    try:
+        response = await sheet.sort_expenses_by_date(offset)
+        await update.message.reply_text(response)
+
+        logger.info(
+            f"Sorted sheet data successfully for user {update.effective_user.id}"
+        )
+    except Exception as sort_error:
+        logger.error(f"Error sorting sheet data: {sort_error}")
+        await update.message.reply_text(f"❌ Có lỗi khi sắp xếp sheet: {sort_error}")
+        return
 
     except Exception as e:
         logger.error(f"Error sorting sheet data: {e}")
@@ -414,34 +434,12 @@ async def sort(update: Update, context: CallbackContext):
 async def today(update: Update, context: CallbackContext):
     """Get today's total expenses"""
     try:
-        logger.info(f"Today command requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time()
-        # now = get_current_time() + datetime.timedelta(days=63)
-
-        today_data = await sheet.get_daily_process_data(now)
-        total = today_data["total"]
-        today_expenses = today_data["today_expenses"]
-        count = len(today_expenses)
-        today_str = today_data["date_str"]
-
-        response = (
-            f"{category_display['summarized']} hôm nay ({today_str}):\n"
-            f"{category_display['spend']}: {total:,.0f} VND\n"
-            f"{category_display['transaction']}: {count}\n"
-        )
-
-        if today_expenses:
-            details = "\n".join(
-                sheet.format_expense(r, i + 1) for i, r in enumerate(today_expenses)
-            )
-            response += f"\n📝 Chi tiết:\n{details}"
-
+        response = await sheet.process_today_summary()
         await update.message.reply_text(response)
+
         logger.info(
             f"Today summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in today command for user {update.effective_user.id}: {e}",
@@ -468,42 +466,12 @@ async def week(update: Update, context: CallbackContext):
             pass
 
     try:
-        now = sheet.get_current_time() + datetime.timedelta(weeks=offset)
+        response = await sheet.process_week_summay(offset)
+        await update.message.reply_text(response)
 
-        week_data = await sheet.get_week_process_data(now)
-        total = week_data["total"]
-        week_expenses = week_data["week_expenses"]
-        count = len(week_expenses)
-        week_start = week_data["week_start"]
-        week_end = week_data["week_end"]
-
-        grouped = defaultdict(list)
-        for r in week_expenses:
-            date_str = r["expense_date"].strftime("%d/%m/%Y")
-            grouped[date_str].append(r)
-
-        details_lines = []
-        for day, rows in sorted(
-            grouped.items(), key=lambda d: datetime.datetime.strptime(d[0], "%d/%m/%Y")
-        ):
-            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
-            details_lines.append(f"\n📅 {day}: {day_total:,.0f} VND")
-            details_lines.extend(
-                sheet.format_expense(r, i) for i, r in enumerate(rows, start=1)
-            )
-
-        response_parts = [
-            f"{category_display['summarized']} tuần này ({week_start:%d/%m} - {week_end:%d/%m}):",
-            f"{category_display['spend']}: {total:,.0f} VND\n"
-            f"{category_display['transaction']}: {count}\n",
-        ]
-
-        if details_lines:
-            response_parts.append("\n📝 Chi tiết:")
-            response_parts.extend(details_lines)
-
-        await update.message.reply_text("\n".join(response_parts))
-
+        logger.info(
+            f"Week summary sent successfully to user {update.effective_user.id}"
+        )
     except Exception as e:
         logger.error(f"Error in week command: {e}", exc_info=True)
         await update.message.reply_text(
@@ -521,52 +489,13 @@ async def month(update: Update, context: CallbackContext):
         except ValueError:
             pass
 
-    """Get this month's total expenses"""
     try:
-        logger.info(f"Month command requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-
-        logger.info(f"Getting month expenses for sheet {target_month}")
-
-        try:
-            current_sheet = await asyncio.to_thread(
-                sheet.get_cached_worksheet, target_month
-            )
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(
-                f"Error getting/creating sheet {target_month}: {sheet_error}",
-                exc_info=True,
-            )
-            await update.message.reply_text(
-                f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}"
-            )
-            return
-
-        try:
-            all_values = await asyncio.to_thread(
-                sheet.get_cached_sheet_data, target_month
-            )
-            logger.info(f"Retrieved {len(all_values)} records from sheet")
-        except Exception as records_error:
-            logger.error(
-                f"Error retrieving records from sheet: {records_error}", exc_info=True
-            )
-            await update.message.reply_text(
-                f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}"
-            )
-            return
-
-        records = sheet.convert_values_to_records(all_values)
-
-        response = sheet.get_month_response(records, current_sheet, now)
+        response = await sheet.process_month_summary(offset)
         await update.message.reply_text(response)
+
         logger.info(
             f"Month summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in month command for user {update.effective_user.id}: {e}",
@@ -584,6 +513,7 @@ async def month(update: Update, context: CallbackContext):
 
 @safe_async_handler
 async def ai_analyze(update: Update, context: CallbackContext):
+    """Get this month's total expenses with AI analysis"""
     args = context.args
     offset = 0
     if args:
@@ -592,93 +522,13 @@ async def ai_analyze(update: Update, context: CallbackContext):
         except ValueError:
             pass
 
-    """Get this month's total expenses with AI analysis"""
     try:
-        logger.info(f"Month command requested by user {update.effective_user.id}")
+        response = await sheet.get_ai_analyze_summary(offset)
+        await update.message.reply_text(response, parse_mode="HTML")
 
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-
-        logger.info(f"Getting month expenses for sheet {target_month}")
-
-        try:
-            current_sheet = await asyncio.to_thread(
-                sheet.get_cached_worksheet, target_month
-            )
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(
-                f"Error getting/creating sheet {target_month}: {sheet_error}",
-                exc_info=True,
-            )
-            await update.message.reply_text(
-                f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}"
-            )
-            return
-
-        try:
-            all_values = await asyncio.to_thread(
-                sheet.get_cached_sheet_data, target_month
-            )
-            logger.info(f"Retrieved {len(all_values)} records from sheet")
-        except Exception as records_error:
-            logger.error(
-                f"Error retrieving records from sheet: {records_error}", exc_info=True
-            )
-            await update.message.reply_text(
-                f"❌ Không thể đọc dữ liệu từ Google Sheets. Vui lòng thử lại!\n\nLỗi: {records_error}"
-            )
-            return
-
-        records = sheet.convert_values_to_records(all_values)
-        raw_data = sheet.get_month_response(records, current_sheet, now)
-
-        client = InferenceClient(token=const.HUGGING_FACE_TOKEN)
-        model = "meta-llama/Llama-3.1-8B-Instruct"
-
-        # Use chat_completion for instruction/chat models
-        ai_response = client.chat_completion(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Bạn là một trợ lý tài chính cá nhân thông minh, phản hồi hoàn toàn bằng tiếng Việt. "
-                        "Phân tích dữ liệu chi tiêu hàng tháng (bao gồm thu nhập, ngân sách và chi tiêu thực tế) để đưa ra phân tích và khuyến nghị.\n\n"
-                        "⚙️ Quy ước dữ liệu:\n"
-                        "- Mỗi dòng chi tiêu có dạng: <Tên hạng mục>: <Chi tiêu thực tế> VND (<Chênh lệch>)\n"
-                        "- Giá trị trong ngoặc thể hiện CHÊNH LỆCH giữa chi tiêu thực tế và ngân sách:\n"
-                        "    • Dấu (+) nghĩa là chi tiêu ÍT HƠN ngân sách (TIẾT KIỆM)\n"
-                        "    • Dấu (-) nghĩa là chi tiêu NHIỀU HƠN ngân sách (VƯỢT CHI)\n"
-                        "- Ví dụ: (+1,000,000) = tiết kiệm 1 triệu. (-500,000) = vượt ngân sách 500 nghìn.\n\n"
-                        "⚙️ Phân tích yêu cầu:\n"
-                        "1️⃣ Xác định các hạng mục chi vượt ngân sách (dấu -) và hạng mục tiết kiệm (dấu +), nêu rõ số tiền chênh lệch.\n"
-                        "2️⃣ So sánh tổng chi tiêu và thu nhập để xác định thặng dư hoặc thâm hụt.\n"
-                        "3️⃣ Phát hiện 2–3 xu hướng nổi bật trong chi tiêu.\n"
-                        "4️⃣ Đưa ra 2–3 khuyến nghị cụ thể giúp cải thiện cân bằng tài chính.\n\n"
-                        "📋 Định dạng đầu ra (HTML-friendly cho Telegram):\n"
-                        "🧾 <b>Tóm tắt:</b> Một đoạn ngắn mô tả tình hình tài chính tháng.\n"
-                        "📊 <b>Phân tích chi tiêu vượt ngân sách:</b> Liệt kê rõ từng mục vượt và tiết kiệm.\n"
-                        "📈 <b>Xu hướng chi tiêu:</b> 2–3 xu hướng nổi bật.\n"
-                        "💡 <b>Khuyến nghị:</b> 2–3 gợi ý cụ thể.\n\n"
-                        "💬 <b>Yêu cầu:</b>\n"
-                        "- Giọng văn thân thiện, chuyên nghiệp, có cảm xúc.\n"
-                        "- Sử dụng emoji phù hợp (🧾📊📈💡💰✨...) để tăng tính dễ đọc.\n"
-                    ),
-                },
-                {"role": "user", "content": f"{raw_data}"},
-            ],
-            max_tokens=1000,
-        )
-
-        markdown_response = markdown_to_html(
-            ai_response["choices"][0]["message"]["content"].strip()
-        )
-        await update.message.reply_text(markdown_response, parse_mode="HTML")
         logger.info(
             f"Month summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in month command for user {update.effective_user.id}: {e}",
@@ -696,6 +546,7 @@ async def ai_analyze(update: Update, context: CallbackContext):
 
 @safe_async_handler
 async def gas(update: Update, context: CallbackContext):
+    """Get this month's total gas expenses"""
     args = context.args
     offset = 0
     if args:
@@ -704,62 +555,11 @@ async def gas(update: Update, context: CallbackContext):
         except ValueError:
             pass
 
-    """Get this month's total gas expenses"""
     try:
-        logger.info(f"Gas command requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
-
-        logger.info(f"Getting gas expenses for sheet {target_month}")
-
-        gas_expenses, total = sheet.get_gas_total(target_month)
-        count = len(gas_expenses)
-        logger.info(f"Found {count} gas expenses for this month with total {total} VND")
-
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = util.get_month_display(current_month, current_year)
-
-        grouped = defaultdict(list)
-        for r in gas_expenses:
-            grouped[r.get("Date", "")].append(r)
-
-        details = ""
-        for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
-            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
-            for i, r in enumerate(rows, start=1):
-                details += sheet.format_expense(r, i) + "\n"
-
-        _, previous_total = sheet.get_gas_total(previous_month)
-
-        # Calculate percentage change
-        if previous_total > 0:
-            percentage_change = ((total - previous_total) / previous_total) * 100
-            change_symbol = (
-                "📈"
-                if percentage_change > 0
-                else "📉" if percentage_change < 0 else "➡️"
-            )
-            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
-        else:
-            percentage_text = ""
-
-        response = (
-            f"{category_display['gas']} {month_display}:\n"
-            f"{category_display['spend']}: {total:,.0f} VND\n"
-            f"{category_display['transaction']}: {count}\n"
-            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
-        )
-
-        if details:
-            response += f"\n📝 Chi tiết:{details}"
-
+        response = await sheet.process_gas_summary(offset)
         await update.message.reply_text(response)
-        logger.info(f"Gas summary sent successfully to user {update.effective_user.id}")
 
+        logger.info(f"Gas summary sent successfully to user {update.effective_user.id}")
     except Exception as e:
         logger.error(
             f"Error in gas command for user {update.effective_user.id}: {e}",
@@ -775,6 +575,7 @@ async def gas(update: Update, context: CallbackContext):
 
 @safe_async_handler
 async def food(update: Update, context: CallbackContext):
+    """Get this month's total food expenses"""
     args = context.args
     offset = 0
     if args:
@@ -783,67 +584,13 @@ async def food(update: Update, context: CallbackContext):
         except ValueError:
             pass
 
-    """Get this month's total food expenses"""
     try:
-        logger.info(f"Food command requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
-
-        logger.info(f"Getting food expenses for sheet {target_month}")
-
-        food_expenses, total = sheet.get_food_total(target_month)
-        count = len(food_expenses)
-        logger.info(
-            f"Found {count} food expenses for this month with total {total} VND"
-        )
-
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = util.get_month_display(current_month, current_year)
-
-        grouped = defaultdict(list)
-        for r in food_expenses:
-            date_str = r["date"]
-            grouped[date_str].append(r)
-
-        details = ""
-        for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
-            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
-            for i, r in enumerate(rows, start=1):
-                details += sheet.format_expense(r, i) + "\n"
-
-        _, previous_total = sheet.get_food_total(previous_month)
-
-        # Calculate percentage change
-        if previous_total > 0:
-            percentage_change = ((total - previous_total) / previous_total) * 100
-            change_symbol = (
-                "📈"
-                if percentage_change > 0
-                else "📉" if percentage_change < 0 else "➡️"
-            )
-            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
-        else:
-            percentage_text = ""
-
-        response = (
-            f"{category_display['food']} {month_display}:\n"
-            f"{category_display['spend']}: {total:,.0f} VND\n"
-            f"{category_display['transaction']}: {count}\n"
-            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
-        )
-
-        if details:
-            response += f"\n📝 Chi tiết:{details}"
-
+        response = await sheet.process_food_summary(offset)
         await update.message.reply_text(response)
+
         logger.info(
             f"Food summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in food command for user {update.effective_user.id}: {e}",
@@ -859,6 +606,7 @@ async def food(update: Update, context: CallbackContext):
 
 @safe_async_handler
 async def dating(update: Update, context: CallbackContext):
+    """Get this month's total dating expenses"""
     args = context.args
     offset = 0
     if args:
@@ -867,67 +615,13 @@ async def dating(update: Update, context: CallbackContext):
         except ValueError:
             pass
 
-    """Get this month's total dating expenses"""
     try:
-        logger.info(f"Dating command requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
-
-        logger.info(f"Getting dating expenses for sheet {target_month}")
-
-        dating_expenses, total = sheet.get_dating_total(target_month)
-        count = len(dating_expenses)
-        logger.info(
-            f"Found {count} dating expenses for this month with total {total} VND"
-        )
-
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = util.get_month_display(current_month, current_year)
-
-        grouped = defaultdict(list)
-        for r in dating_expenses:
-            date_str = r["date"]
-            grouped[date_str].append(r)
-
-        details = ""
-        for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
-            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
-            for i, r in enumerate(rows, start=1):
-                details += sheet.format_expense(r, i) + "\n"
-
-        _, previous_total = sheet.get_dating_total(previous_month)
-
-        # Calculate percentage change
-        if previous_total > 0:
-            percentage_change = ((total - previous_total) / previous_total) * 100
-            change_symbol = (
-                "📈"
-                if percentage_change > 0
-                else "📉" if percentage_change < 0 else "➡️"
-            )
-            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
-        else:
-            percentage_text = ""
-
-        response = (
-            f"{category_display['dating']} {month_display}:\n"
-            f"{category_display['spend']}: {total:,.0f} VND\n"
-            f"{category_display['transaction']}: {count}\n"
-            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
-        )
-
-        if details:
-            response += f"\n📝 Chi tiết:{details}"
-
+        response = await sheet.process_dating_summary(offset)
         await update.message.reply_text(response)
+
         logger.info(
             f"Dating summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in dating command for user {update.effective_user.id}: {e}",
@@ -943,6 +637,7 @@ async def dating(update: Update, context: CallbackContext):
 
 @safe_async_handler
 async def other(update: Update, context: CallbackContext):
+    """Get this month's total other expenses"""
     args = context.args
     offset = 0
     if args:
@@ -951,67 +646,13 @@ async def other(update: Update, context: CallbackContext):
         except ValueError:
             pass
 
-    """Get this month's total other expenses"""
     try:
-        logger.info(f"Other command requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
-
-        logger.info(f"Getting other expenses for sheet {target_month}")
-
-        other_expenses, total = sheet.get_other_total(target_month)
-        count = len(other_expenses)
-        logger.info(
-            f"Found {count} other expenses for this month with total {total} VND"
-        )
-
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = util.get_month_display(current_month, current_year)
-
-        grouped = defaultdict(list)
-        for r in other_expenses:
-            date_str = r["date"]
-            grouped[date_str].append(r)
-
-        details = ""
-        for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
-            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
-            for i, r in enumerate(rows, start=1):
-                details += sheet.format_expense(r, i) + "\n"
-
-        _, previous_total = sheet.get_other_total(previous_month)
-
-        # Calculate percentage change
-        if previous_total > 0:
-            percentage_change = ((total - previous_total) / previous_total) * 100
-            change_symbol = (
-                "📈"
-                if percentage_change > 0
-                else "📉" if percentage_change < 0 else "➡️"
-            )
-            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
-        else:
-            percentage_text = ""
-
-        response = (
-            f"{category_display['other']} {month_display}:\n"
-            f"{category_display['spend']}: {total:,.0f} VND\n"
-            f"{category_display['transaction']}: {count}\n"
-            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
-        )
-
-        if details:
-            response += f"\n📝 Chi tiết:{details}"
-
+        response = await sheet.process_other_summary(offset)
         await update.message.reply_text(response)
+
         logger.info(
             f"Other summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in other command for user {update.effective_user.id}: {e}",
@@ -1029,6 +670,7 @@ async def other(update: Update, context: CallbackContext):
 
 @safe_async_handler
 async def investment(update: Update, context: CallbackContext):
+    """Get this month's total investment expenses"""
     args = context.args
     offset = 0
     if args:
@@ -1037,110 +679,13 @@ async def investment(update: Update, context: CallbackContext):
         except ValueError:
             pass
 
-    """Get this month's total investment expenses"""
     try:
-        logger.info(f"Investment command requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
-
-        logger.info(f"Getting investment expenses for sheet {target_month}")
-
-        try:
-            current_sheet = await asyncio.to_thread(
-                sheet.get_cached_worksheet, target_month
-            )
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(
-                f"Error getting/creating sheet {target_month}: {sheet_error}",
-                exc_info=True,
-            )
-            await update.message.reply_text(
-                f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}"
-            )
-            return
-
-        investment_expenses, total = sheet.get_investment_total(target_month)
-        count = len(investment_expenses)
-        logger.info(
-            f"Found {count} investment expenses for this month with total {total} VND"
-        )
-
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = util.get_month_display(current_month, current_year)
-
-        grouped = defaultdict(list)
-        for r in investment_expenses:
-            date_str = r["date"]
-            grouped[date_str].append(r)
-
-        details = ""
-        for day, rows in sorted(grouped.items()):
-            day_total = sum(sheet.parse_amount(r["vnd"]) for r in rows)
-            details += f"\n📅 {day}: {day_total:,.0f} VND\n"
-            for i, r in enumerate(rows, start=1):
-                details += sheet.format_expense(r, i) + "\n"
-
-        _, previous_total = sheet.get_investment_total(previous_month)
-
-        # Calculate percentage change
-        if previous_total > 0:
-            percentage_change = ((total - previous_total) / previous_total) * 100
-            change_symbol = (
-                "📈"
-                if percentage_change > 0
-                else "📉" if percentage_change < 0 else "➡️"
-            )
-            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
-        else:
-            percentage_text = ""
-
-        # Get income from sheet
-        total_income = sheet.get_total_income(current_sheet)
-        long_invest_budget = sheet.get_category_percentage(
-            current_sheet, const.LONG_INVEST
-        )
-        opportunity_invest_budget = sheet.get_category_percentage(
-            current_sheet, const.OPPORTUNITY_INVEST
-        )
-        long_invest_estimate = (
-            total_income * long_invest_budget if total_income > 0 else 0
-        )
-        opportunity_invest_estimate = (
-            total_income * opportunity_invest_budget if total_income > 0 else 0
-        )
-
-        response = (
-            f"{category_display['investment']} {month_display}:\n"
-            f"{category_display['spend']}: {total:,.0f} VND\n"
-            f"{category_display['transaction']}: {count}\n"
-            f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📌 Phân bổ danh mục\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
-            f"💰 Danh mục đầu tư\n\n"
-            f"🏦 Đầu tư dài hạn (CCQ): {long_invest_estimate:,.0f} VND\n"
-            f"   ├─ 📊 DCDS (50%) → {long_invest_estimate * 0.5:,.0f} VND\n"
-            f"   └─ 📈 VESAF (50%) → {long_invest_estimate * 0.5:,.0f} VND\n\n"
-            f"🌐 Đầu tư cơ hội (Crypto): {opportunity_invest_estimate:,.0f} VND\n"
-            f"   ├─ ₿ Bitcoin (70%) → {opportunity_invest_estimate * 0.7:,.0f} VND\n"
-            f"   └─ ✨ Ethereum (30%) → {opportunity_invest_estimate * 0.3:,.0f} VND\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-            "📌 Lịch sử giao dịch\n"
-            "━━━━━━━━━━━━━━━━━━\n"
-        )
-
-        if details:
-            response += details
-
+        response = await invest.get_investment_response(offset)
         await update.message.reply_text(response)
+
         logger.info(
             f"Investment summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in investment command for user {update.effective_user.id}: {e}",
@@ -1180,7 +725,7 @@ async def freelance(update: Update, context: CallbackContext):
                 offset = int(args[0])
             except ValueError:
                 offset = 0
-            amount = current_sheet.safe_int(args[1])
+            amount = int(args[1])
     else:
         await update.message.reply_text(
             "❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/fl 200'"
@@ -1194,29 +739,12 @@ async def freelance(update: Update, context: CallbackContext):
         return
 
     try:
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        target_year = now.strftime("%Y")
-        month_display = util.get_month_display(target_month, target_year)
-        current_sheet = await asyncio.to_thread(
-            sheet.get_cached_worksheet, target_month
-        )
-
-        amount = amount * 1000
-        current_sheet.update_acell(const.FREELANCE_CELL, amount)
-
-        # Update config
-        if offset == 0:
-            config["income"]["freelance"] = amount
-            save_config()
+        response = sheet.process_freelance(offset, amount)
+        await update.message.reply_text(response)
 
         logger.info(
             f"Freelance income of {amount} VND logged successfully for user {update.effective_user.id}"
         )
-        await update.message.reply_text(
-            f"✅ Đã ghi nhận thu nhập freelance {month_display}: {amount:,.0f} VND"
-        )
-
     except Exception as e:
         logger.error(
             f"Error in freelance command for user {update.effective_user.id}: {e}",
@@ -1256,7 +784,7 @@ async def salary(update: Update, context: CallbackContext):
                 offset = int(args[0])
             except ValueError:
                 offset = 0
-            amount = sheet.safe_int(args[1])
+            amount = int(args[1])
     else:
         await update.message.reply_text(
             "❌ Vui lòng cung cấp số tiền thu nhập. Ví dụ: '/sl 200' hoặc '/sl 1 200'"
@@ -1270,29 +798,12 @@ async def salary(update: Update, context: CallbackContext):
         return
 
     try:
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        target_year = now.strftime("%Y")
-        month_display = util.get_month_display(target_month, target_year)
-        current_sheet = await asyncio.to_thread(
-            sheet.get_cached_worksheet, target_month
-        )
-
-        amount = amount * 1000
-        current_sheet.update_acell(const.SALARY_CELL, amount)
-
-        if offset == 0:
-            # Update config
-            config["income"]["salary"] = amount
-            save_config()
+        response = sheet.process_salary(offset, amount)
+        await update.message.reply_text(response)
 
         logger.info(
             f"Salary income of {amount} VND logged successfully for user {update.effective_user.id}"
         )
-        await update.message.reply_text(
-            f"✅ Đã ghi nhận thu nhập lương {month_display}: {amount:,.0f} VND"
-        )
-
     except Exception as e:
         logger.error(
             f"Error in salary command for user {update.effective_user.id}: {e}",
@@ -1320,116 +831,12 @@ async def income(update: Update, context: CallbackContext):
 
     """Show total income from sheet"""
     try:
-        logger.info(f"Income summary requested by user {update.effective_user.id}")
-
-        now = sheet.get_current_time() + relativedelta(months=offset)
-        target_month = now.strftime("%m/%Y")
-        previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
-
-        logger.info(f"Getting income summary for sheet {target_month}")
-
-        try:
-            current_sheet = await asyncio.to_thread(
-                sheet.get_cached_worksheet, target_month
-            )
-            logger.info(f"Successfully obtained sheet for {target_month}")
-        except Exception as sheet_error:
-            logger.error(
-                f"Error getting/creating sheet {target_month}: {sheet_error}",
-                exc_info=True,
-            )
-            await update.message.reply_text(
-                f"❌ Không thể truy cập Google Sheets. Vui lòng thử lại!\n\nLỗi: {sheet_error}"
-            )
-            return
-
-        try:
-            previous_sheet = await asyncio.to_thread(
-                sheet.get_cached_worksheet, previous_month
-            )
-            logger.info(f"Successfully obtained sheet for {previous_month}")
-        except Exception as prev_sheet_error:
-            logger.error(
-                f"Error getting/creating sheet {previous_month}: {prev_sheet_error}",
-                exc_info=True,
-            )
-            await update.message.reply_text(
-                f"❌ Không thể truy cập Google Sheets tháng trước. Vui lòng thử lại!\n\nLỗi: {prev_sheet_error}"
-            )
-            return
-
-        # Get income from current month's sheet
-        freelance_income = current_sheet.acell(const.FREELANCE_CELL).value
-        salary_income = current_sheet.acell(const.SALARY_CELL).value
-
-        if not freelance_income or freelance_income.strip() == "":
-            logger.info("Freelance income cell is empty, using config fallback")
-            await update.message.reply_text(
-                "⚠️ Thu nhập freelance chưa được ghi nhận trong tháng này. Vui lòng sử dụng lệnh /fl để cập nhật."
-            )
-            return
-
-        if not salary_income or salary_income.strip() == "":
-            logger.info("Salary income cell is empty, using config fallback")
-            await update.message.reply_text(
-                "⚠️ Thu nhập lương chưa được ghi nhận trong tháng này. Vui lòng sử dụng lệnh /sl để cập nhật."
-            )
-            return
-
-        freelance_income = sheet.safe_int(freelance_income)
-        salary_income = sheet.safe_int(salary_income)
-
-        # Get income from previous month's sheet for comparison
-        prev_freelance_income = previous_sheet.acell(const.FREELANCE_CELL).value
-        prev_salary_income = previous_sheet.acell(const.SALARY_CELL).value
-
-        if not prev_freelance_income or prev_freelance_income.strip() == "":
-            logger.info(
-                "Previous freelance income cell is empty, using config fallback"
-            )
-            prev_freelance_income = 0
-
-        if not prev_salary_income or prev_salary_income.strip() == "":
-            logger.info("Previous salary income cell is empty, using config fallback")
-            prev_salary_income = 0
-
-        prev_freelance_income = sheet.safe_int(prev_freelance_income)
-        prev_salary_income = sheet.safe_int(prev_salary_income)
-
-        prev_total_income = prev_freelance_income + prev_salary_income
-        total_income = freelance_income + salary_income
-
-        # Calculate percentage change
-        if prev_total_income > 0:
-            percentage_change = (
-                (total_income - prev_total_income) / prev_total_income
-            ) * 100
-            change_symbol = (
-                "📈"
-                if percentage_change > 0
-                else "📉" if percentage_change < 0 else "➡️"
-            )
-            percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
-        else:
-            percentage_text = ""
-
-        current_month = now.strftime("%m")
-        current_year = now.strftime("%Y")
-        month_display = util.get_month_display(current_month, current_year)
-
-        response = (
-            f"{category_display['income']} {month_display}:\n"
-            f"{category_display['salary']}: {salary_income:,.0f} VND\n"
-            f"{category_display['freelance']}: {freelance_income:,.0f} VND\n"
-            f"{category_display['total']}: {total_income:,.0f} VND\n"
-            f"{category_display['compare']} {previous_month}: {total_income - prev_total_income:+,.0f} VND {percentage_text}\n"
-        )
-
+        response = await sheet.process_income_summary(offset)
         await update.message.reply_text(response)
+
         logger.info(
             f"Income summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in income command for user {update.effective_user.id}: {e}",
@@ -1442,36 +849,6 @@ async def income(update: Update, context: CallbackContext):
         except Exception as reply_error:
             logger.error(
                 f"Failed to send error message in income command: {reply_error}"
-            )
-
-
-@safe_async_handler
-async def handle_message(update: Update, context: CallbackContext):
-    """Route messages to appropriate handlers"""
-    try:
-        text = update.message.text.strip()
-        user_id = update.effective_user.id
-        logger.info(f"Message received from user {user_id}: '{text}'")
-
-        if text.lower().startswith("del "):
-            logger.info(f"Routing to delete_expense for user {user_id}")
-            await delete_expense(update, context)
-        else:
-            logger.info(f"Routing to log_expense for user {user_id}")
-            await log_expense(update, context)
-
-    except Exception as e:
-        logger.error(
-            f"Error in handle_message for user {update.effective_user.id}: {e}",
-            exc_info=True,
-        )
-        try:
-            await update.message.reply_text(
-                f"❌ Có lỗi xảy ra khi xử lý tin nhắn. Vui lòng thử lại!\n\nLỗi: {e}"
-            )
-        except Exception as reply_error:
-            logger.error(
-                f"Failed to send error message in handle_message: {reply_error}"
             )
 
 
@@ -1489,26 +866,12 @@ async def stats(update: Update, context: CallbackContext):
 async def categories(update: Update, context):
     """Show expense categories"""
     try:
-        logger.info(f"Categories command requested by user {update.effective_user.id}")
+        response = await get_categories_response()
+        await update.message.reply_text(response, parse_mode="MarkdownV2")
 
-        now = sheet.get_current_time()
-        target_month = now.strftime("%m")
-        year = now.strftime("%Y")
-        month_display = util.get_month_display(target_month, year)
-        sheet_name = f"{target_month}/{year}"
-
-        message = f"{category_display['categories']} chi tiêu {month_display}:\n"
-        category_percent = await sheet.get_category_percentages_by_sheet_name(
-            sheet_name
+        logger.info(
+            f"Categories list sent successfully to user {update.effective_user.id}"
         )
-
-        for key in const.CATEGORY_CELLS.keys():
-            icon = const.CATEGORY_ICONS[key]
-            category = const.CATEGORY_NAMES[key]
-            percent = category_percent[key]
-            message += f"• {icon} {category}: {percent}%\n"
-
-        await update.message.reply_text(message, parse_mode="MarkdownV2")
     except Exception as e:
         logger.error(
             f"Error in categories command for user {update.effective_user.id}: {e}",
@@ -1529,18 +892,8 @@ async def categories(update: Update, context):
 async def sync_config(update: Update, context: CallbackContext):
     """Sync configuration to Google Sheets of next month"""
     try:
-        logger.info(f"Sync config command requested by user {update.effective_user.id}")
-
-        # next month
-        now = sheet.get_current_time() + relativedelta(months=1)
-        target_month = now.strftime("%m")
-        year = now.strftime("%Y")
-        month_display = util.get_month_display(target_month, year)
-
-        sheet.sync_config_to_sheet(target_month)
-        await update.message.reply_text(
-            f"{category_display['sync']} cấu hình {month_display} thành công!"
-        )
+        response = sheet.sync_config_to_sheet()
+        await update.message.reply_text(response, parse_mode="Markdown")
 
         logger.info(
             f"Config sync completed successfully for user {update.effective_user.id}"
@@ -1565,37 +918,12 @@ async def sync_config(update: Update, context: CallbackContext):
 async def list_keywords(update: Update, context: CallbackContext):
     """List all keywords from constants"""
     try:
-        logger.info(
-            f"List keywords command requested by user {update.effective_user.id}"
-        )
+        response = keyword.get_keywords_response()
+        await update.message.reply_text(response, parse_mode="MarkdownV2")
 
-        keywords = const.LIST_KEYWORDS
-        message_lines = [f"{category_display['keywords']}\n"]
-
-        for category, words in keywords.items():
-            icon = const.CATEGORY_ICONS.get(category, "🏷️")
-            category_name = const.CATEGORY_NAMES.get(category, category)
-
-            # Category header
-            message_lines.append(f"{icon} {category_name}")
-            message_lines.append("-" * 35)
-
-            # Format keywords in 2–3 columns
-            per_line = 3
-            for i in range(0, len(words), per_line):
-                chunk = " • ".join(words[i : i + per_line])
-                message_lines.append(f"   {chunk}")
-
-            message_lines.append("")  # Add spacing between categories
-
-        # Wrap entire message in a Telegram code block
-        message = "```\n" + "\n".join(message_lines) + "\n```"
-
-        await update.message.reply_text(message, parse_mode="MarkdownV2")
         logger.info(
             f"Keywords list sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in list_keywords command for user {update.effective_user.id}: {e}",
@@ -1615,13 +943,12 @@ async def list_keywords(update: Update, context: CallbackContext):
 async def list_assets(update: Update, context: CallbackContext):
     """Show total assets"""
     try:
-        logger.info(f"Assets command requested by user {update.effective_user.id}")
         response = await asset.get_assets_response()
         await update.message.reply_text(response, parse_mode="Markdown")
+
         logger.info(
             f"Assets summary sent successfully to user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in assets command for user {update.effective_user.id}: {e}",
@@ -1641,15 +968,12 @@ async def list_assets(update: Update, context: CallbackContext):
 async def migrate_assets(update: Update, context: CallbackContext):
     """Migrate assets data to new format"""
     try:
-        logger.info(
-            f"Migrate assets command requested by user {update.effective_user.id}"
-        )
         result = asset.migrate_assets_data()
         await update.message.reply_text(result, parse_mode="Markdown")
+
         logger.info(
             f"Assets migration completed successfully for user {update.effective_user.id}"
         )
-
     except Exception as e:
         logger.error(
             f"Error in migrate_assets command for user {update.effective_user.id}: {e}",

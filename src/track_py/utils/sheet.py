@@ -1,13 +1,12 @@
 import os
-import unicodedata
 import gspread
 import time
 import re
 import asyncio
 import datetime
+from dateutil.relativedelta import relativedelta
 from google.oauth2.service_account import Credentials
 from gspread.utils import a1_to_rowcol
-from collections import defaultdict
 from src.track_py.utils.logger import logger
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.config import config, PROJECT_ROOT
@@ -17,6 +16,10 @@ import src.track_py.utils.util as util
 from src.track_py.utils.category import category_display
 from src.track_py.utils.datetime import parse_date_time
 from typing import TypedDict
+from huggingface_hub import InferenceClient
+from src.track_py.utils.util import markdown_to_html
+from src.track_py.config import config, save_config
+from collections import defaultdict
 
 
 class Record(TypedDict):
@@ -103,21 +106,6 @@ def format_expense(r: Record, index=None):
 
     prefix = f"{index}. " if index is not None else ""
     return f"{prefix}⏰ {time_str} | 💰 {amount_str} | {note_icon} {note_str}"
-
-
-def normalize_text(s: str) -> str:
-    """Normalize text for consistent searching/comparison"""
-    if not s:
-        return ""
-    s = str(s).replace("\xa0", " ")  # NBSP → space
-    s = unicodedata.normalize("NFD", s)  # decompose accents
-    # drop combining marks
-    s = "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
-    # map Vietnamese đ/Đ to d/D for ASCII-ish search
-    s = s.replace("đ", "d").replace("Đ", "D")
-    # collapse whitespace and lowercase
-    s = " ".join(s.split()).lower()
-    return s
 
 
 def normalize_date(date_str: str) -> str:
@@ -280,7 +268,6 @@ def get_or_create_monthly_sheet(target_month=None) -> gspread.Worksheet:
         else:
             # Use current month
             now = get_current_time()
-            # now = get_current_time() + datetime.timedelta(days=63)
             sheet_name = now.strftime("%m/%Y")  # Format: MM/YYYY
 
         logger.info(f"Getting or creating sheet: {sheet_name}")
@@ -1166,20 +1153,25 @@ def get_category_percentage(current_sheet: gspread.Worksheet, category: str) -> 
 
 
 # helper for sync config command
-def sync_config_to_sheet(target_month: str):
-    """Helper to sync config to sheet for a given month"""
+def sync_config_to_sheet() -> str:
+    """Helper to sync config to sheet for a next month"""
+    # next month
+    now = get_current_time() + relativedelta(months=1)
+    target_month = now.strftime("%m")
+    year = now.strftime("%Y")
+    month_display = util.get_month_display(target_month, year)
+
     try:
         logger.info(f"Syncing config to sheet for month {target_month}")
         current_sheet = get_cached_worksheet(target_month)
         update_config_to_sheet(current_sheet)
-        logger.info(
-            f"✅ Đồng bộ cấu hình thành công to sheet for month {target_month}!"
-        )
+        return f"{category_display['sync']} cấu hình {month_display} thành công!"
     except Exception as e:
         logger.error(
             f"Error syncing config to sheet for month {target_month}: {e}",
             exc_info=True,
         )
+        return f"{category_display['sync']} cấu hình {month_display} thất bại!"
 
 
 # helper for update config to sheet
@@ -1221,10 +1213,12 @@ def update_config_to_sheet(current_sheet: gspread.Worksheet):
         )
 
 
-async def sort_expenses_by_date(sheet_name: str) -> int:
+async def sort_expenses_by_date(month_offset: int) -> str:
     """Helper to sort expenses in a given month sheet by date"""
     try:
-        logger.info(f"Sorting expenses in sheet {sheet_name}...")
+        now = get_current_time() + relativedelta(months=month_offset)
+        target_month = now.strftime("%m/%Y")
+        sheet_name = target_month
         current_sheet = await asyncio.to_thread(get_cached_worksheet, sheet_name)
 
         # Get all data
@@ -1256,11 +1250,505 @@ async def sort_expenses_by_date(sheet_name: str) -> int:
             logger.info(
                 f"Manually sorted {len(sorted_data)} rows in sheet {sheet_name}"
             )
-            return len(sorted_data)
+            return f"{category_display['sort']} thành công {len(sorted_data)} mục trong bảng {sheet_name}."
         else:
             logger.info(f"No data to sort in sheet {sheet_name}")
-            return 0
+            return "Không có dữ liệu để sắp xếp."
 
     except Exception as e:
         logger.error(f"Error starting sort for sheet {sheet_name}: {e}", exc_info=True)
-        return 0
+        return "Đã xảy ra lỗi khi sắp xếp dữ liệu."
+
+
+async def get_ai_analyze_summary(month_offset) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+
+    logger.info(f"Getting month expenses for sheet {target_month}")
+
+    try:
+        current_sheet = await asyncio.to_thread(get_cached_worksheet, target_month)
+        logger.info(f"Successfully obtained sheet for {target_month}")
+    except Exception as sheet_error:
+        logger.error(
+            f"Error getting/creating sheet {target_month}: {sheet_error}",
+            exc_info=True,
+        )
+        return
+
+    try:
+        all_values = await asyncio.to_thread(get_cached_sheet_data, target_month)
+        logger.info(f"Retrieved {len(all_values)} records from sheet")
+    except Exception as records_error:
+        logger.error(
+            f"Error retrieving records from sheet: {records_error}", exc_info=True
+        )
+        return
+
+    records = convert_values_to_records(all_values)
+    raw_data = get_month_response(records, current_sheet, now)
+
+    client = InferenceClient(token=const.HUGGING_FACE_TOKEN)
+    model = "meta-llama/Llama-3.1-8B-Instruct"
+
+    # Use chat_completion for instruction/chat models
+    ai_response = client.chat_completion(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Bạn là một trợ lý tài chính cá nhân thông minh, phản hồi hoàn toàn bằng tiếng Việt. "
+                    "Phân tích dữ liệu chi tiêu hàng tháng (bao gồm thu nhập, ngân sách và chi tiêu thực tế) để đưa ra phân tích và khuyến nghị.\n\n"
+                    "⚙️ Quy ước dữ liệu:\n"
+                    "- Mỗi dòng chi tiêu có dạng: <Tên hạng mục>: <Chi tiêu thực tế> VND (<Chênh lệch>)\n"
+                    "- Giá trị trong ngoặc thể hiện CHÊNH LỆCH giữa chi tiêu thực tế và ngân sách:\n"
+                    "    • Dấu (+) nghĩa là chi tiêu ÍT HƠN ngân sách (TIẾT KIỆM)\n"
+                    "    • Dấu (-) nghĩa là chi tiêu NHIỀU HƠN ngân sách (VƯỢT CHI)\n"
+                    "- Ví dụ: (+1,000,000) = tiết kiệm 1 triệu. (-500,000) = vượt ngân sách 500 nghìn.\n\n"
+                    "⚙️ Phân tích yêu cầu:\n"
+                    "1️⃣ Xác định các hạng mục chi vượt ngân sách (dấu -) và hạng mục tiết kiệm (dấu +), nêu rõ số tiền chênh lệch.\n"
+                    "2️⃣ So sánh tổng chi tiêu và thu nhập để xác định thặng dư hoặc thâm hụt.\n"
+                    "3️⃣ Phát hiện 2–3 xu hướng nổi bật trong chi tiêu.\n"
+                    "4️⃣ Đưa ra 2–3 khuyến nghị cụ thể giúp cải thiện cân bằng tài chính.\n\n"
+                    "📋 Định dạng đầu ra (HTML-friendly cho Telegram):\n"
+                    "🧾 <b>Tóm tắt:</b> Một đoạn ngắn mô tả tình hình tài chính tháng.\n"
+                    "📊 <b>Phân tích chi tiêu vượt ngân sách:</b> Liệt kê rõ từng mục vượt và tiết kiệm.\n"
+                    "📈 <b>Xu hướng chi tiêu:</b> 2–3 xu hướng nổi bật.\n"
+                    "💡 <b>Khuyến nghị:</b> 2–3 gợi ý cụ thể.\n\n"
+                    "💬 <b>Yêu cầu:</b>\n"
+                    "- Giọng văn thân thiện, chuyên nghiệp, có cảm xúc.\n"
+                    "- Sử dụng emoji phù hợp (🧾📊📈💡💰✨...) để tăng tính dễ đọc.\n"
+                ),
+            },
+            {"role": "user", "content": f"{raw_data}"},
+        ],
+        max_tokens=1000,
+    )
+
+    summary = markdown_to_html(ai_response["choices"][0]["message"]["content"].strip())
+    return summary
+
+
+def process_income_summary(month_offset: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+    previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+    logger.info(f"Getting income summary for sheet {target_month}")
+
+    try:
+        current_sheet = get_cached_worksheet(target_month)
+        logger.info(f"Successfully obtained sheet for {target_month}")
+    except Exception as sheet_error:
+        logger.error(
+            f"Error getting/creating sheet {target_month}: {sheet_error}",
+            exc_info=True,
+        )
+        exit(1)
+
+    try:
+        previous_sheet = get_cached_worksheet(previous_month)
+        logger.info(f"Successfully obtained sheet for {previous_month}")
+    except Exception as prev_sheet_error:
+        logger.error(
+            f"Error getting/creating sheet {previous_month}: {prev_sheet_error}",
+            exc_info=True,
+        )
+        exit(1)
+
+    # Get income from current month's sheet
+    freelance_income = current_sheet.acell(const.FREELANCE_CELL).value
+    salary_income = current_sheet.acell(const.SALARY_CELL).value
+
+    if not freelance_income or freelance_income.strip() == "":
+        logger.info("Freelance income cell is empty, using config fallback")
+        exit(1)
+
+    if not salary_income or salary_income.strip() == "":
+        logger.info("Salary income cell is empty, using config fallback")
+        exit(1)
+
+    freelance_income = safe_int(freelance_income)
+    salary_income = safe_int(salary_income)
+
+    # Get income from previous month's sheet for comparison
+    prev_freelance_income = previous_sheet.acell(const.FREELANCE_CELL).value
+    prev_salary_income = previous_sheet.acell(const.SALARY_CELL).value
+
+    if not prev_freelance_income or prev_freelance_income.strip() == "":
+        logger.info("Previous freelance income cell is empty, using config fallback")
+        prev_freelance_income = 0
+
+    if not prev_salary_income or prev_salary_income.strip() == "":
+        logger.info("Previous salary income cell is empty, using config fallback")
+        prev_salary_income = 0
+
+    prev_freelance_income = safe_int(prev_freelance_income)
+    prev_salary_income = safe_int(prev_salary_income)
+
+    prev_total_income = prev_freelance_income + prev_salary_income
+    total_income = freelance_income + salary_income
+
+    # Calculate percentage change
+    if prev_total_income > 0:
+        percentage_change = (
+            (total_income - prev_total_income) / prev_total_income
+        ) * 100
+        change_symbol = (
+            "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+        )
+        percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+    else:
+        percentage_text = ""
+
+    current_month = now.strftime("%m")
+    current_year = now.strftime("%Y")
+    month_display = util.get_month_display(current_month, current_year)
+
+    summary = (
+        f"{category_display['income']} {month_display}:\n"
+        f"{category_display['salary']}: {salary_income:,.0f} VND\n"
+        f"{category_display['freelance']}: {freelance_income:,.0f} VND\n"
+        f"{category_display['total']}: {total_income:,.0f} VND\n"
+        f"{category_display['compare']} {previous_month}: {total_income - prev_total_income:+,.0f} VND {percentage_text}\n"
+    )
+
+    return summary
+
+
+def process_salary(month_offset: int, amount: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+    target_year = now.strftime("%Y")
+    month_display = util.get_month_display(target_month, target_year)
+    current_sheet = get_cached_worksheet(target_month)
+
+    amount = amount * 1000
+    current_sheet.update_acell(const.SALARY_CELL, amount)
+
+    if month_offset == 0:
+        # Update config
+        config["income"]["salary"] = amount
+        save_config()
+
+    response = f"✅ Đã ghi nhận thu nhập lương {month_display}: {amount:,.0f} VND"
+    return response
+
+
+def process_freelance(month_offset: int, amount: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+    target_year = now.strftime("%Y")
+    month_display = util.get_month_display(target_month, target_year)
+    current_sheet = get_cached_worksheet(target_month)
+
+    amount = amount * 1000
+    current_sheet.update_acell(const.FREELANCE_CELL, amount)
+
+    # Update config
+    if month_offset == 0:
+        config["income"]["freelance"] = amount
+        save_config()
+
+    response = f"✅ Đã ghi nhận thu nhập freelance {month_display}: {amount:,.0f} VND"
+    return response
+
+
+def process_other_summary(month_offset: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+    previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+    logger.info(f"Getting other expenses for sheet {target_month}")
+
+    other_expenses, total = get_other_total(target_month)
+    count = len(other_expenses)
+    logger.info(f"Found {count} other expenses for this month with total {total} VND")
+
+    current_month = now.strftime("%m")
+    current_year = now.strftime("%Y")
+    month_display = util.get_month_display(current_month, current_year)
+
+    grouped = defaultdict(list)
+    for r in other_expenses:
+        date_str = r["date"]
+        grouped[date_str].append(r)
+
+    details = ""
+    for day, rows in sorted(grouped.items()):
+        day_total = sum(parse_amount(r["vnd"]) for r in rows)
+        details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+        for i, r in enumerate(rows, start=1):
+            details += format_expense(r, i) + "\n"
+
+    _, previous_total = get_other_total(previous_month)
+
+    # Calculate percentage change
+    if previous_total > 0:
+        percentage_change = ((total - previous_total) / previous_total) * 100
+        change_symbol = (
+            "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+        )
+        percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+    else:
+        percentage_text = ""
+
+    summary = (
+        f"{category_display['other']} {month_display}:\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n"
+        f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+    )
+
+    if details:
+        summary += f"\n📝 Chi tiết:{details}"
+
+    return summary
+
+
+def process_dating_summary(month_offset: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+    previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+    logger.info(f"Getting dating expenses for sheet {target_month}")
+
+    dating_expenses, total = get_dating_total(target_month)
+    count = len(dating_expenses)
+    logger.info(f"Found {count} dating expenses for this month with total {total} VND")
+
+    current_month = now.strftime("%m")
+    current_year = now.strftime("%Y")
+    month_display = util.get_month_display(current_month, current_year)
+
+    grouped = defaultdict(list)
+    for r in dating_expenses:
+        date_str = r["date"]
+        grouped[date_str].append(r)
+
+    details = ""
+    for day, rows in sorted(grouped.items()):
+        day_total = sum(parse_amount(r["vnd"]) for r in rows)
+        details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+        for i, r in enumerate(rows, start=1):
+            details += format_expense(r, i) + "\n"
+
+    _, previous_total = get_dating_total(previous_month)
+
+    # Calculate percentage change
+    if previous_total > 0:
+        percentage_change = ((total - previous_total) / previous_total) * 100
+        change_symbol = (
+            "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+        )
+        percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+    else:
+        percentage_text = ""
+
+    summary = (
+        f"{category_display['dating']} {month_display}:\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n"
+        f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+    )
+
+    if details:
+        summary += f"\n📝 Chi tiết:{details}"
+
+    return summary
+
+
+def process_food_summary(month_offset: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+    previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+    logger.info(f"Getting food expenses for sheet {target_month}")
+
+    food_expenses, total = get_food_total(target_month)
+    count = len(food_expenses)
+    logger.info(f"Found {count} food expenses for this month with total {total} VND")
+
+    current_month = now.strftime("%m")
+    current_year = now.strftime("%Y")
+    month_display = util.get_month_display(current_month, current_year)
+
+    grouped = defaultdict(list)
+    for r in food_expenses:
+        date_str = r["date"]
+        grouped[date_str].append(r)
+
+    details = ""
+    for day, rows in sorted(grouped.items()):
+        day_total = sum(parse_amount(r["vnd"]) for r in rows)
+        details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+        for i, r in enumerate(rows, start=1):
+            details += format_expense(r, i) + "\n"
+
+    _, previous_total = get_food_total(previous_month)
+
+    # Calculate percentage change
+    if previous_total > 0:
+        percentage_change = ((total - previous_total) / previous_total) * 100
+        change_symbol = (
+            "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+        )
+        percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+    else:
+        percentage_text = ""
+
+    summary = (
+        f"{category_display['food']} {month_display}:\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n"
+        f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+    )
+
+    if details:
+        summary += f"\n📝 Chi tiết:{details}"
+
+    return summary
+
+
+def process_gas_summary(month_offset: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+    previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
+
+    logger.info(f"Getting gas expenses for sheet {target_month}")
+
+    gas_expenses, total = get_gas_total(target_month)
+    count = len(gas_expenses)
+    logger.info(f"Found {count} gas expenses for this month with total {total} VND")
+
+    current_month = now.strftime("%m")
+    current_year = now.strftime("%Y")
+    month_display = util.get_month_display(current_month, current_year)
+
+    grouped = defaultdict(list)
+    for r in gas_expenses:
+        grouped[r.get("Date", "")].append(r)
+
+    details = ""
+    for day, rows in sorted(grouped.items()):
+        day_total = sum(parse_amount(r["vnd"]) for r in rows)
+        details += f"\n📅 {day}: {day_total:,.0f} VND\n"
+        for i, r in enumerate(rows, start=1):
+            details += format_expense(r, i) + "\n"
+
+    _, previous_total = get_gas_total(previous_month)
+
+    # Calculate percentage change
+    if previous_total > 0:
+        percentage_change = ((total - previous_total) / previous_total) * 100
+        change_symbol = (
+            "📈" if percentage_change > 0 else "📉" if percentage_change < 0 else "➡️"
+        )
+        percentage_text = f" ({change_symbol} {percentage_change:+.1f}%)"
+    else:
+        percentage_text = ""
+
+    summary = (
+        f"{category_display['gas']} {month_display}:\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n"
+        f"{category_display['compare']} {previous_month}: {total - previous_total:+,.0f} VND {percentage_text}\n"
+    )
+
+    if details:
+        summary += f"\n📝 Chi tiết:{details}"
+
+    return summary
+
+
+def process_month_summary(month_offset: int) -> str:
+    now = get_current_time() + relativedelta(months=month_offset)
+    target_month = now.strftime("%m/%Y")
+
+    logger.info(f"Getting month expenses for sheet {target_month}")
+
+    try:
+        current_sheet = get_cached_worksheet(target_month)
+        logger.info(f"Successfully obtained sheet for {target_month}")
+    except Exception as sheet_error:
+        logger.error(
+            f"Error obtaining sheet for {target_month}: {sheet_error}",
+            exc_info=True,
+        )
+        exit(1)
+
+    try:
+        all_values = get_cached_sheet_data(target_month)
+        logger.info(f"Retrieved {len(all_values)} records from sheet")
+    except Exception as records_error:
+        logger.error(
+            f"Error retrieving records from sheet: {records_error}",
+            exc_info=True,
+        )
+        exit(1)
+
+    records = convert_values_to_records(all_values)
+    response = get_month_response(records, current_sheet, now)
+    return response
+
+
+async def process_week_summay(week_offset: int) -> str:
+    now = get_current_time() + datetime.timedelta(weeks=week_offset)
+    week_data = await get_week_process_data(now)
+    total = week_data["total"]
+    week_expenses = week_data["week_expenses"]
+    count = len(week_expenses)
+    week_start = week_data["week_start"]
+    week_end = week_data["week_end"]
+
+    grouped = defaultdict(list)
+    for r in week_expenses:
+        date_str = r["expense_date"].strftime("%d/%m/%Y")
+        grouped[date_str].append(r)
+
+    details_lines = []
+    for day, rows in sorted(
+        grouped.items(),
+        key=lambda d: datetime.datetime.strptime(d[0], "%d/%m/%Y"),
+    ):
+        day_total = sum(parse_amount(r["vnd"]) for r in rows)
+        details_lines.append(f"\n📅 {day}: {day_total:,.0f} VND")
+        details_lines.extend(
+            "\n" + format_expense(r, i) for i, r in enumerate(rows, start=1)
+        )
+        details_lines.append("\n")
+
+    summay = (
+        f"{category_display['summarized']} tuần này ({week_start:%d/%m} - {week_end:%d/%m}):\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n"
+    )
+
+    if details_lines:
+        summay += f"\n📝 Chi tiết:{''.join(details_lines)}"
+
+    return summay
+
+
+async def process_today_summary() -> str:
+    now = get_current_time()
+    today_data = await get_daily_process_data(now)
+    total = today_data["total"]
+    today_expenses = today_data["today_expenses"]
+    count = len(today_expenses)
+    today_str = today_data["date_str"]
+
+    summary = (
+        f"{category_display['summarized']} hôm nay ({today_str}):\n"
+        f"{category_display['spend']}: {total:,.0f} VND\n"
+        f"{category_display['transaction']}: {count}\n"
+    )
+
+    if today_expenses:
+        details = "\n".join(
+            format_expense(r, i + 1) for i, r in enumerate(today_expenses)
+        )
+        summary += f"\n📝 Chi tiết:\n{details}"
+
+    return summary
