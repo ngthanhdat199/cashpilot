@@ -10,9 +10,6 @@ import asyncio
 from src.track_py.const import MONTH_NAMES, HELP_MSG
 from src.track_py.utils.logger import logger
 import src.track_py.utils.sheet as sheet
-import src.track_py.utils.asset as asset
-import src.track_py.utils.keyword as keyword
-import src.track_py.utils.investment as invest
 import src.track_py.const as const
 from src.track_py.utils.category import get_categories_response
 import src.track_py.utils.bot as bot
@@ -466,7 +463,7 @@ async def week(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.process_week_summay(offset)
+        response = await sheet.process_week_summary(offset)
         await update.message.reply_text(response)
 
         logger.info(
@@ -680,7 +677,7 @@ async def investment(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await invest.get_investment_response(offset)
+        response = await sheet.get_investment_response(offset)
         await update.message.reply_text(response)
 
         logger.info(
@@ -918,7 +915,7 @@ async def sync_config(update: Update, context: CallbackContext):
 async def list_keywords(update: Update, context: CallbackContext):
     """List all keywords from constants"""
     try:
-        response = keyword.get_keywords_response()
+        response = sheet.get_keywords_response()
         await update.message.reply_text(response, parse_mode="MarkdownV2")
 
         logger.info(
@@ -943,7 +940,7 @@ async def list_keywords(update: Update, context: CallbackContext):
 async def list_assets(update: Update, context: CallbackContext):
     """Show total assets"""
     try:
-        response = await asset.get_assets_response()
+        response = await sheet.get_assets_response()
         await update.message.reply_text(response, parse_mode="Markdown")
 
         logger.info(
@@ -968,7 +965,7 @@ async def list_assets(update: Update, context: CallbackContext):
 async def migrate_assets(update: Update, context: CallbackContext):
     """Migrate assets data to new format"""
     try:
-        result = asset.migrate_assets_data()
+        result = sheet.migrate_assets_data()
         await update.message.reply_text(result, parse_mode="Markdown")
 
         logger.info(

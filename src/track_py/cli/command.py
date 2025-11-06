@@ -1,9 +1,6 @@
 import src.track_py.utils.sheet as sheet
 import src.track_py.utils.sheet.process as process
 from src.track_py.utils.category import get_categories_response
-import src.track_py.utils.asset as asset
-import src.track_py.utils.keyword as keyword
-import src.track_py.utils.investment as invest
 from ..cli import helper
 
 
@@ -29,7 +26,7 @@ async def today() -> str:
 
 async def week(cmd: str) -> str:
     offset = helper.get_offset_from_command(cmd)
-    response = await sheet.process_week_summay(offset)
+    response = await sheet.process_week_summary(offset)
     return response
 
 
@@ -65,7 +62,7 @@ def other(cmd: str) -> str:
 
 def investment(cmd: str) -> str:
     offset = helper.get_offset_from_command(cmd)
-    response = invest.get_investment_response(offset)
+    response = sheet.get_investment_response(offset)
     return response
 
 
@@ -134,17 +131,17 @@ def sync_config() -> str:
 
 
 def keywords() -> str:
-    response = keyword.get_keywords_response()
+    response = sheet.get_keywords_response()
     return response
 
 
 async def assets() -> str:
-    response = await asset.get_assets_response()
+    response = await sheet.get_assets_response()
     return response
 
 
 def migrate_assets() -> str:
-    response = asset.migrate_assets_data()
+    response = sheet.migrate_assets_data()
     return response
 
 

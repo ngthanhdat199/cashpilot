@@ -20,6 +20,7 @@ from huggingface_hub import InferenceClient
 from src.track_py.utils.util import markdown_to_html
 from src.track_py.config import config, save_config
 from collections import defaultdict
+import src.track_py.utils.sheet as sheet
 
 
 def parse_amount(value: int | float | str) -> int:
@@ -140,3 +141,54 @@ def safe_int(value: str) -> int:
     text = str(value).strip()
     text = re.sub(r"[^\d]", "", text)
     return int(text) if text.isdigit() else 0
+
+
+def convert_values_to_records(all_values: list[list[str]]) -> list[sheet.Record]:
+    """Convert raw sheet values to record format (list of dicts) with optimization"""
+    if not all_values or len(all_values) < 2:  # Need at least header + 1 data row
+        return []
+
+    records = []
+    for row in all_values[1:]:  # Skip header
+        # Create record with proper error handling
+        record = sheet.Record(
+            {
+                "date": (row[0] if len(row) > 0 else "").strip(),
+                "time": (row[1] if len(row) > 1 else "").strip(),
+                "vnd": row[2] if len(row) > 2 else 0,
+                "note": (row[3] if len(row) > 3 else "").strip(),
+            }
+        )
+
+        # Only add records that have at least a date or amount
+        if record["date"] or record["vnd"]:
+            records.append(record)
+
+    return records
+
+
+def format_expense(r: sheet.Record, index=None):
+    """Format an expense record into a readable string"""
+    time_str = r["time"] or "—"
+    amount_str = f"{parse_amount(r['vnd']):,.0f} VND"
+    note_str = r["note"].lower() or ""
+
+    if has_keyword(note_str, const.FOOD_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS["food"]
+    elif has_keyword(note_str, const.TRANSPORT_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS["gas"]
+    elif has_keyword(note_str, const.DATING_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.DATING]
+    elif has_keyword(note_str, const.LONG_INVEST_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.LONG_INVEST]
+    elif has_keyword(note_str, const.OPPORTUNITY_INVEST_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.OPPORTUNITY_INVEST]
+    elif has_keyword(note_str, const.SUPPORT_PARENT_KEYWORDS):
+        note_icon = const.CATEGORY_ICONS[const.SUPPORT_PARENT]
+    elif has_keyword(note_str, const.RENT_KEYWORD):
+        note_icon = const.CATEGORY_ICONS[const.RENT]
+    else:
+        note_icon = "📝"
+
+    prefix = f"{index}. " if index is not None else ""
+    return f"{prefix}⏰ {time_str} | 💰 {amount_str} | {note_icon} {note_str}"
