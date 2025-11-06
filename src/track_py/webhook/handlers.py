@@ -487,7 +487,7 @@ async def month(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.process_month_summary(offset)
+        response = sheet.process_month_summary(offset)
         await update.message.reply_text(response)
 
         logger.info(
