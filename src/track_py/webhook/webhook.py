@@ -123,12 +123,10 @@ def deploy():
         commands = [
             # pull code
             ["git", "pull", "origin", "--no-ff"],
-            # get commit
-            # ["git", "rev-parse", "--short", "HEAD"],
             # update version file
             ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
-            # read from VERSION file
-            ["cat", "VERSION"],
+            # update build time file
+            ["bash", "-c", "echo $(date -u +'%Y-%m-%dT%H:%M:%SZ') > BUILD_TIME"],
             # touch wsgi file to trigger reload
             ["touch", wsgi_path],
         ]
