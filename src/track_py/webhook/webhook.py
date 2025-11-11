@@ -121,40 +121,76 @@ def deploy():
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
         commands = [
-            ["git", "pull", "origin", "--no-ff"],
-            ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
-            ["touch", wsgi_path],
+            (
+                "Git pull",
+                lambda: subprocess.run(
+                    ["git", "pull", "origin", "--no-ff"],
+                    cwd=project_dir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                ),
+            ),
+            (
+                "Update VERSION",
+                lambda: open(os.path.join(project_dir, "VERSION"), "w").write(
+                    subprocess.check_output(
+                        ["git", "rev-parse", "--short", "HEAD"],
+                        cwd=project_dir,
+                        text=True,
+                    ).strip()
+                    + "\n"
+                ),
+            ),
+            ("Touch WSGI", lambda: subprocess.run(["touch", wsgi_path], check=True)),
         ]
 
         results = []
-        for cmd in commands:
+        for desc, func in commands:
             try:
-                logger.info(f"Executing command: {' '.join(cmd)}")
-                result = subprocess.run(
-                    cmd, cwd=project_dir, capture_output=True, text=True, timeout=30
-                )
+                logger.info(f"Executing: {desc}")
+                func()  # run the command
+                logger.info(f"{desc} succeeded")
+                results.append(f"✓ {desc}: Success")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"{desc} failed (code {e.returncode})")
+                if e.stdout:
+                    logger.error(f"stdout: {e.stdout.strip()}")
+                if e.stderr:
+                    logger.error(f"stderr: {e.stderr.strip()}")
+                results.append(f"✗ {desc}: Failed (code {e.returncode})")
+            except Exception as e:
+                logger.error(f"{desc} error: {str(e)}", exc_info=True)
+                results.append(f"✗ {desc}: Error - {str(e)}")
 
-                if result.returncode == 0:
-                    logger.info(f"Command succeeded: {' '.join(cmd)}")
-                    results.append(f"✓ {' '.join(cmd)}: Success")
-                    if result.stdout:
-                        results.append(f"  stdout: {result.stdout.strip()}")
-                else:
-                    logger.error(
-                        f"Command failed: {' '.join(cmd)}, return code: {result.returncode}"
-                    )
-                    results.append(
-                        f"✗ {' '.join(cmd)}: Failed (code {result.returncode})"
-                    )
-                    if result.stderr:
-                        results.append(f"  stderr: {result.stderr.strip()}")
+        # for cmd in commands:
+        #     try:
+        #         logger.info(f"Executing command: {' '.join(cmd)}")
+        #         result = subprocess.run(
+        #             cmd, cwd=project_dir, capture_output=True, text=True, timeout=30
+        #         )
 
-            except subprocess.TimeoutExpired:
-                logger.error(f"Command timed out: {' '.join(cmd)}")
-                results.append(f"✗ {' '.join(cmd)}: Timeout")
-            except Exception as cmd_error:
-                logger.error(f"Error executing command {' '.join(cmd)}: {cmd_error}")
-                results.append(f"✗ {' '.join(cmd)}: Error - {str(cmd_error)}")
+        #         if result.returncode == 0:
+        #             logger.info(f"Command succeeded: {' '.join(cmd)}")
+        #             results.append(f"✓ {' '.join(cmd)}: Success")
+        #             if result.stdout:
+        #                 results.append(f"  stdout: {result.stdout.strip()}")
+        #         else:
+        #             logger.error(
+        #                 f"Command failed: {' '.join(cmd)}, return code: {result.returncode}"
+        #             )
+        #             results.append(
+        #                 f"✗ {' '.join(cmd)}: Failed (code {result.returncode})"
+        #             )
+        #             if result.stderr:
+        #                 results.append(f"  stderr: {result.stderr.strip()}")
+
+        #     except subprocess.TimeoutExpired:
+        #         logger.error(f"Command timed out: {' '.join(cmd)}")
+        #         results.append(f"✗ {' '.join(cmd)}: Timeout")
+        #     except Exception as cmd_error:
+        #         logger.error(f"Error executing command {' '.join(cmd)}: {cmd_error}")
+        #         results.append(f"✗ {' '.join(cmd)}: Error - {str(cmd_error)}")
 
         # Return deployment results
         response_text = "Deployment completed:\n" + "\n".join(results)
