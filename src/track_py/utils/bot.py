@@ -177,7 +177,7 @@ async def process_log_month_expenses(target_month: str, expenses: list[dict]) ->
         assets_to_append = []
 
         # Prepare asset prices once
-        prices = await asset.prepare_prices()
+        prices = asset.prepare_prices()
 
         for expense_data in expenses:
             row = [
