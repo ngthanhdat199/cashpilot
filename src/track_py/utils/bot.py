@@ -7,6 +7,7 @@ import src.track_py.utils.sheet as sheet
 import src.track_py.const as const
 from src.track_py.config import config
 import src.track_py.utils.sheet.asset as asset
+import re
 
 # Background expense logging queue for better performance
 log_expense_queue = deque()
@@ -631,3 +632,13 @@ async def background_delete_expense(
             "bot_token": bot_token,
         }
         await send_error_notification(expense_data, bg_error, const.DELETE_ACTION)
+
+
+def escape_markdown_v2(text: str) -> str:
+    """
+    Escape only Telegram MarkdownV2 special characters in a string.
+    """
+    # Characters that must be escaped
+    special_chars = r"_*[]()~`>#+-=|{}.!"
+    # Replace each with a single backslash
+    return "".join(f"\\{c}" if c in special_chars else c for c in text)

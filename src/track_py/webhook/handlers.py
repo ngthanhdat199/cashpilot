@@ -941,8 +941,9 @@ async def list_assets(update: Update, context: CallbackContext):
     """Show total assets"""
     try:
         response = await sheet.get_assets_response()
-        await update.message.reply_text(response, parse_mode="Markdown")
-
+        escaped_response = bot.escape_markdown_v2(response)
+        wrap_response = f"```{escaped_response}```"
+        await update.message.reply_text(wrap_response, parse_mode="MarkdownV2")
         logger.info(
             f"Assets summary sent successfully to user {update.effective_user.id}"
         )
