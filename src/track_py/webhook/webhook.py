@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask_cors import CORS
 from src.track_py.webhook.bot import setup_bot, setup_bot_commands
 from src.track_py.utils.bot import wait_for_background_tasks
+from src.track_py.utils.version import VERSION
+from src.track_py.utils.datetime import BUILD_TIME
 import src.track_py.const as const
 import src.track_py.utils.sheet as sheet
 from src.track_py.utils.timezone import get_current_time
@@ -117,12 +119,14 @@ def deploy():
 
         # Change to the project directory (assuming the script is in the project root)
         project_dir = os.path.dirname(os.path.abspath(__file__))
+        build_time = datetime.datetime.now().isoformat()
 
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
         commands = [
             ["git", "pull", "origin", "--no-ff"],
-            ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
+            ["bash", "-c", f"echo $(git rev-parse --short HEAD) > {VERSION}"],
+            ["bash", "-c", f"echo {build_time} > {BUILD_TIME}"],
             ["touch", wsgi_path],
         ]
 
