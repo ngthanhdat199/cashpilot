@@ -115,11 +115,8 @@ def deploy():
     try:
         logger.info("Deploy webhook request received")
 
-        # __file__ is the current file: webhook.py
-        current_file = os.path.abspath(__file__)
-
         # Go up 4 levels to reach project root
-        project_dir = os.path.abspath(os.path.join(current_file, "../../../.."))
+        project_dir = "home/thanhdat19/track_py"
 
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
