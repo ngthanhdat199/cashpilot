@@ -165,7 +165,7 @@ def deploy():
                 results.append(f"✗ {' '.join(cmd)}: Error - {str(cmd_error)}")
 
         # Return deployment results
-        response_text = "Deployment completed:\n" + "\n".join(results)
+        response_text = "Deployment completed 123:\n" + "\n".join(results)
         logger.info("Deploy webhook completed")
         return response_text, 200
 
