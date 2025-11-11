@@ -115,17 +115,11 @@ def deploy():
     try:
         logger.info("Deploy webhook request received")
 
-        def find_git_root(start_path=None):
-            start_path = start_path or os.path.dirname(os.path.abspath(__file__))
-            current = start_path
-            while current != "/":
-                if os.path.isdir(os.path.join(current, ".git")):
-                    return current
-                current = os.path.dirname(current)
-            return None  # not found
+        # __file__ is the current file: webhook.py
+        current_file = os.path.abspath(__file__)
 
-        # project_dir = os.path.dirname(os.path.abspath(__file__))
-        project_dir = find_git_root()
+        # Go up 4 levels to reach project root
+        project_dir = os.path.abspath(os.path.join(current_file, "../../../.."))
 
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
