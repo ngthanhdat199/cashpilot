@@ -13,6 +13,7 @@ import src.track_py.const as const
 import src.track_py.utils.sheet as sheet
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.scheduler.job import scheduler, start_scheduler, monthly_sheet_job
+import logging
 
 # Flask app for webhook
 app = Flask(__name__)
@@ -113,7 +114,26 @@ def deploy():
     import os
 
     try:
+
+        # --- Logger setup ---
+        logger = logging.getLogger("deploy_logger")
+        logger.setLevel(logging.INFO)
+
+        file_handler = logging.FileHandler("log.txt")
+        file_handler.setLevel(logging.INFO)
+
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+
+        # Helper to flush logs immediately
+        def flush_logs():
+            for handler in logger.handlers:
+                handler.flush()
+
         logger.info("Deploy webhook request received")
+        flush_logs()
 
         # Change to the project directory (assuming the script is in the project root)
         project_dir = os.path.dirname(os.path.abspath(__file__))
@@ -130,6 +150,8 @@ def deploy():
         for cmd in commands:
             try:
                 logger.info(f"Executing command: {' '.join(cmd)}")
+                flush_logs()
+
                 result = subprocess.run(
                     cmd, cwd=project_dir, capture_output=True, text=True, timeout=30
                 )
@@ -148,13 +170,19 @@ def deploy():
                     )
                     if result.stderr:
                         results.append(f"  stderr: {result.stderr.strip()}")
+                flush_logs()
 
             except subprocess.TimeoutExpired:
                 logger.error(f"Command timed out: {' '.join(cmd)}")
                 results.append(f"✗ {' '.join(cmd)}: Timeout")
+                flush_logs()
             except Exception as cmd_error:
                 logger.error(f"Error executing command {' '.join(cmd)}: {cmd_error}")
                 results.append(f"✗ {' '.join(cmd)}: Error - {str(cmd_error)}")
+                flush_logs()
+
+        logger.info("Deploy webhook completed")
+        flush_logs()
 
         # Return deployment results
         response_text = "Deployment completed:\n" + "\n".join(results)
@@ -163,6 +191,7 @@ def deploy():
 
     except Exception as e:
         logger.error(f"Error in deploy webhook: {e}", exc_info=True)
+        flush_logs()
         return f"Deployment failed: {str(e)}", 500
 
 
