@@ -1,5 +1,5 @@
 from src.track_py.config import config
-from src.track_py.utils.version import get_version, get_build_time
+from src.track_py.utils.version import get_version
 
 # Global variable to store bot application - initialize it 1 immediately
 bot_app = None
@@ -101,7 +101,6 @@ HELP_MSG = f"""
 
 🤖 Bot tự động sắp xếp theo thời gian!  
 📌 Phiên bản: {get_version()}
-🕒 Thời gian build: {get_build_time()}
 """
 
 LOG_EXPENSE_MSG = """
