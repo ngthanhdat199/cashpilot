@@ -124,8 +124,8 @@ def deploy():
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
         commands = [
             ["git", "pull", "origin", "--no-ff"],
-            ["bash", "-c", f"echo $(git rev-parse --short HEAD) > {VERSION}"],
-            ["bash", "-c", f"echo $(date -u +%Y-%m-%dT%H:%M:%SZ) > {BUILD_TIME}"],
+            -["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
+            ["bash", "-c", "echo $(date -u +%Y-%m-%dT%H:%M:%SZ) > BUILD_TIME"],
             ["touch", wsgi_path],
         ]
 
