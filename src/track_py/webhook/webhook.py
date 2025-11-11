@@ -127,7 +127,7 @@ def deploy():
             ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
             # update build time file
             ["bash", "-c", "echo $(date -u +'%Y-%m-%dT%H:%M:%SZ') > BUILD_TIME"],
-            # touch wsgi file to trigger reload 123
+            # touch wsgi file to trigger reload 1234
             ["touch", wsgi_path],
         ]
 
