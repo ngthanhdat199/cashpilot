@@ -13,7 +13,6 @@ import src.track_py.const as const
 import src.track_py.utils.sheet as sheet
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.scheduler.job import scheduler, start_scheduler, monthly_sheet_job
-from src.track_py.config import PROJECT_ROOT
 
 # Flask app for webhook
 app = Flask(__name__)
@@ -116,8 +115,17 @@ def deploy():
     try:
         logger.info("Deploy webhook request received")
 
-        # Change to the project directory (assuming the script is in the project root)
-        project_dir = os.path.dirname(PROJECT_ROOT)
+        def find_git_root(start_path=None):
+            start_path = start_path or os.path.dirname(os.path.abspath(__file__))
+            current = start_path
+            while current != "/":
+                if os.path.isdir(os.path.join(current, ".git")):
+                    return current
+                current = os.path.dirname(current)
+            return None  # not found
+
+        # project_dir = os.path.dirname(os.path.abspath(__file__))
+        project_dir = find_git_root()
 
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
