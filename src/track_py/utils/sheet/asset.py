@@ -362,7 +362,7 @@ def prepare_prices() -> AssetPrices:
 
 def get_price_worker() -> Asset:
     try:
-        token = config["worker"]["token"]
+        token = config["worker"]["github_token"]
         url = f"https://api.github.com/repos/ngthanhdat199/cashpilot-worker/contents/data.json?ref=main"
         logger.info(f"Fetching asset prices from worker URL: {url}")
 
@@ -469,11 +469,10 @@ def process_asset_unit(amount: float, price: float) -> float:
 
 
 def get_usd_to_vnd_rate() -> float:
+    api_key = config["worker"]["coingecko_token"]
     """Fetch current USD to VND exchange rate from an external API"""
     try:
-        url = (
-            "https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=vnd"
-        )
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=vnd&x_cg_demo_api_key={api_key}"
         response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
