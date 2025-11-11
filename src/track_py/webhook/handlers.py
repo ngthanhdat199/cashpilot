@@ -984,3 +984,28 @@ async def migrate_assets(update: Update, context: CallbackContext):
             logger.error(
                 f"Failed to send error message in migrate_assets command: {reply_error}"
             )
+
+
+@safe_async_handler
+async def list_prices(update: Update, context: CallbackContext):
+    """Show total assets"""
+    try:
+        response = await sheet.get_price_response()
+        await update.message.reply_text(response, parse_mode="Markdown")
+
+        logger.info(
+            f"Assets summary sent successfully to user {update.effective_user.id}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Error in assets command for user {update.effective_user.id}: {e}",
+            exc_info=True,
+        )
+        try:
+            await update.message.reply_text(
+                f"❌ Không thể lấy dữ liệu tài sản. Vui lòng thử lại!\n\nLỗi: {e}"
+            )
+        except Exception as reply_error:
+            logger.error(
+                f"Failed to send error message in assets command: {reply_error}"
+            )

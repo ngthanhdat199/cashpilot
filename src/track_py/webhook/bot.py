@@ -35,6 +35,7 @@ def setup_bot() -> Application:
         bot_app.add_handler(
             CommandHandler(["migrate_assets", "ma"], handlers.migrate_assets)
         )
+        bot_app.add_handler(CommandHandler(["price", "pr"], handlers.list_prices))
 
         # Message handler for expenses and delete commands
         bot_app.add_handler(
@@ -117,6 +118,7 @@ async def setup_bot_commands(bot_app: Application) -> None:
             BotCommand(
                 "assets", f"{const.CATEGORY_ICONS['asset']} Show assets summary"
             ),
+            BotCommand("price", f"{const.CATEGORY_ICONS['price']} Show latest prices"),
         ]
         await bot_app.bot.set_my_commands(commands)
         await bot_app.bot.set_chat_menu_button(menu_button=MenuButtonCommands())

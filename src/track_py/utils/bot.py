@@ -6,6 +6,7 @@ from src.track_py.utils.logger import logger
 import src.track_py.utils.sheet as sheet
 import src.track_py.const as const
 from src.track_py.config import config
+import src.track_py.utils.sheet.asset as asset
 
 # Background expense logging queue for better performance
 log_expense_queue = deque()
@@ -173,6 +174,10 @@ async def process_log_month_expenses(target_month: str, expenses: list[dict]) ->
         # Prepare all rows for batch append
         rows_to_append = []
         assets_to_append = []
+
+        # Prepare asset prices once
+        prices = await asset.prepare_prices()
+
         for expense_data in expenses:
             row = [
                 expense_data["entry_date"],
@@ -188,12 +193,7 @@ async def process_log_month_expenses(target_month: str, expenses: list[dict]) ->
                 note, const.OPPORTUNITY_INVEST_KEYWORDS
             ):
                 logger.info(f"Logging asset expense for note: {expense_data}")
-                asset_row = [
-                    f"{expense_data['entry_date']}/{expense_data['entry_year']}",
-                    expense_data["entry_time"],
-                    int(expense_data["amount"]),
-                    expense_data["note"],
-                ]
+                asset_row = sheet.prepare_asset_to_append(expense_data, prices)
                 assets_to_append.append(asset_row)
 
         # Batch append all rows at once (more efficient than individual appends)

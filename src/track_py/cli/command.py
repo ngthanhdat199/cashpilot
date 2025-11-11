@@ -145,6 +145,16 @@ def migrate_assets() -> str:
     return response
 
 
+def price() -> str:
+    response = sheet.get_price_response()
+    return response
+
+
+async def profit() -> str:
+    response = await sheet.get_profit_response()
+    return response
+
+
 command_map = {
     "today": today,
     "week": week,
@@ -164,4 +174,6 @@ command_map = {
     "keywords": keywords,
     "assets": assets,
     "migrate_assets": migrate_assets,
+    "price": price,
+    "profit": profit,
 }

@@ -27,6 +27,8 @@ commands = [
     "keywords",
     "assets",
     "migrate_assets",
+    "price",
+    "profit",
 ]
 completer = WordCompleter(commands, ignore_case=True)
 

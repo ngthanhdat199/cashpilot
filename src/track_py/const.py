@@ -243,6 +243,15 @@ CATEGORY_ICONS = {
     "keywords": "🔑",
     "asset": "💎",
     "migrate_assets": "🚚",
+    "profit": "💰",
+    "gold": "🏅",
+    "etf": "🧾",
+    "dcds": "📊",
+    "vesaf": "📈",
+    "bitcoin": "₿",
+    "ethereum": "✨",
+    "price": "💲",
+    "vnd_to_usd": "💱",
 }
 
 CATEGORY_NAMES = {
@@ -275,6 +284,15 @@ CATEGORY_NAMES = {
     "asset": "Tài sản",
     "migrate_assets": "Di chuyển tài sản",
     "sort": "Sắp xếp",
+    "profit": "Lợi nhuận",
+    "gold": "Vàng",
+    "etf": "ETF",
+    "dcds": "DCDS",
+    "vesaf": "VESAF",
+    "bitcoin": "Bitcoin",
+    "ethereum": "Ethereum",
+    "price": "Giá",
+    "vnd_to_usd": "Tỷ giá VND/USD",
 }
 
 CATEGORY_COLORS = {

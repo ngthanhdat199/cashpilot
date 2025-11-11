@@ -23,6 +23,14 @@ from collections import defaultdict
 import src.track_py.utils.sheet as sheet
 
 
+class AssetRecord(TypedDict):
+    date: str
+    time: str
+    vnd: int
+    note: str
+    unit: float
+
+
 def parse_amount(value: int | float | str) -> int:
     """
     Convert an amount from int/float/str into a float (VND).
@@ -167,6 +175,33 @@ def convert_values_to_records(all_values: list[list[str]]) -> list[sheet.Record]
     return records
 
 
+def convert_values_to_asset_records(
+    all_values: list[list[str]],
+) -> list[AssetRecord]:
+    """Convert raw sheet values to record format (list of dicts) with optimization"""
+    if not all_values or len(all_values) < 2:  # Need at least header + 1 data row
+        return []
+
+    records = []
+    for row in all_values[1:]:  # Skip header
+        # Create record with proper error handling
+        record = AssetRecord(
+            {
+                "date": (row[0] if len(row) > 0 else "").strip(),
+                "time": (row[1] if len(row) > 1 else "").strip(),
+                "vnd": row[2] if len(row) > 2 else 0,
+                "note": (row[3] if len(row) > 3 else "").strip(),
+                "unit": float(row[4]) if len(row) > 4 and row[4] else 0.0,
+            }
+        )
+
+        # Only add records that have at least a date or amount
+        if record["date"] or record["vnd"] or record["unit"]:
+            records.append(record)
+
+    return records
+
+
 def format_expense(r: sheet.Record, index=None):
     """Format an expense record into a readable string"""
     time_str = r["time"] or "—"
@@ -192,3 +227,24 @@ def format_expense(r: sheet.Record, index=None):
 
     prefix = f"{index}. " if index is not None else ""
     return f"{prefix}⏰ {time_str} | 💰 {amount_str} | {note_icon} {note_str}"
+
+
+def process_percent_change(new_value, original_value) -> str:
+    percent = (
+        (new_value - original_value) / original_value * 100
+        if original_value != 0
+        else 0
+    )
+    change_symbol = get_change_symbol(percent)
+    return f"{change_symbol}{abs(percent):.2f}%"
+
+
+def process_value_change(new_value, original_value) -> str:
+    change = new_value - original_value
+    change_symbol = get_change_symbol(change)
+    return f"{change_symbol}{abs(change):,.0f}"
+
+
+def get_change_symbol(value: float) -> str:
+    """Get the change symbol (+/-) based on the percent value"""
+    return "+" if value >= 0 else "-"

@@ -54,6 +54,21 @@ def get_categories_display() -> dict:
     freelance_display = (
         f"{CATEGORY_ICONS.get('freelance')} {CATEGORY_NAMES.get('freelance')}"
     )
+    profit_display = f"{CATEGORY_ICONS.get('profit')} {CATEGORY_NAMES.get('profit')}"
+    long_investment_display = f"{CATEGORY_ICONS.get('long_investment')} {CATEGORY_NAMES.get('long_investment')}"
+    opportunity_investment_display = f"{CATEGORY_ICONS.get('opportunity_investment')} {CATEGORY_NAMES.get('opportunity_investment')}"
+    gold_display = f"{CATEGORY_ICONS.get('gold')} {CATEGORY_NAMES.get('gold')}"
+    etf_display = f"{CATEGORY_ICONS.get('etf')} {CATEGORY_NAMES.get('etf')}"
+    dcds_display = f"{CATEGORY_ICONS.get('dcds')} {CATEGORY_NAMES.get('dcds')}"
+    vesaf_display = f"{CATEGORY_ICONS.get('vesaf')} {CATEGORY_NAMES.get('vesaf')}"
+    bitcoin_display = f"{CATEGORY_ICONS.get('bitcoin')} {CATEGORY_NAMES.get('bitcoin')}"
+    ethereum_display = (
+        f"{CATEGORY_ICONS.get('ethereum')} {CATEGORY_NAMES.get('ethereum')}"
+    )
+    price_display = f"{CATEGORY_ICONS.get('price')} {CATEGORY_NAMES.get('price')}"
+    vnd_to_usd_display = (
+        f"{CATEGORY_ICONS.get('vnd_to_usd')} {CATEGORY_NAMES.get('vnd_to_usd')}"
+    )
 
     category_display = {
         "rent": rent_display,
@@ -85,6 +100,17 @@ def get_categories_display() -> dict:
         "sort": sort_display,
         "salary": salary_display,
         "freelance": freelance_display,
+        "profit": profit_display,
+        "long_investment": long_investment_display,
+        "opportunity_investment": opportunity_investment_display,
+        "gold": gold_display,
+        "etf": etf_display,
+        "dcds": dcds_display,
+        "vesaf": vesaf_display,
+        "bitcoin": bitcoin_display,
+        "ethereum": ethereum_display,
+        "price": price_display,
+        "vnd_to_usd": vnd_to_usd_display,
     }
 
     return category_display

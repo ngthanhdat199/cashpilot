@@ -484,7 +484,7 @@ def update_config_to_sheet(current_sheet: gspread.Worksheet):
         )
 
 
-async def sort_expenses_by_date(month_offset: int) -> str:
+async def sort_expenses_by_date(month_offset: int = 0) -> str:
     """Helper to sort expenses in a given month sheet by date"""
     try:
         now = get_current_time() + relativedelta(months=month_offset)
@@ -513,6 +513,53 @@ async def sort_expenses_by_date(month_offset: int) -> str:
             await asyncio.to_thread(
                 lambda: current_sheet.update(
                     f"A2:D{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
+                )
+            )
+
+            # Invalidate cache
+            sheet.invalidate_sheet_cache(sheet_name)
+            logger.info(
+                f"Manually sorted {len(sorted_data)} rows in sheet {sheet_name}"
+            )
+            return f"{category_display['sort']} thành công {len(sorted_data)} mục trong bảng {sheet_name}."
+        else:
+            logger.info(f"No data to sort in sheet {sheet_name}")
+            return "Không có dữ liệu để sắp xếp."
+
+    except Exception as e:
+        logger.error(f"Error starting sort for sheet {sheet_name}: {e}", exc_info=True)
+        return "Đã xảy ra lỗi khi sắp xếp dữ liệu."
+
+
+async def sort_assets_expenses_by_date(month_offset: int = 0) -> str:
+    """Helper to sort expenses in a given month sheet by date"""
+    try:
+        now = get_current_time() + relativedelta(months=month_offset)
+        target_month = now.strftime("%m/%Y")
+        sheet_name = target_month
+        current_sheet = await asyncio.to_thread(sheet.get_cached_worksheet, sheet_name)
+
+        # Get all data
+        all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, sheet_name)
+
+        if len(all_values) > 2:  # More than header + 1 row
+            data_rows = all_values[1:]
+            sorted_data = sorted(data_rows, key=parse_date_time)
+
+            # format amounts VND
+            for row in sorted_data:
+                if len(row) >= 3 and row[2]:
+                    try:
+                        row[2] = int(
+                            float(str(row[2]).replace(",", "").replace("₫", "").strip())
+                        )
+                    except (ValueError, TypeError):
+                        pass
+
+            # Update the sorted data
+            await asyncio.to_thread(
+                lambda: current_sheet.update(
+                    f"A2:E{len(sorted_data) + 1}", sorted_data, value_input_option="RAW"
                 )
             )
 

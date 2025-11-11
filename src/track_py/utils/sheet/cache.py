@@ -75,7 +75,7 @@ def get_cached_sheet_data(
     try:
         sheet = get_cached_worksheet(sheet_name)
         # Use get_values instead of get_all_records for better performance
-        all_values = sheet.get_values("A:D")
+        all_values = sheet.get_values("A:E")
         _sheet_cache[cache_key] = (all_values, current_time)
         return all_values
     except Exception as e:
