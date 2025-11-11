@@ -124,7 +124,7 @@ def deploy():
             # pull code
             ["git", "pull", "origin", "--no-ff"],
             # get commit
-            ["git", "rev-parse", "--short", "HEAD"],
+            # ["git", "rev-parse", "--short", "HEAD"],
             # update version file
             ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
             # read from VERSION file
