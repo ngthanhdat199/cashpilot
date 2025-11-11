@@ -13,6 +13,7 @@ import src.track_py.const as const
 import src.track_py.utils.sheet as sheet
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.scheduler.job import scheduler, start_scheduler, monthly_sheet_job
+from src.track_py.config import PROJECT_ROOT
 
 # Flask app for webhook
 app = Flask(__name__)
@@ -116,7 +117,7 @@ def deploy():
         logger.info("Deploy webhook request received")
 
         # Change to the project directory (assuming the script is in the project root)
-        project_dir = os.path.dirname(os.path.abspath(__file__))
+        project_dir = os.path.dirname(PROJECT_ROOT)
 
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
