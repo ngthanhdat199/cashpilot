@@ -462,7 +462,7 @@ def process_asset_unit(amount: float, price: float) -> float:
     """Process asset amount based on unit (e.g., grams for gold)"""
     try:
         unit = amount / price
-        return round(unit, 5)
+        return round(unit, 4)
     except Exception as e:
         logger.error(f"Error processing asset unit: {e}")
         return 0.0
