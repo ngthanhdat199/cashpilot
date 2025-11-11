@@ -1,10 +1,6 @@
 import datetime
 import src.track_py.utils.sheet as sheet
 from src.track_py.utils.logger import logger
-import os
-from src.track_py.config import PROJECT_ROOT
-
-BUILD_TIME = "BUILD_TIME"
 
 
 # Sort by date and time
@@ -30,13 +26,3 @@ def parse_date_time(row: list[str]) -> datetime.datetime:
     except (ValueError, TypeError) as e:
         logger.debug(f"Failed to parse date/time '{date_str} {time_str}': {e}")
         return datetime.datetime.min
-
-
-# Get build time
-def get_build_time() -> str:
-    try:
-        build_time_file = os.path.join(PROJECT_ROOT, BUILD_TIME)
-        with open(build_time_file) as f:
-            return f.read().strip()
-    except Exception:
-        return "unknown"

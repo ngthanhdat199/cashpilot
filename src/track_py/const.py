@@ -1,6 +1,5 @@
 from src.track_py.config import config
-from src.track_py.utils.version import get_version
-from src.track_py.utils.datetime import get_build_time
+from src.track_py.utils.version import get_version, get_build_time
 
 # Global variable to store bot application - initialize it immediately
 bot_app = None
