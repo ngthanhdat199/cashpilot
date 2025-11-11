@@ -1,7 +1,7 @@
 from src.track_py.config import config
 from src.track_py.utils.version import get_version, get_build_time
 
-# Global variable to store bot application - initialize it  immediately
+# Global variable to store bot application - initialize it 1 immediately
 bot_app = None
 webhook_failures = 0
 last_failure_time = None
