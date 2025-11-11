@@ -134,7 +134,7 @@ def deploy():
             ["touch", wsgi_path],
         ]
 
-        results = []
+        results = ["project_dir: " + project_dir]
         for cmd in commands:
             try:
                 logger.info(f"Executing command: {' '.join(cmd)}")
