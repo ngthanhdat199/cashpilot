@@ -112,16 +112,6 @@ def deploy():
     import subprocess
     import os
 
-    def update_version():
-        version_file = os.path.join(project_dir, "VERSION")
-        # get the current git commit hash
-        commit_hash = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=project_dir, text=True
-        ).strip()
-        # write it to VERSION
-        with open(version_file, "w") as f:
-            f.write(commit_hash + "\n")
-
     try:
         logger.info("Deploy webhook request received")
 
@@ -131,8 +121,15 @@ def deploy():
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
         commands = [
+            # pull code
             ["git", "pull", "origin", "--no-ff"],
+            # get commit
+            ["git", "rev-parse", "--short", "HEAD"],
+            # update version file
             ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
+            # read from VERSION file
+            ["cat", "VERSION"],
+            # touch wsgi file to trigger reload
             ["touch", wsgi_path],
         ]
 
