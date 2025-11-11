@@ -120,7 +120,7 @@ def deploy():
         project_dir = os.path.dirname(os.path.abspath(__file__))
         # build_time = datetime.datetime.now().isoformat()
 
-        # Execute deployment commands  
+        # Execute deployment commands   
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
         commands = [
             ["git", "pull", "origin", "--no-ff"],
