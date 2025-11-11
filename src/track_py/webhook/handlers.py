@@ -991,7 +991,7 @@ async def migrate_assets(update: Update, context: CallbackContext):
 async def list_prices(update: Update, context: CallbackContext):
     """Show total assets"""
     try:
-        response = await sheet.get_price_response()
+        response = sheet.get_price_response()
         await update.message.reply_text(response, parse_mode="Markdown")
 
         logger.info(
