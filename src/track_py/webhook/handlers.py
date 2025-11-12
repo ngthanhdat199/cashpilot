@@ -553,7 +553,7 @@ async def gas(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.process_gas_summary(offset)
+        response = sheet.process_gas_summary(offset)
         await update.message.reply_text(response)
 
         logger.info(f"Gas summary sent successfully to user {update.effective_user.id}")
@@ -582,7 +582,7 @@ async def food(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.process_food_summary(offset)
+        response = sheet.process_food_summary(offset)
         await update.message.reply_text(response)
 
         logger.info(
@@ -644,7 +644,7 @@ async def other(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.process_other_summary(offset)
+        response = sheet.process_other_summary(offset)
         await update.message.reply_text(response)
 
         logger.info(
@@ -677,7 +677,7 @@ async def investment(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.get_investment_response(offset)
+        response = sheet.get_investment_response(offset)
         await update.message.reply_text(response)
 
         logger.info(
@@ -828,7 +828,7 @@ async def income(update: Update, context: CallbackContext):
 
     """Show total income from sheet"""
     try:
-        response = await sheet.process_income_summary(offset)
+        response = sheet.process_income_summary(offset)
         await update.message.reply_text(response)
 
         logger.info(
