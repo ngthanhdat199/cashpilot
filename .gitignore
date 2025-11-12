@@ -8,3 +8,5 @@ venv/
 src/track_py/__pycache__/
 test.py
 wsgi.py
+VERSION
+BUILD_TIME
