@@ -45,7 +45,9 @@ async def get_assets_response() -> str:
         except Exception as sort_error:
             logger.error(f"Error sorting assets sheet {sheet_name}: {sort_error}")
 
-        all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, sheet_name)
+        all_values = await asyncio.to_thread(
+            sheet.get_cached_asset_sheet_data, sheet_name
+        )
         records = sheet.convert_values_to_asset_records(all_values)
 
         # asset
@@ -309,7 +311,7 @@ def get_assets_expenses(sheet_name: str, year: int) -> list[list]:
             logger.warning(f"Sheet {sheet_name} does not exist.")
             return []
 
-        all_values = sheet.get_cached_sheet_data(sheet_name)
+        all_values = sheet.get_cached_asset_sheet_data(sheet_name)
         records = sheet.convert_values_to_records(all_values)
         assets_expenses = get_assets_expenses_records(records, year)
         return assets_expenses
@@ -531,7 +533,9 @@ async def get_profit_response() -> str:
         except Exception as sort_error:
             logger.error(f"Error sorting assets sheet {sheet_name}: {sort_error}")
 
-        all_values = await asyncio.to_thread(sheet.get_cached_sheet_data, sheet_name)
+        all_values = await asyncio.to_thread(
+            sheet.get_cached_asset_sheet_data, sheet_name
+        )
         records = sheet.convert_values_to_asset_records(all_values)
 
         # asset

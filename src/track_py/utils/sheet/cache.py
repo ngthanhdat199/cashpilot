@@ -26,7 +26,9 @@ import src.track_py.utils.sheet as sheet
 # Performance optimization: Cache for sheet data to reduce API calls
 _sheet_cache = {}
 _worksheet_cache = {}
+_asset_sheet_cache = {}
 _cache_timeout = 300  # Cache timeout in seconds (5 minutes)
+_asset_cache_timeout = 600  # Longer cache for asset sheet (10 minutes)
 _today_cache_timeout = 60  # Shorter cache for today's data (1 minute)
 
 
@@ -75,7 +77,7 @@ def get_cached_sheet_data(
     try:
         sheet = get_cached_worksheet(sheet_name)
         # Use get_values instead of get_all_records for better performance
-        all_values = sheet.get_values("A:E")
+        all_values = sheet.get_values("A:D")
         _sheet_cache[cache_key] = (all_values, current_time)
         return all_values
     except Exception as e:
@@ -83,6 +85,35 @@ def get_cached_sheet_data(
         # Return cached data if available, even if expired
         if cache_key in _sheet_cache:
             return _sheet_cache[cache_key][0]
+        raise
+
+
+def get_cached_asset_sheet_data(
+    sheet_name: str, force_refresh: bool = False
+) -> list[list[str]]:
+    """Get cached sheet data or fetch fresh if expired"""
+    current_time = time.time()
+    cache_key = f"data_{sheet_name}"
+
+    if not force_refresh and cache_key in _asset_sheet_cache:
+        data, timestamp = _asset_sheet_cache[cache_key]
+        if current_time - timestamp < _asset_cache_timeout:
+            logger.debug(f"Using cached data for sheet {sheet_name}")
+            return data
+
+    # Fetch fresh data
+    logger.debug(f"Fetching fresh data for sheet {sheet_name}")
+    try:
+        sheet = get_cached_worksheet(sheet_name)
+        # Use get_values instead of get_all_records for better performance
+        all_values = sheet.get_values("A:E")
+        _asset_sheet_cache[cache_key] = (all_values, current_time)
+        return all_values
+    except Exception as e:
+        logger.error(f"Error fetching sheet data for {sheet_name}: {e}")
+        # Return cached data if available, even if expired
+        if cache_key in _asset_sheet_cache:
+            return _asset_sheet_cache[cache_key][0]
         raise
 
 
@@ -160,6 +191,10 @@ def invalidate_sheet_cache(sheet_name: str):
     if data_key in _sheet_cache:
         del _sheet_cache[data_key]
         logger.debug(f"Invalidated data cache for sheet {sheet_name}")
+
+    if data_key in _asset_sheet_cache:
+        del _asset_sheet_cache[data_key]
+        logger.debug(f"Invalidated asset data cache for sheet {sheet_name}")
 
     if worksheet_key in _worksheet_cache:
         del _worksheet_cache[worksheet_key]
