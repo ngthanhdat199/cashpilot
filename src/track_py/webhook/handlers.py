@@ -613,7 +613,7 @@ async def dating(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.process_dating_summary(offset)
+        response = sheet.process_dating_summary(offset)
         await update.message.reply_text(response)
 
         logger.info(
