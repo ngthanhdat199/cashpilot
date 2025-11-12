@@ -24,49 +24,49 @@ async def today() -> str:
     return response
 
 
-async def week(cmd: str) -> str:
+async def week(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = await sheet.process_week_summary(offset)
     return response
 
 
-def month(cmd: str) -> str:
+def month(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = sheet.process_month_summary(offset)
     return response
 
 
-def gas(cmd: str) -> str:
+def gas(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = sheet.process_gas_summary(offset)
     return response
 
 
-def food(cmd: str) -> str:
+def food(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = sheet.process_food_summary(offset)
     return response
 
 
-def dating(cmd: str) -> str:
+def dating(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = sheet.process_dating_summary(offset)
     return response
 
 
-def other(cmd: str) -> str:
+def other(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = sheet.process_other_summary(offset)
     return response
 
 
-def investment(cmd: str) -> str:
+def investment(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = sheet.get_investment_response(offset)
     return response
 
 
-def freelance(cmd: str) -> str:
+def freelance(cmd: str = "") -> str:
     parts = cmd.split()
     # /fl 200 -> offset=0, amount=200
     if len(parts) == 2:
@@ -84,7 +84,7 @@ def freelance(cmd: str) -> str:
     return response
 
 
-def salary(cmd: str) -> str:
+def salary(cmd: str = "") -> str:
     parts = cmd.split()
     # /sl 200 -> offset=0, amount=200
     if len(parts) == 2:
@@ -102,19 +102,19 @@ def salary(cmd: str) -> str:
     return response
 
 
-def income(cmd: str) -> str:
+def income(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = sheet.process_income_summary(offset)
     return response
 
 
-async def sort(cmd: str) -> str:
+async def sort(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = await sheet.sort_expenses_by_date(offset)
     return response
 
 
-async def ai(cmd: str) -> str:
+async def ai(cmd: str = "") -> str:
     offset = helper.get_offset_from_command(cmd)
     response = await sheet.get_ai_analyze_summary(offset)
     return response
@@ -155,6 +155,29 @@ async def profit() -> str:
     return response
 
 
+async def test() -> str:
+    response = ""
+
+    for name, func in test_func.items():
+        result = await helper.handle_coroutine_command(func)
+        response += f"{name.capitalize()} Test Result:\n{result}\n\n"
+
+    return response
+
+
+test_func = {
+    "today": today,
+    "week": week,
+    "month": month,
+    "investment": investment,
+    "sort": sort,
+    "categories": categories,
+    "keywords": keywords,
+    "assets": assets,
+    "price": price,
+}
+
+
 command_map = {
     "today": today,
     "week": week,
@@ -176,4 +199,5 @@ command_map = {
     "migrate_assets": migrate_assets,
     "price": price,
     "profit": profit,
+    "test": test,
 }

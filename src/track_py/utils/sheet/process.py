@@ -511,7 +511,7 @@ def process_gas_summary(month_offset: int) -> str:
     return summary
 
 
-def process_month_summary(month_offset: int) -> str:
+def process_month_summary(month_offset: int = 0) -> str:
     now = get_current_time() + relativedelta(months=month_offset)
     target_month = now.strftime("%m/%Y")
 
@@ -542,7 +542,7 @@ def process_month_summary(month_offset: int) -> str:
     return response
 
 
-async def process_week_summary(week_offset: int) -> str:
+async def process_week_summary(week_offset: int = 0) -> str:
     now = get_current_time() + datetime.timedelta(weeks=week_offset)
     week_data = await sheet.get_week_process_data(now)
     total = week_data["total"]
@@ -603,7 +603,7 @@ async def process_today_summary() -> str:
     return summary
 
 
-def get_investment_response(month_offset: int) -> str:
+def get_investment_response(month_offset: int = 0) -> str:
     now = sheet.get_current_time() + relativedelta(months=month_offset)
     target_month = now.strftime("%m/%Y")
     previous_month = (now - relativedelta(months=1)).strftime("%m/%Y")
