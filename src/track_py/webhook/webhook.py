@@ -116,7 +116,7 @@ def deploy():
         logger.info("Deploy webhook request received")
 
         # Go up 4 levels to reach project root
-        project_dir = "home/thanhdat19/track-money"
+        project_dir = "/home/thanhdat19/track-money"
 
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
