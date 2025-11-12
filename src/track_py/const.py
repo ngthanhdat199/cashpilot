@@ -15,6 +15,7 @@ CHAT_ID = config["telegram"]["chat_id"]
 WEBHOOK_URL = config["telegram"]["webhook_url"]
 WSGI_FILE = "thanhdat19_pythonanywhere_com_wsgi.py"
 HUGGING_FACE_TOKEN = config["hugging_face"]["token"]
+PROJECT_DIR = "/home/thanhdat19/track-money"
 
 # Get month name in Vietnamese
 MONTH_NAMES = {

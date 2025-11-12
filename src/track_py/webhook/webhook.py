@@ -11,6 +11,7 @@ from src.track_py.webhook.bot import setup_bot, setup_bot_commands
 from src.track_py.utils.bot import wait_for_background_tasks
 import src.track_py.const as const
 import src.track_py.utils.sheet as sheet
+from src.track_py.utils.version import VERSION, BUILD_TIME
 from src.track_py.utils.timezone import get_current_time
 from src.track_py.scheduler.job import scheduler, start_scheduler, monthly_sheet_job
 
@@ -116,7 +117,7 @@ def deploy():
         logger.info("Deploy webhook request received")
 
         # Go up 4 levels to reach project root
-        project_dir = "/home/thanhdat19/track-money"
+        project_dir = const.PROJECT_DIR
 
         # Execute deployment commands
         wsgi_path = f"/var/www/{const.WSGI_FILE}"
@@ -124,10 +125,14 @@ def deploy():
             # pull code
             ["git", "pull", "origin", "--no-ff"],
             # update version file
-            ["bash", "-c", "echo $(git rev-parse --short HEAD) > VERSION"],
+            ["bash", "-c", f"echo $(git rev-parse --short HEAD) > {VERSION}"],
             # update build time file
-            ["bash", "-c", "echo $(date -u +'%Y-%m-%dT%H:%M:%SZ') > BUILD_TIME"],
-            # touch wsgi file to trigger reload 123445555
+            [
+                "bash",
+                "-c",
+                f"TZ='Asia/Ho_Chi_Minh' date +'%Y-%m-%dT%H:%M:%S%:z' > {BUILD_TIME}",
+            ],
+            # touch wsgi file to trigger reload
             ["touch", wsgi_path],
         ]
 
@@ -162,7 +167,7 @@ def deploy():
                 results.append(f"✗ {' '.join(cmd)}: Error - {str(cmd_error)}")
 
         # Return deployment results
-        response_text = "Deployment completed 1234562132131232112:\n" + "\n".join(results)
+        response_text = "Deployment completed:\n" + "\n".join(results)
         logger.info("Deploy webhook completed")
         return response_text, 200
 
