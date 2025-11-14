@@ -12,33 +12,50 @@ import re
 # Background expense logging queue for better performance
 log_expense_queue = deque()
 delete_expense_queue = deque()
+get_expense_queue = deque()
 _log_queue_processor_running = False
 _delete_queue_processor_running = False
+_get_queue_processor_running = False
 _background_tasks = set()  # Keep track of background tasks
 
 
 async def wait_for_background_tasks(timeout=30) -> bool:
-    """Wait for all background tasks (log + delete) to complete before shutdown"""
-    if not _background_tasks and not log_expense_queue and not delete_expense_queue:
+    """Wait for all background tasks (log + delete + get) to complete before shutdown"""
+    if (
+        not _background_tasks
+        and not log_expense_queue
+        and not delete_expense_queue
+        and not get_expense_queue
+    ):
         logger.info("No background tasks to wait for")
         return True
 
     logger.info(
         f"Waiting for {len(_background_tasks)} background tasks, "
-        f"{len(log_expense_queue)} log queue, and {len(delete_expense_queue)} delete queue to complete..."
+        f"{len(log_expense_queue)} log queue, {len(delete_expense_queue)} delete queue, "
+        f"and {len(get_expense_queue)} get queue to complete..."
     )
 
     start_time = time.time()
-    while (_background_tasks or log_expense_queue or delete_expense_queue) and (
-        time.time() - start_time
-    ) < timeout:
+    while (
+        _background_tasks
+        or log_expense_queue
+        or delete_expense_queue
+        or get_expense_queue
+    ) and (time.time() - start_time) < timeout:
         await asyncio.sleep(0.1)
 
-    if _background_tasks or log_expense_queue or delete_expense_queue:
+    if (
+        _background_tasks
+        or log_expense_queue
+        or delete_expense_queue
+        or get_expense_queue
+    ):
         logger.warning(
             f"Timeout waiting for background tasks. "
             f"Remaining: {len(_background_tasks)} tasks, "
-            f"{len(log_expense_queue)} log, {len(delete_expense_queue)} delete"
+            f"{len(log_expense_queue)} log, {len(delete_expense_queue)} delete, "
+            f"{len(get_expense_queue)} get"
         )
         return False
     else:
@@ -142,6 +159,156 @@ async def process_delete_expense_queue() -> None:
         logger.error(f"Error in delete expense queue processor: {queue_error}")
     finally:
         _delete_queue_processor_running = False
+
+
+async def process_get_expense_queue() -> None:
+    """Process get expense requests from queue"""
+    global _get_queue_processor_running
+
+    if _get_queue_processor_running:
+        return
+
+    _get_queue_processor_running = True
+
+    try:
+        while get_expense_queue:
+            # Process one request at a time for get expense operations
+            if not get_expense_queue:
+                break
+
+            request_data = get_expense_queue.popleft()
+            handler_type = request_data["handler_type"]
+            offset = request_data.get("offset", 0)
+            user_id = request_data["user_id"]
+            chat_id = request_data["chat_id"]
+            bot_token = request_data["bot_token"]
+            message_id = request_data["message_id"]
+            start_time = request_data.get("timestamp", time.time())
+            handler_display = const.HANDLER_ACTIONS.get(handler_type, handler_type)
+
+            try:
+                # Send progress update
+                progress_message = (
+                    f"⚡ *Đã ghi nhận xem {handler_display}!*\n"
+                    f"🔄 *Đang lấy dữ liệu...*\n"
+                    f"📊 *Đang đồng bộ với Google Sheets...*\n"
+                )
+                try:
+                    notification_bot = Bot(token=bot_token)
+                    await notification_bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text=progress_message,
+                        parse_mode="Markdown",
+                    )
+                except Exception as progress_error:
+                    logger.warning(f"Could not send progress update: {progress_error}")
+
+                # Call appropriate sheet function based on handler type
+                response = None
+                parse_mode = "Markdown"
+
+                if handler_type == "today":
+                    response = await sheet.process_today_summary()
+                elif handler_type == "week":
+                    response = await sheet.process_week_summary(offset)
+                elif handler_type == "month":
+                    # process_month_summary is not async, so wrap it
+                    response = await asyncio.to_thread(
+                        sheet.process_month_summary, offset
+                    )
+                elif handler_type == "assets":
+                    response = await sheet.get_assets_response()
+                    # Assets uses MarkdownV2 and needs escaping
+                    parse_mode = "MarkdownV2"
+                    escaped_response = escape_markdown_v2(response)
+                    response = f"```{escaped_response}```"
+                else:
+                    raise ValueError(f"Unknown handler type: {handler_type}")
+
+                # Send success notification with response
+                elapsed_time = time.time() - start_time
+                try:
+                    notification_bot = Bot(token=bot_token)
+                    # Add response time to the message if it's not already there
+                    # For Markdown mode, append time at the end
+                    if parse_mode == "Markdown":
+                        response_with_time = (
+                            f"{response}\n⚡ _Hoàn thành trong {elapsed_time:.1f}s_"
+                        )
+                    else:
+                        # For MarkdownV2 (assets), keep original response as it's already formatted
+                        response_with_time = response
+
+                    await notification_bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text=response_with_time,
+                        parse_mode=parse_mode,
+                    )
+                    logger.info(
+                        f"✅ Successfully sent {handler_type} response to user {user_id} in {elapsed_time:.1f}s"
+                    )
+                except Exception as send_error:
+                    logger.error(f"Failed to send response message: {send_error}")
+                    # Fallback: send new message
+                    try:
+                        fallback_bot = Bot(token=bot_token)
+                        # Add response time to fallback message too
+                        if parse_mode == "Markdown":
+                            fallback_response = f"{response}\n\n⚡ _Hoàn thành trong {elapsed_time:.1f}s_"
+                        else:
+                            fallback_response = response
+                        await fallback_bot.send_message(
+                            chat_id=chat_id,
+                            text=fallback_response,
+                            parse_mode=parse_mode,
+                        )
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback message also failed: {fallback_error}")
+
+            except Exception as process_error:
+                logger.error(
+                    f"Error processing get expense request for user {user_id}, handler_type={handler_type}: {process_error}",
+                    exc_info=True,
+                )
+                # Send error notification
+                try:
+                    error_bot = Bot(token=bot_token)
+                    error_message = (
+                        f"❌ *Lỗi khi lấy dữ liệu*\n\n"
+                        f"⚠️ *Lỗi:* `{str(process_error)}`\n\n"
+                        f"💡 _Vui lòng thử lại hoặc liên hệ admin_"
+                    )
+                    await error_bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text=error_message,
+                        parse_mode="Markdown",
+                    )
+                except Exception as error_notify_error:
+                    logger.error(
+                        f"Failed to send error notification: {error_notify_error}"
+                    )
+                    # Fallback: send new error message
+                    try:
+                        fallback_bot = Bot(token=bot_token)
+                        await fallback_bot.send_message(
+                            chat_id=chat_id,
+                            text=f"❌ Lỗi khi lấy dữ liệu: {str(process_error)}",
+                        )
+                    except Exception as fallback_error:
+                        logger.error(
+                            f"Fallback error message also failed: {fallback_error}"
+                        )
+
+            # Small delay between requests to avoid overwhelming the API
+            await asyncio.sleep(0.3)
+
+    except Exception as queue_error:
+        logger.error(f"Error in get expense queue processor: {queue_error}")
+    finally:
+        _get_queue_processor_running = False
 
 
 async def process_log_month_expenses(target_month: str, expenses: list[dict]) -> None:
@@ -632,6 +799,101 @@ async def background_delete_expense(
             "bot_token": bot_token,
         }
         await send_error_notification(expense_data, bg_error, const.DELETE_ACTION)
+
+
+async def background_get_expense(
+    handler_type: str,
+    user_id: int,
+    chat_id: int,
+    bot_token: str,
+    message_id: int,
+    offset: int = 0,
+) -> None:
+    """Background task to queue get expense request for processing"""
+    try:
+        # Add request to queue
+        request_data = {
+            "handler_type": handler_type,
+            "offset": offset,
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "bot_token": bot_token,
+            "message_id": message_id,
+            "timestamp": time.time(),
+        }
+
+        get_expense_queue.append(request_data)
+        queue_position = len(get_expense_queue)
+        logger.info(
+            f"Queued get expense request: handler_type={handler_type}, offset={offset} for user {user_id}. Queue size: {queue_position}"
+        )
+
+        # Determine handler display name
+        handler_display = const.HANDLER_ACTIONS.get(handler_type, handler_type)
+
+        # Send queue position update if there are multiple items waiting
+        if queue_position > 1:
+            queue_update_message = (
+                f"⚡ *Đã ghi nhận xem {handler_display}!*\n"
+                f"📋 *Vị trí trong hàng đợi: #{queue_position}*\n"
+                f"⏳ _Ước tính: {queue_position * 2}-{queue_position * 3} giây_"
+            )
+            try:
+                queue_bot = Bot(token=bot_token)
+                await queue_bot.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=queue_update_message,
+                    parse_mode="Markdown",
+                )
+            except Exception as queue_msg_error:
+                logger.warning(
+                    f"Could not send queue position update: {queue_msg_error}"
+                )
+
+        # Start queue processor if not running and keep track of the task
+        try:
+            current_loop = asyncio.get_running_loop()
+            task = current_loop.create_task(process_get_expense_queue())
+            _background_tasks.add(task)
+            # Remove the task from the set when it's done to prevent memory leak
+            task.add_done_callback(lambda t: _background_tasks.discard(t))
+            logger.info("Background get expense processor task started successfully")
+        except Exception as task_error:
+            logger.error(f"Failed to create background task: {task_error}")
+            # Fallback: try to process synchronously
+            await process_get_expense_queue()
+
+    except Exception as bg_error:
+        logger.error(
+            f"Background get expense queueing failed for user {user_id}, handler_type={handler_type}: {bg_error}",
+            exc_info=True,
+        )
+        # Send error notification
+        try:
+            error_bot = Bot(token=bot_token)
+            error_message = (
+                f"❌ *Lỗi khi lấy dữ liệu*\n\n"
+                f"⚠️ *Lỗi:* `{str(bg_error)}`\n\n"
+                f"💡 _Vui lòng thử lại hoặc liên hệ admin_"
+            )
+            await error_bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=error_message,
+                parse_mode="Markdown",
+            )
+        except Exception as error_notify_error:
+            logger.error(f"Failed to send error notification: {error_notify_error}")
+            # Fallback: send new error message
+            try:
+                fallback_bot = Bot(token=bot_token)
+                await fallback_bot.send_message(
+                    chat_id=chat_id,
+                    text=f"❌ Lỗi khi lấy dữ liệu: {str(bg_error)}",
+                )
+            except Exception as fallback_error:
+                logger.error(f"Fallback error message also failed: {fallback_error}")
 
 
 def escape_markdown_v2(text: str) -> str:

@@ -152,7 +152,7 @@ def get_cached_today_data(
                     f"Optimized fetch range: {fetch_range} (detected {last_row} rows)"
                 )
                 all_values = sheet.get_values(fetch_range)
-                logger.info(f"Fetched {all_values} rows for today data")
+                # logger.info(f"Fetched {all_values} rows for today data")
             else:
                 all_values = []
         except Exception as range_error:

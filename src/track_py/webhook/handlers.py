@@ -431,12 +431,39 @@ async def sort(update: Update, context: CallbackContext):
 async def today(update: Update, context: CallbackContext):
     """Get today's total expenses"""
     try:
-        response = await sheet.process_today_summary()
-        await update.message.reply_text(response)
-
-        logger.info(
-            f"Today summary sent successfully to user {update.effective_user.id}"
+        response = (
+            f"⚡ *Đã ghi nhận xem {const.HANDLER_ACTIONS.get("today")}!*\n"
+            f"🔄 *Đang đồng bộ với Google Sheets...*\n"
         )
+        sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        message_id = sent_message.message_id
+
+        # Get bot token reliably
+        try:
+            bot_token = context.bot.token
+        except Exception:
+            # Fallback to config token
+            bot_token = const.TELEGRAM_TOKEN
+
+        # Create background task
+        task = asyncio.create_task(
+            bot.background_get_expense(
+                handler_type="today",
+                user_id=user_id,
+                chat_id=chat_id,
+                bot_token=bot_token,
+                message_id=message_id,
+            )
+        )
+
+        # Add task to background tasks set for tracking
+        bot._background_tasks.add(task)
+        task.add_done_callback(bot._background_tasks.discard)
+
+        logger.info(f"Today summary request queued for user {update.effective_user.id}")
     except Exception as e:
         logger.error(
             f"Error in today command for user {update.effective_user.id}: {e}",
@@ -448,7 +475,7 @@ async def today(update: Update, context: CallbackContext):
             )
         except Exception as reply_error:
             logger.error(
-                f"Failed to send error message in today command 1: {reply_error}"
+                f"Failed to send error message in today command: {reply_error}"
             )
 
 
@@ -463,12 +490,40 @@ async def week(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = await sheet.process_week_summary(offset)
-        await update.message.reply_text(response)
-
-        logger.info(
-            f"Week summary sent successfully to user {update.effective_user.id}"
+        response = (
+            f"⚡ *Đã ghi nhận xem {const.HANDLER_ACTIONS.get("week")}!*\n"
+            f"🔄 *Đang đồng bộ với Google Sheets...*\n"
         )
+        sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        message_id = sent_message.message_id
+
+        # Get bot token reliably
+        try:
+            bot_token = context.bot.token
+        except Exception:
+            # Fallback to config token
+            bot_token = const.TELEGRAM_TOKEN
+
+        # Create background task
+        task = asyncio.create_task(
+            bot.background_get_expense(
+                handler_type="week",
+                user_id=user_id,
+                chat_id=chat_id,
+                bot_token=bot_token,
+                message_id=message_id,
+                offset=offset,
+            )
+        )
+
+        # Add task to background tasks set for tracking
+        bot._background_tasks.add(task)
+        task.add_done_callback(bot._background_tasks.discard)
+
+        logger.info(f"Week summary request queued for user {update.effective_user.id}")
     except Exception as e:
         logger.error(f"Error in week command: {e}", exc_info=True)
         await update.message.reply_text(
@@ -487,12 +542,40 @@ async def month(update: Update, context: CallbackContext):
             pass
 
     try:
-        response = sheet.process_month_summary(offset)
-        await update.message.reply_text(response)
-
-        logger.info(
-            f"Month summary sent successfully to user {update.effective_user.id}"
+        response = (
+            f"⚡ *Đã ghi nhận xem {const.HANDLER_ACTIONS.get("month")}!*\n"
+            f"🔄 *Đang đồng bộ với Google Sheets...*\n"
         )
+        sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        message_id = sent_message.message_id
+
+        # Get bot token reliably
+        try:
+            bot_token = context.bot.token
+        except Exception:
+            # Fallback to config token
+            bot_token = const.TELEGRAM_TOKEN
+
+        # Create background task
+        task = asyncio.create_task(
+            bot.background_get_expense(
+                handler_type="month",
+                user_id=user_id,
+                chat_id=chat_id,
+                bot_token=bot_token,
+                message_id=message_id,
+                offset=offset,
+            )
+        )
+
+        # Add task to background tasks set for tracking
+        bot._background_tasks.add(task)
+        task.add_done_callback(bot._background_tasks.discard)
+
+        logger.info(f"Month summary request queued for user {update.effective_user.id}")
     except Exception as e:
         logger.error(
             f"Error in month command for user {update.effective_user.id}: {e}",
@@ -940,12 +1023,40 @@ async def list_keywords(update: Update, context: CallbackContext):
 async def list_assets(update: Update, context: CallbackContext):
     """Show total assets"""
     try:
-        response = await sheet.get_assets_response()
-        escaped_response = bot.escape_markdown_v2(response)
-        wrap_response = f"```{escaped_response}```"
-        await update.message.reply_text(wrap_response, parse_mode="MarkdownV2")
+        response = (
+            f"⚡ *Đã ghi nhận xem {const.HANDLER_ACTIONS.get("assets")}!*\n"
+            f"🔄 *Đang đồng bộ với Google Sheets...*\n"
+        )
+        sent_message = await update.message.reply_text(response, parse_mode="Markdown")
+
+        chat_id = update.effective_chat.id
+        user_id = update.effective_user.id
+        message_id = sent_message.message_id
+
+        # Get bot token reliably
+        try:
+            bot_token = context.bot.token
+        except Exception:
+            # Fallback to config token
+            bot_token = const.TELEGRAM_TOKEN
+
+        # Create background task
+        task = asyncio.create_task(
+            bot.background_get_expense(
+                handler_type="assets",
+                user_id=user_id,
+                chat_id=chat_id,
+                bot_token=bot_token,
+                message_id=message_id,
+            )
+        )
+
+        # Add task to background tasks set for tracking
+        bot._background_tasks.add(task)
+        task.add_done_callback(bot._background_tasks.discard)
+
         logger.info(
-            f"Assets summary sent successfully to user {update.effective_user.id}"
+            f"Assets summary request queued for user {update.effective_user.id}"
         )
     except Exception as e:
         logger.error(

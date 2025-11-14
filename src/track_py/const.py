@@ -317,3 +317,10 @@ CATEGORY_CELLS = {
 
 LOG_ACTION = "lưu chi tiêu"
 DELETE_ACTION = "xoá chi tiêu"
+
+HANDLER_ACTIONS = {
+    "today": "chi tiêu hôm nay",
+    "week": "chi tiêu tuần",
+    "month": "chi tiêu tháng",
+    "assets": "tài sản",
+}
